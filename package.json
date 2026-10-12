@@ -1,0 +1,30 @@
+{
+  "dependencies": {
+    "axios": "^1.13.2",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.6",
+    "lucide-react": "^0.562.0",
+    "react-hook-form": "^7.70.0",
+    "tailwind-merge": "^3.4.0"
+  },
+  "name": "doantotnghiep",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "//": "--- CÁC LỆNH CON ---",
+    "client": "cd client && npm run dev",
+    "server": "cd server && npm run dev",
+    
+    "dev": "concurrently \"npm run client\" \"npm run server\" --names \"CLIENT,SERVER\" --prefix-colors \"blue,magenta\"",
+    
+    "install-all": "cd client && npm install && cd ../server && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
