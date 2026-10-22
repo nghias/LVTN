@@ -1,6 +1,7 @@
 const NguoiDungModel = require('../app/models/nguoiDung.model');
 const { comparePassword, hashPassword, decryptAES } = require('../utils/crypto.util');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwt.util');
+const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]).{8,}$/;
 
 const AuthService = {
   // 1. Xử lý Đăng nhập bằng Bcrypt
@@ -75,9 +76,25 @@ const AuthService = {
       Quyen: user.Quyen,
     };
   },
-
-  // 3. Đổi mật khẩu bằng Bcrypt
+// Bên trong AuthService:
   changePassword: async (maND, matKhauCu, matKhauMoi) => {
+    // 1. Kiểm tra mật khẩu mới phải khác mật khẩu hiện tại
+    if (matKhauCu === matKhauMoi) {
+      const error = new Error('Mật khẩu mới phải khác mật khẩu hiện tại!');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 2. Kiểm tra độ mạnh mật khẩu bằng Regex
+    if (!STRONG_PASSWORD_REGEX.test(matKhauMoi)) {
+      const error = new Error(
+        'Mật khẩu mới phải có ít nhất 8 ký tự, bao gồm chữ in hoa, chữ số và ký tự đặc biệt!'
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Tìm người dùng trong Database
     const user = await NguoiDungModel.findById(maND);
     if (!user) {
       const error = new Error('Người dùng không tồn tại!');
@@ -85,6 +102,7 @@ const AuthService = {
       throw error;
     }
 
+    // 4. Đối chiếu mật khẩu hiện tại
     const isMatch = await comparePassword(matKhauCu, user.MatKhau);
     if (!isMatch) {
       const error = new Error('Mật khẩu hiện tại không chính xác!');
@@ -92,6 +110,15 @@ const AuthService = {
       throw error;
     }
 
+    // 5. Đảm bảo mật khẩu mới không trùng với bản băm hiện tại trong DB
+    const isSameAsOldHash = await comparePassword(matKhauMoi, user.MatKhau);
+    if (isSameAsOldHash) {
+      const error = new Error('Mật khẩu mới phải khác mật khẩu hiện tại!');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 6. Mã hóa mật khẩu mới và cập nhật
     const hashedNewPass = await hashPassword(matKhauMoi);
     await NguoiDungModel.updatePassword(maND, hashedNewPass);
     return true;

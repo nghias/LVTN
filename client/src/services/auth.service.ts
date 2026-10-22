@@ -95,4 +95,38 @@ export const AuthService = {
       'Cập nhật thông tin thất bại!'
     );
   },
+  // Đổi mật khẩu tài khoản (/api/auth/change-password)
+  async changePassword(payload: {
+    matKhauCu: string;
+    matKhauMoi: string;
+  }): Promise<ApiResponse<null>> {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}/change-password`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      throw new Error('Không thể kết nối đến hệ thống, vui lòng thử lại sau!');
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('Không thể thực hiện đổi mật khẩu lúc này!');
+    }
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      // Chỉ hiển thị thông báo nghiệp vụ an toàn (VD: "Mật khẩu hiện tại không chính xác!")
+      throw new Error(
+        data.message || 'Đổi mật khẩu không thành công, vui lòng kiểm tra lại!'
+      );
+    }
+
+    return data;
+  },
 };

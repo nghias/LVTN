@@ -6,9 +6,10 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isProtectedPage =
-    pathname.startsWith('/chuTro') || pathname.startsWith('/nguoiThue');
+    pathname.startsWith('/chuTro') ||
+    pathname.startsWith('/nguoiThue') ||
+    pathname.startsWith('/taiKhoan');
 
-  // Nếu chưa có Cookie đăng nhập mà cố vào trang Thống kê -> Chuyển về /auth
   if (isProtectedPage && !token) {
     return NextResponse.redirect(new URL('/auth', request.url));
   }
@@ -17,5 +18,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/chuTro/:path*', '/nguoiThue/:path*'],
+  matcher: ['/chuTro/:path*', '/nguoiThue/:path*', '/taiKhoan/:path*'],
 };

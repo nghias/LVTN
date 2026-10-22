@@ -7,6 +7,8 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import QuanLyHeader from '@/components/layout/QuanLyHeader';
 import NguoiThueHeader from '@/components/layout/NguoiThueHeader';
 import { useAlertModal } from '@/components/common/AlertModalProvider';
+import { AuthService } from '@/services/auth.service';
+import { clearRememberedCredentials } from '@/utils/rememberMe.util';
 
 export default function DoiMatKhauPage() {
   const router = useRouter();
@@ -16,27 +18,79 @@ export default function DoiMatKhauPage() {
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: FormEvent) => {
+  // Kiểm tra từng tiêu chí bảo mật theo thời gian thực
+  const hasMinLength = newPass.length >= 8;
+  const hasUppercase = /[A-Z]/.test(newPass);
+  const hasNumber = /\d/.test(newPass);
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(newPass);
+  const isDifferentFromOld = Boolean(newPass && oldPass && newPass !== oldPass);
+
+  const isPasswordValid =
+    hasMinLength &&
+    hasUppercase &&
+    hasNumber &&
+    hasSpecialChar &&
+    isDifferentFromOld;
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
     if (!oldPass || !newPass || !confirmPass) {
       showError('Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới!');
       return;
     }
-    if (newPass.length < 6) {
-      showError('Mật khẩu mới phải có độ dài tối thiểu 6 ký tự!');
+
+    if (newPass === oldPass) {
+      showError('Mật khẩu mới phải khác mật khẩu hiện tại!');
       return;
     }
+
+    if (!hasMinLength || !hasUppercase || !hasNumber || !hasSpecialChar) {
+      showError(
+        'Mật khẩu mới phải có ít nhất 8 ký tự, bao gồm chữ in hoa, chữ số và ký tự đặc biệt!'
+      );
+      return;
+    }
+
     if (newPass !== confirmPass) {
       showError('Mật khẩu xác nhận không khớp với mật khẩu mới!');
       return;
     }
 
-    setOldPass('');
-    setNewPass('');
-    setConfirmPass('');
-    showSuccess('Đổi mật khẩu tài khoản thành công!', 'Thành công', 2);
+    try {
+      setSubmitting(true);
+      await AuthService.changePassword({
+        matKhauCu: oldPass,
+        matKhauMoi: newPass,
+      });
+
+      // Xóa mật khẩu cũ đã ghi nhớ trên trình duyệt (nếu có) để đảm bảo an toàn
+      clearRememberedCredentials();
+
+      setOldPass('');
+      setNewPass('');
+      setConfirmPass('');
+      showSuccess('Mật khẩu của bạn đã được mã hóa và cập nhật thành công!', 'Thành công', 2);
+    } catch (err: unknown) {
+      const safeMsg =
+        err instanceof Error
+          ? err.message
+          : 'Không thể đổi mật khẩu lúc này, vui lòng thử lại sau!';
+      showError(safeMsg, 'Đổi mật khẩu thất bại', 3);
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const passwordRules = [
+    { label: 'Ít nhất 8 ký tự', passed: hasMinLength },
+    { label: 'Có ít nhất 1 chữ cái in hoa (A-Z)', passed: hasUppercase },
+    { label: 'Có ít nhất 1 chữ số (0-9)', passed: hasNumber },
+    { label: 'Có ít nhất 1 ký tự đặc biệt (!@#$%^&*...)', passed: hasSpecialChar },
+    { label: 'Khác với mật khẩu hiện tại', passed: isDifferentFromOld },
+  ];
 
   return (
     <ProtectedRoute allowedRoles={['ChuTro', 'QuanLy', 'KhachThue']}>
@@ -101,6 +155,7 @@ export default function DoiMatKhauPage() {
                   type={showPass ? 'text' : 'password'}
                   value={oldPass}
                   onChange={(e) => setOldPass(e.target.value)}
+                  disabled={submitting}
                   placeholder="Nhập mật khẩu đang sử dụng..."
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 />
@@ -114,9 +169,36 @@ export default function DoiMatKhauPage() {
                   type={showPass ? 'text' : 'password'}
                   value={newPass}
                   onChange={(e) => setNewPass(e.target.value)}
-                  placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)..."
+                  disabled={submitting}
+                  placeholder="Nhập mật khẩu mới..."
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 />
+
+                {/* Bảng kiểm tra tiêu chí mật khẩu trực quan */}
+                <div className="mt-3 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <p className="text-[11px] font-bold text-slate-700 mb-1">
+                    Yêu cầu bảo mật mật khẩu mới:
+                  </p>
+                  {passwordRules.map((rule, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-center gap-2 text-xs font-medium transition ${
+                        rule.passed ? 'text-teal-700 font-semibold' : 'text-slate-500'
+                      }`}
+                    >
+                      <span
+                        className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                          rule.passed
+                            ? 'bg-[#00FFCC] text-slate-900'
+                            : 'bg-slate-200 text-slate-500'
+                        }`}
+                      >
+                        {rule.passed ? '✓' : '•'}
+                      </span>
+                      <span>{rule.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -127,6 +209,7 @@ export default function DoiMatKhauPage() {
                   type={showPass ? 'text' : 'password'}
                   value={confirmPass}
                   onChange={(e) => setConfirmPass(e.target.value)}
+                  disabled={submitting}
                   placeholder="Nhập lại mật khẩu mới..."
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 />
@@ -146,15 +229,17 @@ export default function DoiMatKhauPage() {
                 <button
                   type="button"
                   onClick={() => router.back()}
+                  disabled={submitting}
                   className="w-full sm:w-auto px-6 py-3 rounded-full border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100 cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="w-full sm:w-auto px-8 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs cursor-pointer"
+                  disabled={submitting || !isPasswordValid}
+                  className="w-full sm:w-auto px-8 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] disabled:opacity-50 text-slate-900 text-xs font-bold shadow-xs cursor-pointer transition"
                 >
-                  Cập Nhật Mật Khẩu
+                  {submitting ? 'Đang mã hóa & lưu...' : 'Cập Nhật Mật Khẩu'}
                 </button>
               </div>
             </form>
