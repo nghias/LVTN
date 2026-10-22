@@ -21,5 +21,10 @@ module.exports = {
     accessExpires: process.env.JWT_ACCESS_EXPIRES || '1d',
     refreshExpires: process.env.JWT_REFRESH_EXPIRES || '7d',
   },
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    apiKey: process.env.CLOUDINARY_API_KEY,
+    apiSecret: process.env.CLOUDINARY_API_SECRET,
+  },
   aesSecretKey: process.env.AES_SECRET_KEY,
 };

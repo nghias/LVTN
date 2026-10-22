@@ -1,6 +1,28 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function AppFooter() {
+  const pathname = usePathname();
+
+  // Ẩn hoàn toàn Footer khi ở giao diện quản lý của Chủ trọ, Quản lý và Người thuê
+  if (
+    pathname.startsWith('/chuTro') ||
+    pathname.startsWith('/nguoiThue') ||
+    pathname.startsWith('/taiKhoan')
+  ) {
+    return (
+      <footer className="w-full bg-[#DDDDDD] text-slate-300 border-t border-[#00FFCC]/20 mt-auto">
+        <div className="border-t border-white/10 bg-[#00FFCC]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-400">
+            <p className="text-black text-[12px] text-bold font-semibold">© {new Date().getFullYear()} Xóm Trọ Gia Đình</p>
+            <p className="hidden sm:block text-black text-[12px] text-bold font-semibold">Giải pháp cho hộ gia đình thông minh</p>
+          </div>
+        </div>
+      </footer>
+    );
+  }
   return (
     <footer className="w-full bg-[#DDDDDD] text-slate-300 border-t border-[#00FFCC]/20 mt-auto">
       {/* Phần nội dung chính 5 cột giống ảnh mẫu */}
@@ -42,16 +64,6 @@ export default function AppFooter() {
           </ul>
         </div>
 
-        {/* Cột 3: Về hệ thống & Đồ án */}
-        <div className="space-y-3">
-          <h4 className="text-sm font-bold text-teal-700 tracking-wide">Đồ án tốt nghiệp</h4>
-          <ul className="space-y-2 text-slate-400">
-            <li><Link href="#" className="hover:text-white text-black transition no-underline">Giới thiệu đề tài</Link></li>
-            <li><Link href="#" className="hover:text-white text-black transition no-underline">Kiến trúc kỹ thuật</Link></li>
-            <li><Link href="#" className="hover:text-white text-black transition no-underline">Pháp lý & Bảo mật</Link></li>
-          </ul>
-        </div>
-
         {/* Cột 4: Tài nguyên & Hướng dẫn */}
         <div className="space-y-3">
           <h4 className="text-sm font-bold text-teal-700 tracking-wide">Tài nguyên</h4>
@@ -77,9 +89,6 @@ export default function AppFooter() {
               <span className="font-bold text-black">yt</span>
             </Link>
           </div>
-          <p className="text-[11px] text-slate-500 pt-2 leading-relaxed">
-            Hệ thống vận hành trên nền tảng Next.js, Express.js & TiDB Cloud.
-          </p>
         </div>
 
       </div>
@@ -94,3 +103,5 @@ export default function AppFooter() {
     </footer>
   );
 }
+
+{/** Ảnh 1 là giao diện đăng nhập bạn hãy thay icon ngôi nhà thành logo ở cây thư mục ảnh 3 và làm thêm chức năng ghi nhớ mật khẩu, chỉ ghi nhớ trong 30 ngày và đảm bảo bảo mật. ảnh 2 là thành header bạn cũng thay chữ XT thành logo của ứng dụng, đồng thời xóa nút đăng nhập đó và làm 1 listdown xổ xuống khi hover vào tên người dùng và vai trò ở bên phải, bên trong thanh xổ xuống đó có các tín năng của quản lý tài khoản người dùng như Thông tin cá nhân, quên mật khẩu, đổi mật khẩu, đăng xuất. Bên cạnh tên sẽ có 1 icon thông báo để làm chức năng thông báo */}

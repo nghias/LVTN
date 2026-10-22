@@ -10,5 +10,7 @@ router.post('/logout', AuthController.logout);
 // Protected routes (Phải đăng nhập mới gọi được)
 router.get('/me', verifyToken, AuthController.getMe);
 router.put('/change-password', verifyToken, AuthController.changePassword);
+router.get('/profile', verifyToken, AuthController.getProfile.bind(AuthController));
+router.put('/profile', verifyToken, AuthController.updateProfile.bind(AuthController));
 
 module.exports = router;

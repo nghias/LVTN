@@ -1,7 +1,6 @@
 const db = require('../../database/db');
 
 const NguoiDungModel = {
-  // Tìm người dùng theo TenTK, Email hoặc SDT để đăng nhập
   findByLoginIdentifier: async (identifier) => {
     const sql = `
       SELECT MaND, HoTen, CCCD, NamSinh, SDT, Email, DiaChi, TenTK, MatKhau, Quyen
@@ -13,7 +12,6 @@ const NguoiDungModel = {
     return rows[0] || null;
   },
 
-  // Tìm người dùng theo MaND
   findById: async (maND) => {
     const sql = `
       SELECT MaND, HoTen, CCCD, NamSinh, SDT, Email, DiaChi, TenTK, MatKhau, Quyen
@@ -25,37 +23,54 @@ const NguoiDungModel = {
     return rows[0] || null;
   },
 
-  // Lấy danh sách Khu trọ mà Quản lý này phụ trách (Bảng KhuTro)
-  getManagedKhuTroByMaND: async (maND) => {
+  getDanhSachQuanLy: async () => {
     const sql = `
-      SELECT MaKhu, TenKhu, DiaChi
-      FROM KhuTro
-      WHERE MaND = ?
+      SELECT MaND, HoTen, SDT, Email, Quyen
+      FROM NguoiDung
+      WHERE Quyen IN ('QuanLy', 'ChuTro')
+      ORDER BY Quyen DESC, MaND ASC
     `;
-    const [rows] = await db.execute(sql, [maND]);
+    const [rows] = await db.execute(sql);
     return rows;
   },
 
-  // Lấy thông tin Phòng và Hợp đồng đang hiệu lực của Khách thuê
-  getActiveRoomByKhachThue: async (maND) => {
+  // Kiểm tra Email, SĐT hoặc CCCD có bị trùng với tài khoản khác không
+  // Kiểm tra trùng Email, SĐT, CCCD với người dùng khác (trừ chính maND đang sửa)
+  checkDuplicateProfile: async (maND, { Email, SDT, CCCD }) => {
     const sql = `
-      SELECT 
-        p.MaPhong, p.TenPhong, p.MaKhu, kt.TenKhu,
-        hdt.MaHDT, ct.VaiTro, ct.TamTru
-      FROM ChiTietHopDongThue ct
-      INNER JOIN HopDongThue hdt ON ct.MaHDT = hdt.MaHDT
-      INNER JOIN Phong p ON hdt.MaPhong = p.MaPhong
-      INNER JOIN KhuTro kt ON p.MaKhu = kt.MaKhu
-      WHERE ct.MaND = ? 
-        AND hdt.TrangThai = 'ConHieuLuc' 
-        AND ct.NgayDi IS NULL
+      SELECT MaND, Email, SDT, CCCD
+      FROM NguoiDung
+      WHERE MaND != ?
+        AND (
+          (Email IS NOT NULL AND Email != '' AND Email = ?)
+          OR (SDT IS NOT NULL AND SDT != '' AND SDT = ?)
+          OR (CCCD IS NOT NULL AND CCCD != '' AND CCCD = ?)
+        )
       LIMIT 1
     `;
-    const [rows] = await db.execute(sql, [maND]);
+    const [rows] = await db.execute(sql, [maND, Email || '', SDT || '', CCCD || '']);
     return rows[0] || null;
   },
 
-  // Cập nhật mật khẩu mới
+  // Cập nhật thông tin cá nhân (Không cho phép sửa TenTK, Quyen, MatKhau tại đây)
+  updateProfile: async (maND, { HoTen, CCCD, NamSinh, SDT, Email, DiaChi }) => {
+    const sql = `
+      UPDATE NguoiDung
+      SET HoTen = ?, CCCD = ?, NamSinh = ?, SDT = ?, Email = ?, DiaChi = ?
+      WHERE MaND = ?
+    `;
+    const [result] = await db.execute(sql, [
+      HoTen,
+      CCCD,
+      NamSinh,
+      SDT,
+      Email,
+      DiaChi,
+      maND,
+    ]);
+    return result.affectedRows > 0;
+  },
+
   updatePassword: async (maND, hashedPassword) => {
     const sql = `UPDATE NguoiDung SET MatKhau = ? WHERE MaND = ?`;
     const [result] = await db.execute(sql, [hashedPassword, maND]);

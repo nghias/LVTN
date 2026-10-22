@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { AuthService } from '../../services/auth.service';
-import { useAlertModal } from '../../components/common/AlertModalProvider';
+import { AuthService } from '@/services/auth.service';
+import { useAlertModal } from '@/components/common/AlertModalProvider';
+import {
+  saveRememberedCredentials,
+  getRememberedCredentials,
+  clearRememberedCredentials,
+} from '@/utils/rememberMe.util';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -13,8 +18,20 @@ export default function LoginForm() {
   const [tenTK, setTenTK] = useState('');
   const [matKhau, setMatKhau] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [infoPanel, setInfoPanel] = useState<'forgot' | 'support' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Tự động nạp thông tin đã mã hóa nếu còn trong hạn 30 ngày
+  useEffect(() => {
+    getRememberedCredentials().then((saved) => {
+      if (saved) {
+        setTenTK(saved.tenTK);
+        setMatKhau(saved.matKhau);
+        setRememberMe(true);
+      }
+    });
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -37,6 +54,13 @@ export default function LoginForm() {
       if (!user) {
         showError('Không lấy được thông tin tài khoản!');
         return;
+      }
+
+      // Xử lý lưu hoặc xóa ghi nhớ mật khẩu 30 ngày (Mã hóa AES-GCM)
+      if (rememberMe) {
+        await saveRememberedCredentials(cleanTenTK, matKhau);
+      } else {
+        clearRememberedCredentials();
       }
 
       const targetUrl =
@@ -65,28 +89,17 @@ export default function LoginForm() {
 
   return (
     <div className="w-full max-w-[960px]">
-      {/* Khung Card kiểu Google trên nền Trắng */}
       <div className="w-full bg-white text-slate-900 rounded-[28px] p-6 sm:p-10 md:p-12 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-200 grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12">
         
-        {/* CỘT TRÁI: Logo + Tiêu đề lớn */}
+        {/* CỘT TRÁI: Logo từ /img/logo.png + Tiêu đề lớn */}
         <div className="md:col-span-6 flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-[#00FFCC] flex items-center justify-center mb-6 shadow-sm">
-              <svg
-                width="28"
-                height="28"
-                className="w-7 h-7 text-slate-900"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
+            <div className="w-16 h-16 rounded-2xl bg-[#00FFCC]/20 border border-[#00FFCC] p-1.5 flex items-center justify-center mb-6 shadow-xs overflow-hidden">
+              <img
+                src="/img/logo.png"
+                alt="Logo Xóm Trọ"
+                className="w-full h-full object-contain"
+              />
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900">
@@ -139,7 +152,7 @@ export default function LoginForm() {
           </div>
         </div>
 
-        {/* CỘT PHẢI: Form nhập liệu kiểu Google */}
+        {/* CỘT PHẢI: Form nhập liệu */}
         <div className="md:col-span-6 flex flex-col justify-center">
           <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
             <div>
@@ -177,24 +190,36 @@ export default function LoginForm() {
                 className="w-full px-4 py-3.5 bg-white border border-slate-300 rounded-xl text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-[#00FFCC] transition"
               />
 
-              {/* Checkbox Hiện mật khẩu & Quên mật khẩu */}
-              <div className="mt-3 flex items-center justify-between">
-                <label className="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={showPassword}
-                    onChange={(e) => setShowPassword(e.target.checked)}
-                    className="w-4 h-4 accent-teal-600 rounded cursor-pointer"
-                  />
-                  <span>Hiện mật khẩu</span>
-                </label>
+              {/* Hàng tùy chọn: Hiện mật khẩu + Ghi nhớ 30 ngày + Quên mật khẩu */}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-4">
+                  <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showPassword}
+                      onChange={(e) => setShowPassword(e.target.checked)}
+                      className="w-4 h-4 accent-teal-600 rounded cursor-pointer"
+                    />
+                    <span>Hiện mật khẩu</span>
+                  </label>
+
+                  <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 accent-teal-600 rounded cursor-pointer"
+                    />
+                    <span>Ghi nhớ mật khẩu (30 ngày)</span>
+                  </label>
+                </div>
 
                 <button
                   type="button"
                   onClick={() =>
                     setInfoPanel(infoPanel === 'forgot' ? null : 'forgot')
                   }
-                  className="text-sm font-bold text-teal-700 hover:underline cursor-pointer"
+                  className="text-xs sm:text-sm font-bold text-teal-700 hover:underline cursor-pointer"
                 >
                   Bạn quên mật khẩu?
                 </button>
@@ -202,10 +227,10 @@ export default function LoginForm() {
             </div>
 
             <p className="text-xs text-slate-500 leading-relaxed pt-1">
-              Dữ liệu cá nhân và phiên đăng nhập được bảo vệ bằng mã hóa AES-256 & chứng chỉ bảo mật SSL.
+              Mật khẩu ghi nhớ được mã hóa chuẩn AES-GCM 256-bit và tự động xóa sau 30 ngày.
             </p>
 
-            {/* Cụm nút dưới đáy kiểu Google */}
+            {/* Cụm nút dưới đáy */}
             <div className="pt-4 flex items-center justify-between gap-4">
               <button
                 type="button"
@@ -229,7 +254,7 @@ export default function LoginForm() {
         </div>
       </div>
 
-      {/* Thanh chân Card nhỏ gọn */}
+      {/* Thanh chân Card */}
       <div className="mt-4 px-4 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
         <Link
           href="/"
