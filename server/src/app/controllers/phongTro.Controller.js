@@ -497,6 +497,317 @@ class PhongTroController {
       next(error);
     }
   }
+  async getPublicHomeInit(req, res, next) {
+    try {
+      // Bước 1: Gọi độc lập các Model để lấy Khu trọ, Tiện ích và Quản lý
+      const [khuList, tienIchList, quanLyList] = await Promise.all([
+        KhuTroModel.getAll(),
+        TienIchModel.getAll(),
+        NguoiDungModel.getDanhSachQuanLy(),
+      ]);
+
+      const maKhuIds = khuList.map((k) => k.MaKhu);
+      const allRooms =
+        maKhuIds.length > 0 ? await PhongTroModel.getByMaKhuIds(maKhuIds) : [];
+
+      // Bước 2: Ghép số lượng phòng và thông tin người quản lý vào từng Khu trọ
+      const formattedKhuTro = khuList.map((khu) => {
+        const ql = quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND));
+        const roomsInKhu = allRooms.filter((r) => r.MaKhu === khu.MaKhu);
+        const soPhongTrong = roomsInKhu.filter((r) => r.TrangThai === 'Trong').length;
+
+        return {
+          ...khu,
+          TenQuanLy: ql ? ql.HoTen : 'Chủ trọ',
+          SDTQuanLy: ql && ql.SDT ? decryptAES(ql.SDT) : null,
+          TongSoPhong: roomsInKhu.length,
+          SoPhongTrong: soPhongTrong,
+        };
+      });
+
+      // Bước 3: Tính toán số liệu thống kê hiển thị trên Banner trang Home
+      const thongKe = {
+        TongSoKhu: khuList.length,
+        TongSoPhong: allRooms.length,
+        SoPhongTrong: allRooms.filter((r) => r.TrangThai === 'Trong').length,
+      };
+
+      return successResponse(res, 'Lấy dữ liệu khởi tạo trang Home thành công!', {
+        thongKe,
+        khuTroList: formattedKhuTro,
+        tienIchList,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // 14. [GET] /api/phong-tro/public/phong
+  // Lấy danh sách phòng hiển thị trên trang Home (kèm lọc theo khu, giá, diện tích, tiện ích, từ khóa)
+  async getPublicPhongList(req, res, next) {
+    try {
+      const {
+        maKhu,
+        trangThai,
+        keyword,
+        minPrice,
+        maxPrice,
+        minArea,
+        maxArea,
+        tienIchIds, // Chuỗi ID tiện ích cách nhau bởi dấu phẩy, VD: "1,2,5"
+      } = req.query;
+
+      // Bước 1: Gọi KhuTroModel và PhongTroModel độc lập
+      const [allKhus, rooms] = await Promise.all([
+        KhuTroModel.getAll(),
+        PhongTroModel.getPublicListByFilters({
+          maKhu,
+          trangThai,
+          keyword,
+          minPrice,
+          maxPrice,
+          minArea,
+          maxArea,
+        }),
+      ]);
+
+      if (rooms.length === 0) {
+        return successResponse(res, 'Lấy danh sách phòng trang chủ thành công!', []);
+      }
+
+      const roomIds = rooms.map((r) => r.MaPhong);
+
+      // Bước 2: Gọi AnhPhongModel, ChiTietTienIchModel, TienIchModel, NguoiDungModel độc lập
+      const [allImages, allChiTietTI, allTienIch, quanLyList] = await Promise.all([
+        AnhPhongModel.getByMaPhongList(roomIds),
+        ChiTietTienIchModel.getByMaPhongList(roomIds),
+        TienIchModel.getAll(),
+        NguoiDungModel.getDanhSachQuanLy(),
+      ]);
+
+      // Bước 3: Ghép dữ liệu KhuTro, Người quản lý, Ảnh và Tiện ích vào từng Phòng
+      let result = rooms.map((room) => {
+        const khu = allKhus.find((k) => k.MaKhu === room.MaKhu);
+        const ql = khu
+          ? quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND))
+          : null;
+
+        // Lấy danh sách ảnh và ảnh đại diện của phòng
+        const roomImages = allImages.filter((img) => img.MaPhong === room.MaPhong);
+        const mainImage = roomImages.length > 0 ? roomImages[0].DuongDan : null;
+
+        // Lấy danh sách tiện ích của phòng
+        const roomMaTIs = allChiTietTI
+          .filter((ct) => ct.MaPhong === room.MaPhong)
+          .map((ct) => ct.MaTI);
+        const roomTienIch = allTienIch.filter((ti) => roomMaTIs.includes(ti.MaTI));
+
+        return {
+          ...room,
+          TenKhu: khu ? khu.TenKhu : '',
+          DiaChi: khu ? khu.DiaChi : '',
+          MoTaKhu: khu ? khu.MoTa : '',
+          TenNguoiLienHe: ql ? ql.HoTen : 'Ban quản lý',
+          SDTLienHe: ql && ql.SDT ? decryptAES(ql.SDT) : null,
+          AnhDaiDien: mainImage,
+          DanhSachAnh: roomImages,
+          TienIch: roomTienIch,
+        };
+      });
+
+      // Bước 4: Nếu người dùng lọc theo Tiện ích (VD: ?tienIchIds=1,3)
+      if (tienIchIds) {
+        const filterMaTIs = String(tienIchIds)
+          .split(',')
+          .map((id) => Number(id.trim()))
+          .filter((id) => !Number.isNaN(id) && id > 0);
+
+        if (filterMaTIs.length > 0) {
+          result = result.filter((room) => {
+            const currentMaTIs = room.TienIch.map((ti) => Number(ti.MaTI));
+            return filterMaTIs.every((reqId) => currentMaTIs.includes(reqId));
+          });
+        }
+      }
+
+      return successResponse(res, 'Lấy danh sách phòng trang chủ thành công!', result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // 15. [GET] /api/phong-tro/public/phong/:maPhong
+  async getPublicPhongDetail(req, res, next) {
+    try {
+      const maPhong = Number(req.params.maPhong);
+
+      // Bước 1: Gọi PhongTroModel
+      const room = await PhongTroModel.getById(maPhong);
+      if (!room) {
+        return errorResponse(res, 'Không tìm thấy phòng trọ này!', 404);
+      }
+
+      // Bước 2: Gọi KhuTroModel, AnhPhongModel, ChiTietTienIchModel, TienIchModel độc lập
+      const [khuTro, images, chiTietTI, allTienIch] = await Promise.all([
+        KhuTroModel.getById(room.MaKhu),
+        AnhPhongModel.getByMaPhong(maPhong),
+        ChiTietTienIchModel.getByMaPhong(maPhong),
+        TienIchModel.getAll(),
+      ]);
+
+      // Bước 3: Lấy thông tin người quản lý khu trọ để khách liên hệ
+      const ql = khuTro ? await NguoiDungModel.findById(khuTro.MaND) : null;
+
+      const maTIList = chiTietTI.map((ct) => ct.MaTI);
+      const roomTienIch = allTienIch.filter((ti) => maTIList.includes(ti.MaTI));
+
+      return successResponse(res, 'Lấy chi tiết phòng thành công!', {
+        ...room,
+        TenKhu: khuTro ? khuTro.TenKhu : '',
+        DiaChi: khuTro ? khuTro.DiaChi : '',
+        MoTaKhu: khuTro ? khuTro.MoTa : '',
+        TenNguoiLienHe: ql ? ql.HoTen : 'Ban quản lý',
+        SDTLienHe: ql && ql.SDT ? decryptAES(ql.SDT) : null,
+        EmailLienHe: ql ? ql.Email : null,
+        AnhDaiDien: images.length > 0 ? images[0].DuongDan : null,
+        DanhSachAnh: images,
+        TienIch: roomTienIch,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+  // 16. [GET] /api/phong-tro/public/home-data
+  async getHomeData(req, res, next) {
+    try {
+      // Bước 1: Gọi song song các Model để lấy toàn bộ dữ liệu cho trang Home
+      const [
+        khuList,
+        rooms,
+        tinDangRows,
+        tienIchList,
+        phuPhiRows,
+        giaDienNuocRow,
+        quanLyList,
+      ] = await Promise.all([
+        KhuTroModel.getAll(),
+        PhongTroModel.getAllPublicRooms(),
+        PhongTroModel.getActiveTinDang(),
+        TienIchModel.getAll(),
+        PhongTroModel.getAllPhuPhi(),
+        PhongTroModel.getLatestGiaDienNuoc(),
+        NguoiDungModel.getDanhSachQuanLy(),
+      ]);
+
+      const roomIds = rooms.map((r) => r.MaPhong);
+
+      // Bước 2: Lấy hình ảnh và tiện ích của tất cả các phòng
+      const [allImages, allChiTietTI] =
+        roomIds.length > 0
+          ? await Promise.all([
+              AnhPhongModel.getByMaPhongList(roomIds),
+              ChiTietTienIchModel.getByMaPhongList(roomIds),
+            ])
+          : [[], []];
+
+      // Bước 3: Chuẩn hóa danh sách KhuTroSummary
+      const khuTro = khuList.map((khu) => {
+        const roomsInKhu = rooms.filter((r) => Number(r.MaKhu) === Number(khu.MaKhu));
+        const soPhongTrong = roomsInKhu.filter((r) => r.TrangThai === 'Trong').length;
+        return {
+          MaKhu: khu.MaKhu,
+          TenKhu: khu.TenKhu,
+          DiaChi: khu.DiaChi,
+          MoTa: khu.MoTa || '',
+          TongSoPhong: roomsInKhu.length,
+          SoPhongTrong: soPhongTrong,
+        };
+      });
+
+      // Bước 4: Chuẩn hóa danh sách TinDangHome (ghép TinDang + Phong + KhuTro + AnhPhong + TienIch + NguoiDung)
+      const tinDang = rooms.map((room) => {
+        const khu = khuList.find((k) => Number(k.MaKhu) === Number(room.MaKhu));
+        const tin = tinDangRows.find((t) => Number(t.MaPhong) === Number(room.MaPhong));
+        const ql = khu
+          ? quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND))
+          : null;
+
+        // DanhSachAnh trong page.tsx là mảng string URL: string[]
+        const roomImages = allImages
+          .filter((img) => Number(img.MaPhong) === Number(room.MaPhong))
+          .map((img) => img.DuongDan);
+
+        // DanhSachTienIch của phòng
+        const roomMaTIs = allChiTietTI
+          .filter((ct) => Number(ct.MaPhong) === Number(room.MaPhong))
+          .map((ct) => Number(ct.MaTI));
+        const roomTienIch = tienIchList.filter((ti) =>
+          roomMaTIs.includes(Number(ti.MaTI))
+        );
+
+        let sdtChuTro = '0901234567';
+        if (ql && ql.SDT) {
+          try {
+            sdtChuTro = decryptAES(ql.SDT) || ql.SDT;
+          } catch {
+            sdtChuTro = ql.SDT;
+          }
+        }
+
+        return {
+          MaTin: tin ? tin.MaTin : room.MaPhong,
+          MaPhong: room.MaPhong,
+          MaKhu: room.MaKhu,
+          TieuDe: tin
+            ? tin.TieuDe
+            : `Cho thuê ${room.TenPhong} - ${khu ? khu.TenKhu : 'Khu trọ tiện nghi'}`,
+          MoTa: tin ? tin.MoTa : khu?.MoTa || '',
+          TenPhong: room.TenPhong,
+          TenKhu: khu ? khu.TenKhu : '',
+          DiaChi: khu ? khu.DiaChi : '',
+          Gia: Number(room.Gia),
+          DienTich: Number(room.DienTich),
+          TrangThaiPhong: room.TrangThai,
+          DanhSachAnh: roomImages,
+          DanhSachTienIch: roomTienIch,
+          TenChuTro: ql ? ql.HoTen : 'Ban quản lý Xóm Trọ',
+          SDTChuTro: sdtChuTro,
+        };
+      });
+
+      // Bước 5: Chuẩn hóa PhuPhi và GiaDienNuoc (ép kiểu Number cho DECIMAL)
+      const phuPhi = phuPhiRows.map((pp) => ({
+        MaPP: pp.MaPP,
+        TenPP: pp.TenPP,
+        Gia: Number(pp.Gia),
+        GhiChu: pp.GhiChu || '',
+      }));
+
+      const giaDienNuoc = giaDienNuocRow
+        ? {
+            MaGia: giaDienNuocRow.MaGia,
+            GiaDien: Number(giaDienNuocRow.GiaDien),
+            GiaNuoc: Number(giaDienNuocRow.GiaNuoc),
+            NgayApDung: giaDienNuocRow.NgayApDung,
+          }
+        : {
+            MaGia: 1,
+            GiaDien: 3500,
+            GiaNuoc: 15000,
+            NgayApDung: new Date().toISOString().split('T')[0],
+          };
+
+      return successResponse(res, 'Lấy dữ liệu trang chủ thành công!', {
+        tinDang,
+        tienIch: tienIchList,
+        phuPhi,
+        khuTro,
+        giaDienNuoc,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 const controller = new PhongTroController();
@@ -515,4 +826,8 @@ module.exports = {
   createPhong: controller.createPhong.bind(controller),
   updatePhong: controller.updatePhong.bind(controller),
   deletePhong: controller.deletePhong.bind(controller),
+  getPublicHomeInit: controller.getPublicHomeInit.bind(controller),
+  getPublicPhongList: controller.getPublicPhongList.bind(controller),
+  getPublicPhongDetail: controller.getPublicPhongDetail.bind(controller),
+  getHomeData: controller.getHomeData.bind(controller),
 };

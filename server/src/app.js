@@ -1,3 +1,4 @@
+// server/src/app.js
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -7,24 +8,29 @@ const path = require('path');
 
 const env = require('./app/config/env.config');
 const apiRouters = require('./routers/index');
+const PhongTroController = require('./app/controllers/phongTro.Controller');
 const errorHandler = require('./middlewares/error.middleware');
 
 const app = express();
 
 // 1. Bảo mật HTTP Headers
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
-// 2. Cấu hình CORS cho phép Next.js gửi và nhận HttpOnly Cookie
+// 2. Cấu hình CORS cho phép Next.js gọi API
 app.use(
   cors({
-    origin: env.clientUrl,
+    origin: env.clientUrl || 'http://localhost:3000',
     credentials: true,
   })
 );
 
-// 3. Giới hạn tần suất gọi API chống dò mật khẩu (Brute-force)
+// 3. Giới hạn tần suất gọi API chống dò mật khẩu (900000ms = 15 phút)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 phút
+  windowMs: 900000,
   max: 100,
   message: {
     success: false,
@@ -41,10 +47,13 @@ app.use(cookieParser());
 // 5. Public thư mục chứa ảnh phòng trọ và biên lai thanh toán (/uploads/...)
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
-// 6. Gắn toàn bộ API Routes
+// 6. Route trực tiếp cho Trang chủ (hỗ trợ gọi /api/trang-chu)
+app.get('/api/trang-chu', PhongTroController.getHomeData);
+
+// 7. Gắn toàn bộ API Routes
 app.use('/api', apiRouters);
 
-// 7. Middleware xử lý lỗi tập trung
+// 8. Middleware xử lý lỗi tập trung
 app.use(errorHandler);
 
 app.listen(env.port, () => {
