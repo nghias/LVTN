@@ -123,12 +123,7 @@ export default function HomeHeader() {
           >
             Đăng nhập
           </Link>
-          <Link
-            href="/nguoiThue/thongKe"
-            className="hidden sm:inline-flex items-center justify-center px-4 py-2 rounded-full text-xs font-bold bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 shadow-xs transition no-underline"
-          >
-            Vào cổng thuê trọ
-          </Link>
+       
 
           {/* Nút bật/tắt Menu Mobile */}
           <button

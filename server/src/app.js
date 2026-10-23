@@ -44,6 +44,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+
+
 // 5. Public thư mục chứa ảnh phòng trọ và biên lai thanh toán (/uploads/...)
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
@@ -55,6 +57,10 @@ app.use('/api', apiRouters);
 
 // 8. Middleware xử lý lỗi tập trung
 app.use(errorHandler);
+
+// 9. Gắn router cho TinDang
+const tinDangRouter = require('./routers/tinDang.router');
+app.use('/api/tin-dang', tinDangRouter);
 
 app.listen(env.port, () => {
   console.log(`🚀 Server đang chạy tại: http://localhost:${env.port}`);

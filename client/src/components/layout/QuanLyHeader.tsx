@@ -23,6 +23,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
   const primaryNavItems = [
     { label: 'Thống kê', href: '/chuTro/thongKe' },
     { label: 'Cơ sở & Phòng', href: '/chuTro/phongTro' },
+    { label: 'Đăng Tin', href: '/chuTro/tinDang' },
     { label: 'Khách thuê', href: '/chuTro/khachThue' },
     { label: 'Hợp đồng', href: '/chuTro/hopDong' },
   ];
