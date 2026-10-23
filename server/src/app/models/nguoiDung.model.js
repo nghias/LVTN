@@ -76,6 +76,24 @@ const NguoiDungModel = {
     const [result] = await db.execute(sql, [hashedPassword, maND]);
     return result.affectedRows > 0;
   },
+  // Tìm tài khoản theo địa chỉ Email đăng ký
+  findByEmail: async (email) => {
+    const sql = `
+      SELECT MaND, HoTen, Email, TenTK, MatKhau, Quyen
+      FROM NguoiDung
+      WHERE LOWER(Email) = LOWER(?)
+      LIMIT 1
+    `;
+    const [rows] = await db.execute(sql, [email.trim()]);
+    return rows[0] || null;
+  },
+
+  // Cập nhật mật khẩu mới đã băm vào bảng NguoiDung
+  updatePassword: async (maND, hashedPassword) => {
+    const sql = `UPDATE NguoiDung SET MatKhau = ? WHERE MaND = ?`;
+    const [result] = await db.execute(sql, [hashedPassword, maND]);
+    return result.affectedRows > 0;
+  },
 };
 
 module.exports = NguoiDungModel;

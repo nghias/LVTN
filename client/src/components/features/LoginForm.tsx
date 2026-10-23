@@ -19,7 +19,7 @@ export default function LoginForm() {
   const [matKhau, setMatKhau] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [infoPanel, setInfoPanel] = useState<'forgot' | 'support' | null>(null);
+  const [infoPanel, setInfoPanel] = useState<'support' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Tự động nạp thông tin đã mã hóa nếu còn trong hạn 30 ngày
@@ -114,24 +114,8 @@ export default function LoginForm() {
             </p>
           </div>
 
-          {/* Hộp thông tin Quên mật khẩu / Liên hệ hỗ trợ */}
+          {/* Hộp thông tin Liên hệ hỗ trợ */}
           <div className="mt-6">
-            {infoPanel === 'forgot' && (
-              <div className="p-4 rounded-2xl bg-[#00FFCC]/15 border border-[#00FFCC] text-xs text-slate-700 leading-relaxed">
-                <div className="flex items-center justify-between font-bold text-slate-900 text-sm mb-1">
-                  <span>Cấp lại mật khẩu</span>
-                  <button
-                    type="button"
-                    onClick={() => setInfoPanel(null)}
-                    className="text-slate-500 hover:text-slate-900 cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-                Vui lòng liên hệ trực tiếp Chủ trọ hoặc Quản lý cơ sở trọ của bạn kèm số CCCD/SĐT đã đăng ký để được xác minh và đặt lại mật khẩu mới.
-              </div>
-            )}
-
             {infoPanel === 'support' && (
               <div className="p-4 rounded-2xl bg-[#00FFCC]/15 border border-[#00FFCC] text-xs text-slate-700 leading-relaxed space-y-1">
                 <div className="flex items-center justify-between font-bold text-slate-900 text-sm mb-1">
@@ -144,9 +128,18 @@ export default function LoginForm() {
                     ✕
                   </button>
                 </div>
-                <p>• <strong className="text-slate-900">Chủ trọ (Quỳnh Dư):</strong> 0903.112.233</p>
-                <p>• <strong className="text-slate-900">Quản lý Khu 1 (Tuấn Nghĩa):</strong> 0931.493.785</p>
-                <p>• <strong className="text-slate-900">Quản lý Khu 2 (Nhật Nguyên):</strong> 0383.193.961</p>
+                <p>
+                  <strong className="text-slate-900">Chủ trọ (Quỳnh Dư):</strong> 0903.112.233
+                </p>
+                <p>
+                  <strong className="text-slate-900">Quản lý Cơ sở 1 (Tuấn Nghĩa):</strong> 0931.493.785
+                </p>
+                <p>
+                  <strong className="text-slate-900">Quản lý Cơ sở 2 (Nhật Nguyên):</strong> 0383.193.961
+                </p>
+                <p>
+                  <strong className="text-slate-900">Quản lý Cơ sở 3 (Hoàng Nam):</strong> 0908451236
+                </p>
               </div>
             )}
           </div>
@@ -210,25 +203,19 @@ export default function LoginForm() {
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="w-4 h-4 accent-teal-600 rounded cursor-pointer"
                     />
-                    <span>Ghi nhớ mật khẩu (30 ngày)</span>
+                    <span>Ghi nhớ mật khẩu</span>
                   </label>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setInfoPanel(infoPanel === 'forgot' ? null : 'forgot')
-                  }
+                  onClick={() => router.push('/taiKhoan/quenMatKhau')}
                   className="text-xs sm:text-sm font-bold text-teal-700 hover:underline cursor-pointer"
                 >
                   Bạn quên mật khẩu?
                 </button>
               </div>
             </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed pt-1">
-              Mật khẩu ghi nhớ được mã hóa chuẩn AES-GCM 256-bit và tự động xóa sau 30 ngày.
-            </p>
 
             {/* Cụm nút dưới đáy */}
             <div className="pt-4 flex items-center justify-between gap-4">

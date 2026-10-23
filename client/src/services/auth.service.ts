@@ -129,4 +129,49 @@ export const AuthService = {
 
     return data;
   },
+  // 7. Gửi mã OTP khôi phục mật khẩu về Email thật
+  async sendForgotPasswordOtp(email: string): Promise<ApiResponse<null>> {
+    const res = await fetch(`${API_URL}/forgot-password/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Không thể gửi mã xác thực!');
+    }
+    return data;
+  },
+
+  // 8. Kiểm tra mã OTP người dùng nhập
+  async verifyForgotPasswordOtp(email: string, otp: string): Promise<ApiResponse<null>> {
+    const res = await fetch(`${API_URL}/forgot-password/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Mã xác thực không chính xác!');
+    }
+    return data;
+  },
+
+  // 9. Đặt lại mật khẩu mới sau khi xác thực OTP đúng
+  async resetPasswordWithOtp(payload: {
+    email: string;
+    otp: string;
+    matKhauMoi: string;
+  }): Promise<ApiResponse<null>> {
+    const res = await fetch(`${API_URL}/forgot-password/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Không thể đặt lại mật khẩu mới!');
+    }
+    return data;
+  },
 };
