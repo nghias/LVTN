@@ -94,6 +94,98 @@ const NguoiDungModel = {
     const [result] = await db.execute(sql, [hashedPassword, maND]);
     return result.affectedRows > 0;
   },
+
+  getAllKhachThueWithRoom: async () => {
+    const sql = `
+      SELECT 
+        nd.MaND, nd.HoTen, nd.CCCD, nd.NamSinh, nd.SDT, nd.Email, nd.DiaChi, nd.TenTK, nd.Quyen,
+        p.MaPhong, p.TenPhong,
+        kt.MaKhu, kt.TenKhu, kt.MaND AS MaQuanLyKhu,
+        hdt.MaHDT, hdt.TrangThai AS TrangThaiHD,
+        ct.VaiTro, ct.TamTru, ct.NgayVao, ct.NgayDi
+      FROM NguoiDung nd
+      LEFT JOIN ChiTietHopDongThue ct ON nd.MaND = ct.MaND AND ct.NgayDi IS NULL
+      LEFT JOIN HopDongThue hdt ON ct.MaHDT = hdt.MaHDT AND hdt.TrangThai = 'ConHieuLuc'
+      LEFT JOIN Phong p ON hdt.MaPhong = p.MaPhong
+      LEFT JOIN KhuTro kt ON p.MaKhu = kt.MaKhu
+      WHERE nd.Quyen = 'KhachThue'
+      ORDER BY nd.MaND DESC
+    `;
+    const [rows] = await db.execute(sql);
+    return rows;
+  },
+
+  // 2. Kiểm tra trùng TenTK, CCCD, SDT, Email (trừ chính mình khi sửa)
+  checkDuplicateField: async (field, value, excludeMaND = null) => {
+    if (!value) return false;
+    let sql = `SELECT MaND FROM NguoiDung WHERE ${field} = ?`;
+    const params = [value];
+    if (excludeMaND) {
+      sql += ` AND MaND != ?`;
+      params.push(excludeMaND);
+    }
+    const [rows] = await db.execute(sql, params);
+    return rows.length > 0;
+  },
+
+  // 3. Tạo tài khoản Khách thuê mới
+  createKhachThue: async (data) => {
+    const sql = `
+      INSERT INTO NguoiDung (HoTen, CCCD, NamSinh, SDT, Email, DiaChi, TenTK, MatKhau, Quyen)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'KhachThue')
+    `;
+    const [result] = await db.execute(sql, [
+      data.HoTen,
+      data.CCCD,
+      data.NamSinh,
+      data.SDT,
+      data.Email,
+      data.DiaChi,
+      data.TenTK,
+      data.MatKhau,
+    ]);
+    return result.insertId;
+  },
+
+  // 4. Cập nhật thông tin tài khoản Khách thuê
+  updateKhachThue: async (maND, data) => {
+    const sql = `
+      UPDATE NguoiDung
+      SET HoTen = ?, CCCD = ?, NamSinh = ?, SDT = ?, Email = ?, DiaChi = ?, TenTK = ?
+      WHERE MaND = ? AND Quyen = 'KhachThue'
+    `;
+    const [result] = await db.execute(sql, [
+      data.HoTen,
+      data.CCCD,
+      data.NamSinh,
+      data.SDT,
+      data.Email,
+      data.DiaChi,
+      data.TenTK,
+      maND,
+    ]);
+    return result.affectedRows > 0;
+  },
+
+  // 5. Kiểm tra khách thuê có đang trong hợp đồng hiệu lực không
+  hasActiveContract: async (maND) => {
+    const sql = `
+      SELECT ct.MaCTHDT
+      FROM ChiTietHopDongThue ct
+      INNER JOIN HopDongThue hdt ON ct.MaHDT = hdt.MaHDT
+      WHERE ct.MaND = ? AND hdt.TrangThai = 'ConHieuLuc' AND ct.NgayDi IS NULL
+      LIMIT 1
+    `;
+    const [rows] = await db.execute(sql, [maND]);
+    return rows.length > 0;
+  },
+
+  // 6. Xóa tài khoản Khách thuê
+  deleteKhachThue: async (maND) => {
+    const sql = `DELETE FROM NguoiDung WHERE MaND = ? AND Quyen = 'KhachThue'`;
+    const [result] = await db.execute(sql, [maND]);
+    return result.affectedRows > 0;
+  },
 };
 
 module.exports = NguoiDungModel;
