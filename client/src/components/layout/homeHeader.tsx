@@ -158,22 +158,9 @@ export default function HomeHeader() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#00FFCC] text-slate-900 border border-teal-300 text-center no-underline"
               >
-                Đăng nhập / Đăng ký
+                Đăng nhập
               </Link>
-              <Link
-                href="/nguoiThue/thongKe"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-50 text-slate-700 hover:bg-[#00FFCC]/20 border border-slate-200/80 text-center no-underline"
-              >
-                Cổng Người thuê
-              </Link>
-              <Link
-                href="/chuTro"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-50 text-slate-700 hover:bg-[#00FFCC]/20 border border-slate-200/80 text-center no-underline col-span-2"
-              >
-                Bảng điều khiển Chủ trọ & Quản lý
-              </Link>
+
             </div>
           </div>
         </div>

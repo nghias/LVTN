@@ -1220,7 +1220,7 @@ export default function HomePage() {
       <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end">
         {/* Cửa sổ Chat khi mở */}
         {isChatOpen && (
-          <div className="mb-3 w-[340px] sm:w-[380px] bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="mb-3 w-85 sm:w-95 bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             {/* Đầu hộp thoại AI */}
             <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
