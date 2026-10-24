@@ -1,6 +1,12 @@
 const db = require('../../database/db');
 
 const ChiTietTienIchModel = {
+  
+  getAll: async () => {
+    const sql = `SELECT MaPhong, MaTI FROM ChiTietTienIch`;
+    const [rows] = await db.execute(sql);
+    return rows;
+  },
   // Lấy danh sách MaTI của 1 phòng
   getByMaPhong: async (maPhong) => {
     const sql = `
@@ -23,6 +29,12 @@ const ChiTietTienIchModel = {
     `;
     const [rows] = await db.execute(sql, maPhongIds);
     return rows;
+  },
+
+  countByMaTI: async (maTI) => {
+    const sql = `SELECT COUNT(*) AS total FROM ChiTietTienIch WHERE MaTI = ?`;
+    const [rows] = await db.execute(sql, [maTI]);
+    return rows[0]?.total || 0;
   },
 
   // Gắn 1 tiện ích vào phòng

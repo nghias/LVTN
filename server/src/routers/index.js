@@ -4,10 +4,12 @@ const router = express.Router();
 
 const authRouter = require('./auth.router');
 const phongTroRouter = require('./phongTro.router');
-const khachThueRouter = require('./khachThue.route'); // hoặc './khachThue.router'
+const khachThueRouter = require('./khachThue.route');
+const tienIchRouter = require('./tienIch.router');
 
 router.use('/auth', authRouter);
 router.use('/phong-tro', phongTroRouter);
 router.use('/khach-thue', khachThueRouter);
+router.use('/tien-ich', tienIchRouter);
 
 module.exports = router;
