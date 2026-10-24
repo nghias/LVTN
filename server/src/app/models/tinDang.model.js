@@ -1,4 +1,4 @@
-const pool = require('../../database/db');
+const pool = require("../../database/db");
 
 const TinDangModel = {
   // 1. Lấy danh sách tất cả tin đăng kèm thông tin Phòng & Khu trọ
@@ -42,9 +42,12 @@ const TinDangModel = {
         p.Gia,
         p.TrangThai,
         k.MaKhu,
-        k.TenKhu
+        k.TenKhu,
+        nd.HoTen AS TenChuTro,
+        nd.SDT AS SDTChuTro
       FROM Phong p
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN NguoiDung nd ON p.MaND = nd.MaND
       ORDER BY k.MaKhu ASC, p.MaPhong ASC
     `;
     const [rows] = await pool.query(sql);
@@ -63,16 +66,13 @@ const TinDangModel = {
       TieuDe,
       MoTa || null,
       NgayHetHan || null,
-      TrangThai || 'DangHienThi',
+      TrangThai || "DangHienThi",
     ]);
     return result.insertId;
   },
 
   // 4. Sửa tin đã đăng theo MaTin
-  async updateTinDang(
-    maTin,
-    { MaPhong, TieuDe, MoTa, NgayHetHan, TrangThai }
-  ) {
+  async updateTinDang(maTin, { MaPhong, TieuDe, MoTa, NgayHetHan, TrangThai }) {
     const sql = `
       UPDATE TinDang
       SET MaPhong = ?,
