@@ -12,6 +12,16 @@ interface QuanLyHeaderProps {
   user: UserProfile;
 }
 
+interface NavItem {
+  label: string;
+  href: string;
+}
+
+interface NavGroup {
+  groupLabel: string;
+  items: NavItem[];
+}
+
 export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -20,24 +30,46 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
 
   const roleLabel = user.Quyen === 'ChuTro' ? 'Chủ trọ' : 'Quản lý cơ sở';
 
-  const primaryNavItems = [
-    { label: 'Thống kê', href: '/chuTro/thongKe' },
-    { label: 'Cơ sở & Phòng', href: '/chuTro/phongTro' },
-    { label: 'Đăng Tin', href: '/chuTro/tinDang' },
-    { label: 'Khách thuê', href: '/chuTro/khachThue' },
-    { label: 'Hợp đồng', href: '/chuTro/hopDong' },
+  // Các cụm menu đã được gom nhóm gọn gàng cho giao diện Máy tính
+  const navGroups: NavGroup[] = [
+    {
+      groupLabel: 'Không gian & Phòng',
+      items: [
+        { label: 'Cơ sở & Phòng', href: '/chuTro/phongTro' },
+        { label: 'Tiện ích phòng', href: '/chuTro/tienIch' },
+        { label: 'Đăng tin', href: '/chuTro/tinDang' },
+      ],
+    },
+    {
+      groupLabel: 'Khách & Hợp đồng',
+      items: [
+        { label: 'Khách thuê', href: '/chuTro/khachThue' },
+        { label: 'Hợp đồng', href: '/chuTro/hopDong' },
+      ],
+    },
+    {
+      groupLabel: 'Tài chính & Dịch vụ',
+      items: [
+        { label: 'Phí dịch vụ', href: '/chuTro/phiDichVu' },
+        { label: 'Điện nước & IoT', href: '/chuTro/dienNuoc' },
+        { label: 'Hóa đơn', href: '/chuTro/hoaDon' },
+      ],
+    },
   ];
 
-  const moreNavItems = [
+  // Danh sách đầy đủ hiển thị trên giao diện Điện thoại
+  const allMobileNavItems: NavItem[] = [
+    { label: 'Thống kê', href: '/chuTro/thongKe' },
+    { label: 'Cơ sở & Phòng', href: '/chuTro/phongTro' },
+    { label: 'Tiện ích', href: '/chuTro/tienIch' },
+    { label: 'Phí dịch vụ', href: '/chuTro/phiDichVu' },
+    { label: 'Đăng tin', href: '/chuTro/tinDang' },
+    { label: 'Khách thuê', href: '/chuTro/khachThue' },
+    { label: 'Hợp đồng', href: '/chuTro/hopDong' },
     { label: 'Điện nước & IoT', href: '/chuTro/dienNuoc' },
     { label: 'Hóa đơn', href: '/chuTro/hoaDon' },
     { label: 'Thông báo', href: '/chuTro/thongBao' },
   ];
-
-  const allNavItems = [...primaryNavItems, ...moreNavItems];
-  const activeMoreItem = moreNavItems.find((item) =>
-    pathname.startsWith(item.href)
-  );
 
   const handleMobileLogout = () => {
     setMobileMenuOpen(false);
@@ -58,6 +90,9 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
       'Hủy'
     );
   };
+
+  const isThongKeActive = pathname.startsWith('/chuTro/thongKe');
+  const isThongBaoActive = pathname.startsWith('/chuTro/thongBao');
 
   return (
     <header className="w-full bg-white text-slate-900 border-b-2 border-[#00FFCC] shadow-xs sticky top-0 z-40">
@@ -83,75 +118,93 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
           </div>
         </Link>
 
-        {/* Menu điều hướng trên Máy tính */}
+        {/* Menu điều hướng gom cụm trên Máy tính */}
         <nav className="hidden lg:flex items-center gap-1.5 shrink-0">
-          {primaryNavItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+          {/* 1. Link đơn: Thống kê */}
+          <Link
+            href="/chuTro/thongKe"
+            className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition no-underline ${
+              isThongKeActive
+                ? 'bg-[#00FFCC] text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-[#00FFCC]/20'
+            }`}
+          >
+            Thống kê
+          </Link>
+
+          {/* 2. Các cụm Dropdown gom nhóm chức năng */}
+          {navGroups.map((group) => {
+            const activeChild = group.items.find((item) =>
+              pathname.startsWith(item.href)
+            );
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition no-underline ${
-                  isActive
-                    ? 'bg-[#00FFCC] text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-[#00FFCC]/20'
-                }`}
-              >
-                {item.label}
-              </Link>
+              <div key={group.groupLabel} className="relative group">
+                <button
+                  type="button"
+                  className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
+                    activeChild
+                      ? 'bg-[#00FFCC] text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-[#00FFCC]/20'
+                  }`}
+                >
+                  <span>
+                    {activeChild
+                      ? `${group.groupLabel}: ${activeChild.label}`
+                      : group.groupLabel}
+                  </span>
+                  <svg
+                    width="14"
+                    height="14"
+                    className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-200"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2.2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </button>
+
+                <div className="absolute left-0 top-full pt-2 w-52 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 z-50">
+                  <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden py-1.5">
+                    {group.items.map((item) => {
+                      const isActive = pathname.startsWith(item.href);
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`w-full px-4 py-2.5 text-left text-xs font-bold whitespace-nowrap flex items-center justify-between transition no-underline ${
+                            isActive
+                              ? 'bg-[#00FFCC]/40 text-slate-900'
+                              : 'text-slate-700 hover:bg-[#00FFCC]/20 hover:text-slate-900'
+                          }`}
+                        >
+                          <span>{item.label}</span>
+                          {isActive && <span>•</span>}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             );
           })}
 
-          {/* Dropdown "Khác" */}
-          <div className="relative group">
-            <button
-              type="button"
-              className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
-                activeMoreItem
-                  ? 'bg-[#00FFCC] text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-[#00FFCC]/20'
-              }`}
-            >
-              <span>{activeMoreItem ? activeMoreItem.label : 'Khác'}</span>
-              <svg
-                width="14"
-                height="14"
-                className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-200"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            <div className="absolute left-0 top-full pt-2 w-48 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 z-50">
-              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden py-1.5">
-                {moreNavItems.map((item) => {
-                  const isActive = pathname.startsWith(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`w-full px-4 py-2.5 text-left text-xs font-bold whitespace-nowrap flex items-center justify-between transition no-underline ${
-                        isActive
-                          ? 'bg-[#00FFCC]/40 text-slate-900'
-                          : 'text-slate-700 hover:bg-[#00FFCC]/20 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      {isActive && <span>•</span>}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          {/* 3. Link đơn: Thông báo */}
+          <Link
+            href="/chuTro/thongBao"
+            className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition no-underline ${
+              isThongBaoActive
+                ? 'bg-[#00FFCC] text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-[#00FFCC]/20'
+            }`}
+          >
+            Thông báo
+          </Link>
         </nav>
 
         <UserHeaderActions
@@ -163,7 +216,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
         />
       </div>
 
-      {/* Menu tổng hợp trên Điện thoại */}
+      {/* Menu tổng hợp hiển thị đầy đủ trên Điện thoại */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-white border-t border-slate-200 px-4 pt-3 pb-5 shadow-xl space-y-4">
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
@@ -185,7 +238,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
               Danh mục quản lý
             </p>
             <div className="grid grid-cols-2 gap-2">
-              {allNavItems.map((item) => {
+              {allMobileNavItems.map((item) => {
                 const isActive = pathname.startsWith(item.href);
                 return (
                   <Link
