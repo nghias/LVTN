@@ -70,9 +70,10 @@ export default function ThemTinDangPage() {
       try {
         setLoadingPhong(true);
         const maND = getStoredMaND();
+
         const response = await fetch(`${API_BASE_URL}/tin-dang?MaND=${maND}`, {
           method: "GET",
-          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           cache: "no-store",
         });
 
@@ -88,7 +89,10 @@ export default function ThemTinDangPage() {
         const maPhongParam = searchParams.get("maPhong");
 
         let defaultRoomId = "";
-        if (maPhongParam && rooms.some((r) => String(r.MaPhong) === maPhongParam)) {
+        if (
+          maPhongParam &&
+          rooms.some((r) => String(r.MaPhong) === maPhongParam)
+        ) {
           defaultRoomId = maPhongParam;
         } else if (maKhuParam > 0) {
           const filtered = rooms.filter((r) => Number(r.MaKhu) === maKhuParam);

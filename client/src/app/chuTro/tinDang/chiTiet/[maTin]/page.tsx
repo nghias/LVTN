@@ -26,8 +26,8 @@ export default function ChiTietTinDangPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [updatingStatus, setUpdatingStatus] = useState<boolean>(false);
 
-  const getStoredMaND = useCallback((): number => {
-    if (typeof window === "undefined") return 1;
+  const getStoredMaND = useCallback((): number | null => {
+    if (typeof window === "undefined") return null;
 
     for (const storage of [window.localStorage, window.sessionStorage]) {
       for (let i = 0; i < storage.length; i++) {
@@ -35,26 +35,45 @@ export default function ChiTietTinDangPage() {
         if (!key) continue;
 
         try {
-          const parsed = JSON.parse(storage.getItem(key) || "");
-          if (parsed && typeof parsed === "object") {
-            if (parsed.MaND) return Number(parsed.MaND);
-            if (parsed.user?.MaND) return Number(parsed.user.MaND);
+          const raw = storage.getItem(key);
+          if (!raw) continue;
+
+          const parsed = JSON.parse(raw);
+
+          if (!parsed || typeof parsed !== "object") continue;
+
+          const candidates = [parsed.MaND, parsed.user?.MaND];
+
+          for (const value of candidates) {
+            const id = Number(value);
+
+            if (
+              value !== null &&
+              value !== undefined &&
+              value !== "" &&
+              Number.isSafeInteger(id) &&
+              id > 0
+            ) {
+              return id;
+            }
           }
         } catch {
-          // Bỏ qua
+          // Bỏ qua dữ liệu không phải JSON
         }
       }
     }
-    return 1;
+
+    return null;
   }, []);
 
   const fetchDetail = useCallback(async () => {
     try {
       setLoading(true);
       const maND = getStoredMaND();
+
       const response = await fetch(`${API_BASE_URL}/tin-dang?MaND=${maND}`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         cache: "no-store",
       });
 
@@ -89,20 +108,23 @@ export default function ChiTietTinDangPage() {
 
     try {
       setUpdatingStatus(true);
-      const response = await fetch(`${API_BASE_URL}/tin-dang/${tinDang.MaTin}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          MaPhong: tinDang.MaPhong,
-          MaND: tinDang.MaND,
-          TieuDe: tinDang.TieuDe,
-          MoTa: tinDang.MoTa,
-          NgayHetHan: tinDang.NgayHetHan
-            ? new Date(tinDang.NgayHetHan).toISOString().split("T")[0]
-            : null,
-          TrangThai: newStatus,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/tin-dang/${tinDang.MaTin}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            MaPhong: tinDang.MaPhong,
+            MaND: tinDang.MaND,
+            TieuDe: tinDang.TieuDe,
+            MoTa: tinDang.MoTa,
+            NgayHetHan: tinDang.NgayHetHan
+              ? new Date(tinDang.NgayHetHan).toISOString().split("T")[0]
+              : null,
+            TrangThai: newStatus,
+          }),
+        },
+      );
 
       const result = await response.json();
       if (!response.ok || !result.success) {

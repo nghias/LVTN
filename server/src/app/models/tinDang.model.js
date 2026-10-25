@@ -3,7 +3,7 @@ const pool = require("../../database/db");
 const TinDangModel = {
   // Kiểm tra thông tin và quyền của người dùng
   async getNguoiDungById(maND) {
-    const sql = `SELECT MaND, Quyen FROM NguoiDung WHERE MaND = ? LIMIT 1`;
+    const sql = `SELECT MaND, HoTen, Quyen FROM NguoiDung WHERE MaND = ? LIMIT 1`;
     const [rows] = await pool.query(sql, [maND]);
     return rows[0] || null;
   },
@@ -21,9 +21,24 @@ const TinDangModel = {
     return rows.length > 0;
   },
 
-  // 1. Lấy danh sách tin đăng kèm thông tin Phòng & Khu trọ (Phân quyền theo ChuTro / QuanLy)
+  // Kiểm tra tin đăng có thuộc khu trọ do người dùng này quản lý hay không
+  async checkTinThuocQuanLy(maTin, maND) {
+    const sql = `
+      SELECT td.MaTin
+      FROM TinDang td
+      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      WHERE td.MaTin = ? AND k.MaND = ?
+      LIMIT 1
+    `;
+    const [rows] = await pool.query(sql, [maTin, maND]);
+    return rows.length > 0;
+  },
+
+  // 1. Lấy danh sách tin đăng cho trang Quản lý (Lấy cả tin hết hạn, chỉ xét quyền ChuTro / QuanLy)
   async getAllTinDang(maND, quyen) {
-    const isChuTro = quyen === "ChuTro" || quyen === "Admin";
+    // Chỉ duy nhất quyền ChuTro mới xem được tất cả tin đăng ở tất cả khu trọ
+    const isChuTro = quyen === "ChuTro";
     const params = [];
 
     let whereClause = "";
@@ -41,7 +56,10 @@ const TinDangModel = {
         td.MoTa,
         td.NgayDang,
         td.NgayHetHan,
-        td.TrangThai,
+        CASE 
+          WHEN td.NgayHetHan IS NOT NULL AND td.NgayHetHan < CURDATE() THEN 'HetHan'
+          ELSE td.TrangThai
+        END AS TrangThai,
         p.TenPhong,
         p.DienTich,
         p.Gia,
@@ -54,6 +72,7 @@ const TinDangModel = {
       ${whereClause}
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
+
     const [rows] = await pool.query(sql, params);
     return rows.map((row) => ({
       ...row,
@@ -62,9 +81,9 @@ const TinDangModel = {
     }));
   },
 
-  // 2. Lấy danh sách Phòng để chọn khi đăng tin (Chủ trọ lấy tất cả, Quản lý chỉ lấy cơ sở mình quản lý)
+  // 2. Lấy danh sách Phòng để chọn khi đăng tin (Chỉ ChuTro lấy tất cả, QuanLy chỉ lấy khu của mình)
   async getPhongListForSelect(maND, quyen) {
-    const isChuTro = quyen === "ChuTro" || quyen === "Admin";
+    const isChuTro = quyen === "ChuTro";
     const params = [];
 
     let whereClause = "";
@@ -90,11 +109,49 @@ const TinDangModel = {
       ${whereClause}
       ORDER BY k.MaKhu ASC, p.MaPhong ASC
     `;
+
     const [rows] = await pool.query(sql, params);
-    return rows;
+    return rows.map((row) => ({
+      ...row,
+      DienTich: Number(row.DienTich),
+      Gia: Number(row.Gia),
+    }));
   },
 
-  // 3. Thêm mới tin đăng (Bảng TinDang)
+  // 3. Lấy danh sách tin đăng công khai cho Trang chủ (Chỉ lấy tin DangHienThi và chưa hết hạn)
+  async getPublicTinDang() {
+    const sql = `
+      SELECT 
+        td.MaTin,
+        td.MaPhong,
+        td.MaND,
+        td.TieuDe,
+        td.MoTa,
+        td.NgayDang,
+        td.NgayHetHan,
+        td.TrangThai,
+        p.TenPhong,
+        p.DienTich,
+        p.Gia,
+        p.TrangThai AS TrangThaiPhong,
+        k.MaKhu,
+        k.TenKhu
+      FROM TinDang td
+      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      WHERE td.TrangThai = 'DangHienThi'
+        AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
+      ORDER BY td.NgayDang DESC, td.MaTin DESC
+    `;
+    const [rows] = await pool.query(sql);
+    return rows.map((row) => ({
+      ...row,
+      DienTich: Number(row.DienTich),
+      Gia: Number(row.Gia),
+    }));
+  },
+
+  // 4. Thêm mới tin đăng (Bảng TinDang)
   async createTinDang({ MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai }) {
     const sql = `
       INSERT INTO TinDang (MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai)
@@ -102,7 +159,7 @@ const TinDangModel = {
     `;
     const [result] = await pool.query(sql, [
       MaPhong,
-      MaND || 1,
+      MaND,
       TieuDe,
       MoTa || null,
       NgayHetHan || null,
@@ -111,7 +168,7 @@ const TinDangModel = {
     return result.insertId;
   },
 
-  // 4. Sửa tin đã đăng theo MaTin
+  // 5. Sửa tin đã đăng theo MaTin
   async updateTinDang(maTin, { MaPhong, TieuDe, MoTa, NgayHetHan, TrangThai }) {
     const sql = `
       UPDATE TinDang
@@ -133,7 +190,7 @@ const TinDangModel = {
     return result.affectedRows > 0;
   },
 
-  // 5. Xóa tin đăng theo MaTin
+  // 6. Xóa tin đăng theo MaTin
   async deleteTinDang(maTin) {
     const sql = `DELETE FROM TinDang WHERE MaTin = ?`;
     const [result] = await pool.query(sql, [maTin]);

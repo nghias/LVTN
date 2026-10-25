@@ -5,11 +5,7 @@ import { useRouter, usePathname, useParams } from "next/navigation";
 import ProtectedRoute from "../../../../../components/common/ProtectedRoute";
 import QuanLyHeader from "../../../../../components/layout/QuanLyHeader";
 import { useAlertModal } from "../../../../../components/common/AlertModalProvider";
-import type {
-  TrangThaiTin,
-  TinDangItem,
-  PhongSelectOption,
-} from "../../page";
+import type { TrangThaiTin, TinDangItem, PhongSelectOption } from "../../page";
 
 interface TinDangFormData {
   MaPhong: string;
@@ -43,7 +39,7 @@ export default function SuaTinDangPage() {
 
   const [formData, setFormData] = useState<TinDangFormData>({
     MaPhong: "",
-    MaND: 1,
+    MaND: 0,
     TieuDe: "",
     MoTa: "",
     NgayHetHan: "",
@@ -80,7 +76,7 @@ export default function SuaTinDangPage() {
 
         const response = await fetch(`${API_BASE_URL}/tin-dang?MaND=${maND}`, {
           method: "GET",
-          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           cache: "no-store",
         });
 

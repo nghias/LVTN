@@ -1,3 +1,4 @@
+// C:\Users\nhat nguyen\Desktop\LVTN\server\src\app\models\phongTro.model.js
 const db = require("../../database/db");
 
 const PhongTroModel = {
@@ -61,13 +62,71 @@ const PhongTroModel = {
     return rows;
   },
 
-  // Lấy danh sách bài đăng đang hiển thị
+  // ========== API RIÊNG CHO TRANG HOME ==========
+  // Chỉ lấy tin đăng có TrangThai = 'DangHienThi' VÀ Phòng có TrangThai = 'Trong'
+  getPublicTinDangForHome: async ({ maKhu, mucGia, dienTich } = {}) => {
+    let sql = `
+      SELECT 
+        td.MaTin,
+        td.MaPhong,
+        td.MaND,
+        td.TieuDe,
+        td.MoTa,
+        td.NgayDang,
+        td.NgayHetHan,
+        td.TrangThai AS TrangThaiTin,
+        p.MaKhu,
+        p.TenPhong,
+        p.DienTich,
+        p.Gia,
+        p.TrangThai AS TrangThaiPhong,
+        k.TenKhu,
+        k.DiaChi,
+        k.MoTa AS MoTaKhu,
+        k.MaND AS MaQuanLyKhu
+      FROM TinDang td
+      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      WHERE td.TrangThai = 'DangHienThi'
+        AND p.TrangThai = 'Trong'
+    `;
+    const params = [];
+
+    if (maKhu && maKhu !== "ALL") {
+      sql += ` AND p.MaKhu = ? `;
+      params.push(Number(maKhu));
+    }
+
+    if (mucGia === "DUOI_25") {
+      sql += ` AND p.Gia < 2500000 `;
+    } else if (mucGia === "TU_25_DEN_40") {
+      sql += ` AND p.Gia >= 2500000 AND p.Gia <= 4000000 `;
+    } else if (mucGia === "TREN_40") {
+      sql += ` AND p.Gia > 4000000 `;
+    }
+
+    if (dienTich === "DUOI_20") {
+      sql += ` AND p.DienTich < 20 `;
+    } else if (dienTich === "TU_20_DEN_30") {
+      sql += ` AND p.DienTich >= 20 AND p.DienTich <= 30 `;
+    } else if (dienTich === "TREN_30") {
+      sql += ` AND p.DienTich > 30 `;
+    }
+
+    sql += ` ORDER BY td.NgayDang DESC, td.MaTin DESC `;
+    const [rows] = await db.execute(sql, params);
+    return rows;
+  },
+
+  // Giữ lại hàm cũ nếu nơi khác còn gọi nhưng đồng bộ điều kiện phòng trống
   getActiveTinDang: async () => {
     const sql = `
-      SELECT MaTin, MaPhong, MaND, TieuDe, MoTa, NgayDang, NgayHetHan, TrangThai
-      FROM TinDang
-      WHERE TrangThai = 'DangHienThi'
-      ORDER BY NgayDang DESC
+      SELECT td.MaTin, td.MaPhong, td.MaND, td.TieuDe, td.MoTa, td.NgayDang, td.NgayHetHan, td.TrangThai
+      FROM TinDang td
+      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
+      WHERE td.TrangThai = 'DangHienThi'
+        AND p.TrangThai = 'Trong'
+      ORDER BY td.NgayDang DESC
     `;
     const [rows] = await db.execute(sql);
     return rows;

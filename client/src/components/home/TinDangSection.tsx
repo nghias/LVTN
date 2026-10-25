@@ -1,6 +1,7 @@
 // src/components/home/TinDangSection.tsx
 "use client";
 
+import { useMemo } from "react";
 import { resolveRoomImageUrl } from "@/services/phongTro.service";
 import { TienIchItem } from "@/services/home.service";
 import {
@@ -40,6 +41,23 @@ export default function TinDangSection({
   onResetFilters,
   onSelectContactRoom,
 }: TinDangSectionProps) {
+  // Chốt chặn lọc chỉ giữ lại tin đăng Đang hiển thị & Phòng đang trống
+  const validTotalTinDangList = useMemo(() => {
+    return tinDangList.filter(
+      (tin) =>
+        tin.TrangThaiPhong === "Trong" &&
+        (!tin.TrangThai || tin.TrangThai === "DangHienThi"),
+    );
+  }, [tinDangList]);
+
+  const validFilteredTinDangList = useMemo(() => {
+    return filteredTinDangList.filter(
+      (tin) =>
+        tin.TrangThaiPhong === "Trong" &&
+        (!tin.TrangThai || tin.TrangThai === "DangHienThi"),
+    );
+  }, [filteredTinDangList]);
+
   return (
     <section id="tin-dang" className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -48,8 +66,8 @@ export default function TinDangSection({
             Tra cứu phòng trống trực tuyến
           </span>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Danh Sách Phòng Đang Mở Cho Thuê ({filteredTinDangList.length}/
-            {tinDangList.length})
+            Danh Sách Phòng Đang Mở Cho Thuê ({validFilteredTinDangList.length}/
+            {validTotalTinDangList.length})
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Hỗ trợ bộ lọc đa tiêu chí theo cơ sở, diện tích, mức giá thuê và kết
@@ -176,32 +194,43 @@ export default function TinDangSection({
             </div>
           ))}
         </div>
-      ) : filteredTinDangList.length === 0 ? (
+      ) : validFilteredTinDangList.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center max-w-xl mx-auto shadow-xs">
           <span className="inline-block px-3.5 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900 mb-3">
             Không có kết quả phù hợp
           </span>
           <h3 className="text-lg font-bold text-slate-900">
-            Hiện chưa tìm thấy phòng trọ khớp với tiêu chí lọc
+            Hiện chưa tìm thấy phòng trống đang mở tin khớp với tiêu chí lọc
           </h3>
           <p className="text-xs text-slate-500 mt-1.5">
             Bạn có thể đặt lại bộ lọc, hỏi Trợ lý ảo AI Chatbot ở góc màn hình
             hoặc liên hệ trực tiếp chủ trọ để được hỗ trợ.
           </p>
-          {tinDangList.length > 0 && (
+          {validTotalTinDangList.length > 0 && (
             <button
               type="button"
               onClick={onResetFilters}
               className="mt-4 px-4 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition cursor-pointer"
             >
-              Xem toàn bộ {tinDangList.length} phòng đang mở
+              Xem toàn bộ {validTotalTinDangList.length} phòng đang mở
             </button>
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTinDangList.map((tin) => {
+          {validFilteredTinDangList.map((tin) => {
             const contact = extractManagerContact(tin, khuTroList);
+            const rawImage =
+              tin.AnhDaiDien ||
+              (Array.isArray((tin as any).DanhSachAnh) &&
+              (tin as any).DanhSachAnh.length > 0
+                ? (tin as any).DanhSachAnh[0]
+                : null);
+
+            const formattedDate =
+              tin.NgayDang && !isNaN(new Date(tin.NgayDang).getTime())
+                ? new Date(tin.NgayDang).toLocaleDateString("vi-VN")
+                : "Mới cập nhật";
 
             return (
               <div
@@ -212,8 +241,8 @@ export default function TinDangSection({
                 <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
                   <img
                     src={
-                      tin.AnhDaiDien
-                        ? resolveRoomImageUrl(tin.AnhDaiDien)
+                      rawImage
+                        ? resolveRoomImageUrl(rawImage)
                         : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop&q=80"
                     }
                     alt={tin.TieuDe}
@@ -225,16 +254,8 @@ export default function TinDangSection({
                     </span>
                   </div>
                   <div className="absolute top-3 right-3">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                        tin.TrangThaiPhong === "Trong"
-                          ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-                          : "bg-amber-100 text-amber-800 border-amber-300"
-                      }`}
-                    >
-                      {tin.TrangThaiPhong === "Trong"
-                        ? "Đang trống"
-                        : "Đang thuê"}
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-emerald-100 text-emerald-800 border-emerald-300">
+                      Đang trống
                     </span>
                   </div>
                 </div>
@@ -245,8 +266,7 @@ export default function TinDangSection({
                     Mã tin #{tin.MaTin}
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
-                    Đăng ngày:{" "}
-                    {new Date(tin.NgayDang).toLocaleDateString("vi-VN")}
+                    Đăng ngày: {formattedDate}
                   </span>
                 </div>
 

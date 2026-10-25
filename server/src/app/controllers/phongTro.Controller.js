@@ -1,10 +1,11 @@
+// C:\Users\nhat nguyen\Desktop\LVTN\server\src\app\controllers\phongTro.Controller.js
 const KhuTroModel = require("../models/khuTro.model");
 const PhongTroModel = require("../models/phongTro.model");
 const ChiTietTienIchModel = require("../models/chiTietTienIch.model");
 const AnhPhongModel = require("../models/anhPhong.model");
 const TienIchModel = require("../models/tienIch.model");
 const NguoiDungModel = require("../models/nguoiDung.model");
-const PhiDichVuModel = require("../models/PhiDichVu.model"); // Thay thế phụ phí cũ bằng PhiDichVuModel
+const PhiDichVuModel = require("../models/PhiDichVu.model");
 
 const { deleteImageFromCloudinary } = require("../config/cloudinary.config");
 const { successResponse, errorResponse } = require("../../utils/response.util");
@@ -29,6 +30,80 @@ class PhongTroController {
       };
     }
     return { error: null, status: 200, khuTro };
+  }
+
+  // Hàm nội bộ: Chuẩn hóa danh sách tin đăng cho trang Home
+  async buildHomeTinDangList(tinDangRows, tienIchList = null, quanLyList = null) {
+    if (!tinDangRows || tinDangRows.length === 0) return [];
+
+    const roomIds = [...new Set(tinDangRows.map((r) => Number(r.MaPhong)))];
+
+    const [allImages, allChiTietTI, fetchedTienIch, fetchedQuanLy] =
+      await Promise.all([
+        AnhPhongModel.getByMaPhongList(roomIds),
+        ChiTietTienIchModel.getByMaPhongList(roomIds),
+        tienIchList ? Promise.resolve(tienIchList) : TienIchModel.getAll(),
+        quanLyList
+          ? Promise.resolve(quanLyList)
+          : NguoiDungModel.getDanhSachQuanLy(),
+      ]);
+
+    return tinDangRows.map((row) => {
+      const ql = fetchedQuanLy.find(
+        (u) => Number(u.MaND) === Number(row.MaQuanLyKhu),
+      );
+
+      const roomImageObjs = allImages.filter(
+        (img) => Number(img.MaPhong) === Number(row.MaPhong),
+      );
+      const mainImgObj =
+        roomImageObjs.find((img) => Number(img.AnhChinh) === 1) ||
+        roomImageObjs[0];
+      const mainImage = mainImgObj ? mainImgObj.DuongDan : null;
+      const roomImagePaths = roomImageObjs.map((img) => img.DuongDan);
+
+      const roomMaTIs = allChiTietTI
+        .filter((ct) => Number(ct.MaPhong) === Number(row.MaPhong))
+        .map((ct) => Number(ct.MaTI));
+      const roomTienIch = fetchedTienIch.filter((ti) =>
+        roomMaTIs.includes(Number(ti.MaTI)),
+      );
+
+      let sdtQuanLy = null;
+      if (ql && ql.SDT) {
+        try {
+          sdtQuanLy = decryptAES(ql.SDT) || ql.SDT;
+        } catch {
+          sdtQuanLy = ql.SDT;
+        }
+      }
+
+      return {
+        MaTin: Number(row.MaTin),
+        MaPhong: Number(row.MaPhong),
+        MaKhu: Number(row.MaKhu),
+        MaND: Number(row.MaND),
+        TieuDe: row.TieuDe,
+        MoTa: row.MoTa || row.MoTaKhu || "",
+        NgayDang: row.NgayDang,
+        NgayHetHan: row.NgayHetHan,
+        TrangThai: row.TrangThaiTin, // 'DangHienThi'
+        TrangThaiPhong: row.TrangThaiPhong, // 'Trong'
+        TenPhong: row.TenPhong,
+        TenKhu: row.TenKhu || "",
+        DiaChi: row.DiaChi || "",
+        Gia: Number(row.Gia),
+        DienTich: Number(row.DienTich),
+        AnhDaiDien: mainImage,
+        DanhSachAnh: roomImagePaths,
+        DanhSachTienIch: roomTienIch,
+        TienIch: roomTienIch,
+        TenQuanLy: ql ? ql.HoTen : "Ban quản lý",
+        SDTQuanLy: sdtQuanLy,
+        TenChuTro: ql ? ql.HoTen : "Ban quản lý",
+        SDTChuTro: sdtQuanLy || "",
+      };
+    });
   }
 
   // 1. [GET] /api/phong-tro/khu-tro
@@ -574,6 +649,7 @@ class PhongTroController {
     }
   }
 
+  // 13. [GET] /api/phong-tro/public/home-init
   async getPublicHomeInit(req, res, next) {
     try {
       const [khuList, tienIchList, quanLyList] = await Promise.all([
@@ -728,12 +804,34 @@ class PhongTroController {
     }
   }
 
-  // 16. [GET] /api/phong-tro/public/home-data
+  // 16. [GET] /api/phong-tro/public/tin-dang (API RIÊNG LẤY TIN ĐĂNG TRANG HOME)
+  async getPublicTinDangHome(req, res, next) {
+    try {
+      const { maKhu, mucGia, dienTich } = req.query;
+
+      const tinDangRows = await PhongTroModel.getPublicTinDangForHome({
+        maKhu,
+        mucGia,
+        dienTich,
+      });
+
+      const formattedTinDang = await this.buildHomeTinDangList(tinDangRows);
+
+      return successResponse(
+        res,
+        "Lấy danh sách tin đăng trang chủ thành công!",
+        formattedTinDang,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // 17. [GET] /api/phong-tro/public/home-data
   async getHomeData(req, res, next) {
     try {
       const [
         khuList,
-        rooms,
         tinDangRows,
         tienIchList,
         phiDichVuRows,
@@ -741,98 +839,60 @@ class PhongTroController {
         quanLyList,
       ] = await Promise.all([
         KhuTroModel.getAll(),
-        PhongTroModel.getAllPublicRooms(),
-        PhongTroModel.getActiveTinDang(),
+        PhongTroModel.getPublicTinDangForHome(), // Chỉ lấy tin DangHienThi + Phòng Trong
         TienIchModel.getAll(),
-        PhiDichVuModel.getAll(), // Gọi từ PhiDichVuModel mới
+        PhiDichVuModel.getAll(),
         PhongTroModel.getLatestGiaDienNuoc(),
         NguoiDungModel.getDanhSachQuanLy(),
       ]);
 
-      const roomIds = rooms.map((r) => r.MaPhong);
-
-      const [allImages, allChiTietTI] =
-        roomIds.length > 0
-          ? await Promise.all([
-              AnhPhongModel.getByMaPhongList(roomIds),
-              ChiTietTienIchModel.getByMaPhongList(roomIds),
-            ])
-          : [[], []];
+      const maKhuIds = khuList.map((k) => k.MaKhu);
+      const allRooms =
+        maKhuIds.length > 0 ? await PhongTroModel.getByMaKhuIds(maKhuIds) : [];
 
       const khuTro = khuList.map((khu) => {
-        const roomsInKhu = rooms.filter(
+        const ql = quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND));
+        const roomsInKhu = allRooms.filter(
           (r) => Number(r.MaKhu) === Number(khu.MaKhu),
         );
         const soPhongTrong = roomsInKhu.filter(
           (r) => r.TrangThai === "Trong",
         ).length;
+
+        let sdtQuanLy = null;
+        if (ql && ql.SDT) {
+          try {
+            sdtQuanLy = decryptAES(ql.SDT) || ql.SDT;
+          } catch {
+            sdtQuanLy = ql.SDT;
+          }
+        }
+
         return {
           MaKhu: khu.MaKhu,
+          MaND: khu.MaND,
           TenKhu: khu.TenKhu,
           DiaChi: khu.DiaChi,
           MoTa: khu.MoTa || "",
+          TenQuanLy: ql ? ql.HoTen : "Ban quản lý",
+          SDTQuanLy: sdtQuanLy,
           TongSoPhong: roomsInKhu.length,
           SoPhongTrong: soPhongTrong,
         };
       });
 
-      const tinDang = rooms.map((room) => {
-        const khu = khuList.find((k) => Number(k.MaKhu) === Number(room.MaKhu));
-        const tin = tinDangRows.find(
-          (t) => Number(t.MaPhong) === Number(room.MaPhong),
-        );
-        const ql = khu
-          ? quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND))
-          : null;
+      const tinDang = await this.buildHomeTinDangList(
+        tinDangRows,
+        tienIchList,
+        quanLyList,
+      );
 
-        const roomImages = allImages
-          .filter((img) => Number(img.MaPhong) === Number(room.MaPhong))
-          .map((img) => img.DuongDan);
-
-        const roomMaTIs = allChiTietTI
-          .filter((ct) => Number(ct.MaPhong) === Number(room.MaPhong))
-          .map((ct) => Number(ct.MaTI));
-        const roomTienIch = tienIchList.filter((ti) =>
-          roomMaTIs.includes(Number(ti.MaTI)),
-        );
-
-        let sdtChuTro = "0901234567";
-        if (ql && ql.SDT) {
-          try {
-            sdtChuTro = decryptAES(ql.SDT) || ql.SDT;
-          } catch {
-            sdtChuTro = ql.SDT;
-          }
-        }
-
-        return {
-          MaTin: tin ? tin.MaTin : room.MaPhong,
-          MaPhong: room.MaPhong,
-          MaKhu: room.MaKhu,
-          TieuDe: tin
-            ? tin.TieuDe
-            : `Cho thuê ${room.TenPhong} - ${khu ? khu.TenKhu : "Khu trọ tiện nghi"}`,
-          MoTa: tin ? tin.MoTa : khu?.MoTa || "",
-          TenPhong: room.TenPhong,
-          TenKhu: khu ? khu.TenKhu : "",
-          DiaChi: khu ? khu.DiaChi : "",
-          Gia: Number(room.Gia),
-          DienTich: Number(room.DienTich),
-          TrangThaiPhong: room.TrangThai,
-          DanhSachAnh: roomImages,
-          DanhSachTienIch: roomTienIch,
-          TenChuTro: ql ? ql.HoTen : "Ban quản lý Xóm Trọ",
-          SDTChuTro: sdtChuTro,
-        };
-      });
-
-      // Ánh xạ cột từ bảng PhiDichVu (MaDV, TenDV, DonGia thay cho MaPP, TenPP...)
       const phiDichVu = phiDichVuRows.map((dv) => ({
-        MaDV: dv.MaDV,     
-        TenDV: dv.TenDV,   
+        MaDV: dv.MaDV,
+        TenDV: dv.TenDV,
         DonGia: Number(dv.DonGia),
         DonViTinh: dv.DonViTinh || "",
-        MoTa: dv.MoTa || "", 
+        MoTa: dv.MoTa || "",
       }));
 
       const giaDienNuoc = giaDienNuocRow
@@ -880,5 +940,6 @@ module.exports = {
   getPublicHomeInit: controller.getPublicHomeInit.bind(controller),
   getPublicPhongList: controller.getPublicPhongList.bind(controller),
   getPublicPhongDetail: controller.getPublicPhongDetail.bind(controller),
+  getPublicTinDangHome: controller.getPublicTinDangHome.bind(controller),
   getHomeData: controller.getHomeData.bind(controller),
 };
