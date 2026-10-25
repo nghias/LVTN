@@ -1,6 +1,8 @@
+// server/src/app/models/tienIch.model.js
 const db = require('../../database/db');
 
 const TienIchModel = {
+  // 1. Lấy danh sách tất cả tiện ích (hoặc tìm kiếm theo từ khóa)
   getAll: async (keyword = '') => {
     let sql = `
       SELECT MaTI, TenTI, MoTa
@@ -18,6 +20,7 @@ const TienIchModel = {
     const [rows] = await db.execute(sql, params);
     return rows;
   },
+
   // 2. Lấy chi tiết 1 tiện ích theo MaTI
   getById: async (maTI) => {
     const sql = `
@@ -55,7 +58,10 @@ const TienIchModel = {
       INSERT INTO TienIch (TenTI, MoTa)
       VALUES (?, ?)
     `;
-    const [result] = await db.execute(sql, [TenTI.trim(), MoTa ? MoTa.trim() : '']);
+    const [result] = await db.execute(sql, [
+      TenTI.trim(),
+      MoTa ? MoTa.trim() : '',
+    ]);
     return result.insertId;
   },
 
@@ -66,7 +72,11 @@ const TienIchModel = {
       SET TenTI = ?, MoTa = ?
       WHERE MaTI = ?
     `;
-    const [result] = await db.execute(sql, [TenTI.trim(), MoTa ? MoTa.trim() : '', maTI]);
+    const [result] = await db.execute(sql, [
+      TenTI.trim(),
+      MoTa ? MoTa.trim() : '',
+      maTI,
+    ]);
     return result.affectedRows > 0;
   },
 

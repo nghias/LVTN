@@ -108,17 +108,14 @@ class KhachThueController {
     try {
       const { HoTen, CCCD, NamSinh, SDT, Email, DiaChi, TenTK, MatKhau } = req.body;
 
-      if (!HoTen || !CCCD || !SDT || !TenTK || !MatKhau) {
+      if (!HoTen || !CCCD || !SDT || !MatKhau) {
         return errorResponse(
           res,
-          'Vui lòng nhập đầy đủ Họ tên, CCCD, SĐT, Tên tài khoản và Mật khẩu!',
+          'Vui lòng nhập đầy đủ Họ tên, CCCD, SĐT và Mật khẩu!',
           400
         );
       }
 
-      if (await NguoiDungModel.checkDuplicateField('TenTK', TenTK.trim())) {
-        return errorResponse(res, `Tên tài khoản "${TenTK}" đã tồn tại!`, 400);
-      }
       if (await NguoiDungModel.checkDuplicateField('CCCD', CCCD.trim())) {
         return errorResponse(res, `Số CCCD "${CCCD}" đã được đăng ký!`, 400);
       }
@@ -138,7 +135,7 @@ class KhachThueController {
         SDT: SDT.trim(),
         Email: Email ? Email.trim() : null,
         DiaChi: DiaChi ? DiaChi.trim() : '',
-        TenTK: TenTK.trim(),
+        TenTK: Email,
         MatKhau: hashedPassword,
       });
 
@@ -158,16 +155,12 @@ class KhachThueController {
       if (error) return errorResponse(res, error, status);
 
       const { HoTen, CCCD, NamSinh, SDT, Email, DiaChi, TenTK } = req.body;
-      if (!HoTen || !CCCD || !SDT || !TenTK) {
+      if (!HoTen || !CCCD || !SDT) {
         return errorResponse(
           res,
           'Vui lòng nhập đầy đủ Họ tên, CCCD, SĐT và Tên tài khoản!',
           400
         );
-      }
-
-      if (await NguoiDungModel.checkDuplicateField('TenTK', TenTK.trim(), maND)) {
-        return errorResponse(res, `Tên tài khoản "${TenTK}" đã tồn tại!`, 400);
       }
       if (await NguoiDungModel.checkDuplicateField('CCCD', CCCD.trim(), maND)) {
         return errorResponse(res, `Số CCCD "${CCCD}" đã được sử dụng bởi người khác!`, 400);
@@ -186,7 +179,7 @@ class KhachThueController {
         SDT: SDT.trim(),
         Email: Email ? Email.trim() : null,
         DiaChi: DiaChi ? DiaChi.trim() : '',
-        TenTK: TenTK.trim(),
+        TenTK: Email,
       });
 
       const updated = await NguoiDungModel.findById(maND);

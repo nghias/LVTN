@@ -6,11 +6,12 @@ export interface TienIchItem {
   MoTa?: string;
 }
 
-export interface PhuPhiItem {
-  MaPP: number;
-  TenPP: string;
-  Gia: number;
-  GhiChu?: string;
+export interface PhiDichVuItem {
+  MaDV: number;    
+  TenDV: string;     
+  DonGia: number;      
+  DonViTinh?: string; 
+  MoTa?: string;
 }
 
 export interface TinDangHome {
@@ -53,7 +54,7 @@ export interface GiaDienNuocHome {
 export interface HomeDataPayload {
   tinDang: TinDangHome[];
   tienIch: TienIchItem[];
-  phuPhi: PhuPhiItem[];
+  phiDichVu: PhiDichVuItem[];
   khuTro: KhuTroSummary[];
   giaDienNuoc: GiaDienNuocHome;
 }

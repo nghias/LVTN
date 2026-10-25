@@ -140,6 +140,7 @@ export default function ThemKhachThuePage() {
                   <input
                     type="email"
                     name="Email"
+                    required
                     value={formData.Email}
                     onChange={handleChange}
                     placeholder="VD: minhkhoi.nguyen02@gmail.com"
@@ -164,21 +165,6 @@ export default function ThemKhachThuePage() {
               </div>
 
               <div className="border-t border-slate-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Tên tài khoản đăng nhập (TenTK) *
-                  </label>
-                  <input
-                    type="text"
-                    name="TenTK"
-                    required
-                    value={formData.TenTK}
-                    onChange={handleChange}
-                    placeholder="VD: minhkhoi02"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                  />
-                </div>
-
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Mật khẩu khởi tạo *

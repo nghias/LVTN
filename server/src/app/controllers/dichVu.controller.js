@@ -1,5 +1,5 @@
 // server/src/app/controllers/dichVu.controller.js
-const DichVuModel = require('../models/dichVu.model');
+const DichVuModel = require('../models/PhiDichVu.model');
 const ChiTietDichVuModel = require('../models/chiTietDichVu.model');
 const KhuTroModel = require('../models/khuTro.model');
 const PhongTroModel = require('../models/phongTro.model');
