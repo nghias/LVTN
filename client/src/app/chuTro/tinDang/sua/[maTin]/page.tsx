@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useRouter, usePathname, useParams } from "next/navigation";
 import ProtectedRoute from "../../../../../components/common/ProtectedRoute";
 import QuanLyHeader from "../../../../../components/layout/QuanLyHeader";
@@ -19,6 +26,31 @@ interface TinDangFormData {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
+// Định dạng chuỗi số sang dạng có dấu chấm phân cách hàng nghìn (giữ nguyên số 0 đứng đầu khi đang sửa)
+function formatGiaInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+// Tính vị trí con trỏ trong chuỗi đã có dấu chấm dựa theo số lượng chữ số đứng trước con trỏ
+function getCaretPositionByDigitIndex(
+  formatted: string,
+  digitIndex: number,
+): number {
+  if (digitIndex <= 0) return 0;
+  let count = 0;
+  for (let i = 0; i < formatted.length; i++) {
+    if (/\d/.test(formatted[i])) {
+      count++;
+      if (count === digitIndex) {
+        return i + 1;
+      }
+    }
+  }
+  return formatted.length;
+}
+
 // Lấy chuỗi ngày hiện tại YYYY-MM-DD theo giờ địa phương
 function getTodayDateString(): string {
   const now = new Date();
@@ -31,7 +63,6 @@ function getTodayDateString(): string {
 // Chuyển đổi chuỗi ngày bất kỳ (từ DB hoặc input) về chuẩn YYYY-MM-DD theo giờ địa phương
 function toLocalDateString(dateInput?: string | null): string {
   if (!dateInput) return "";
-  // Nếu đã đúng định dạng YYYY-MM-DD thì giữ nguyên
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput.trim())) {
     return dateInput.trim();
   }
@@ -61,6 +92,10 @@ export default function SuaTinDangPage() {
 
   const { showSuccess, showError } = useAlertModal();
 
+  // Ref quản lý vị trí con trỏ của ô nhập giá niêm yết
+  const giaInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingCaretDigitIndexRef = useRef<number | null>(null);
+
   // Đường dẫn quay về trang danh sách tinDang
   const baseTinDangPath = useMemo(() => {
     return pathname.replace(/\/sua\/[^/]+\/?$/, "");
@@ -85,6 +120,20 @@ export default function SuaTinDangPage() {
     NgayHetHan: "",
     TrangThai: "DangHienThi",
   });
+
+  // Khôi phục chính xác vị trí con trỏ sau mỗi lần giá trị Gia thay đổi
+  useLayoutEffect(() => {
+    if (pendingCaretDigitIndexRef.current === null || !giaInputRef.current) {
+      return;
+    }
+    const formatted = formatGiaInput(formData.Gia);
+    const nextPos = getCaretPositionByDigitIndex(
+      formatted,
+      pendingCaretDigitIndexRef.current,
+    );
+    giaInputRef.current.setSelectionRange(nextPos, nextPos);
+    pendingCaretDigitIndexRef.current = null;
+  }, [formData.Gia]);
 
   const getStoredMaND = useCallback((): number => {
     if (typeof window === "undefined") return 1;
@@ -196,12 +245,10 @@ export default function SuaTinDangPage() {
     const currentToday = getTodayDateString();
     const selectedDate = toLocalDateString(formData.NgayHetHan);
 
-    // 1. Nếu có chọn ngày hết hạn và ngày đó nhỏ hơn HOẶC BẰNG ngày hiện tại -> Cảnh báo ngay
     if (selectedDate && selectedDate <= currentToday) {
       return true;
     }
 
-    // 2. Nếu tin gốc vốn đang "HetHan", chuyển sang "DangHienThi" mà để trống ngày hết hạn -> Cảnh báo
     if (initialTrangThai === "HetHan" && !selectedDate) {
       return true;
     }
@@ -214,6 +261,7 @@ export default function SuaTinDangPage() {
     const foundRoom = phongOptions.find(
       (p) => String(p.MaPhong) === String(newMaPhong),
     );
+    pendingCaretDigitIndexRef.current = null;
     setFormData((prev) => ({
       ...prev,
       MaPhong: newMaPhong,
@@ -224,12 +272,104 @@ export default function SuaTinDangPage() {
     }));
   };
 
-  // Khi rời khỏi ô nhập giá: nếu xóa trắng hoặc <= 0 thì tự động trả về giá niêm yết cũ của phòng
+  // Cập nhật chuỗi giá kèm lưu lại vị trí chữ số của con trỏ
+  const updateGiaWithCaret = (nextRawDigits: string, caretDigitIndex: number) => {
+    const cleaned = nextRawDigits.replace(/\D/g, "").slice(0, 12);
+    pendingCaretDigitIndexRef.current = Math.max(
+      0,
+      Math.min(caretDigitIndex, cleaned.length),
+    );
+
+    setFormData((prev) => {
+      if (prev.Gia === cleaned && giaInputRef.current) {
+        const formatted = formatGiaInput(cleaned);
+        const pos = getCaretPositionByDigitIndex(
+          formatted,
+          pendingCaretDigitIndexRef.current ?? formatted.length,
+        );
+        giaInputRef.current.setSelectionRange(pos, pos);
+        pendingCaretDigitIndexRef.current = null;
+      }
+      return { ...prev, Gia: cleaned };
+    });
+  };
+
+  // Xử lý khi gõ hoặc dán số vào ô Giá niêm yết
+  const handleGiaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputEl = e.target;
+    const selectionStart = inputEl.selectionStart ?? inputEl.value.length;
+    const digitsBeforeCursor = inputEl.value
+      .slice(0, selectionStart)
+      .replace(/\D/g, "").length;
+    const rawDigits = inputEl.value.replace(/\D/g, "").slice(0, 12);
+
+    updateGiaWithCaret(rawDigits, digitsBeforeCursor);
+  };
+
+  // Xử lý phím Backspace/Delete qua dấu chấm và phím mũi tên Lên/Xuống tăng giảm theo từng hàng
+  const handleGiaKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const inputEl = e.currentTarget;
+    const start = inputEl.selectionStart ?? 0;
+    const end = inputEl.selectionEnd ?? 0;
+    const val = inputEl.value;
+
+    // 1. Khi nhấn Backspace ngay sau dấu chấm (VD: 3.|500.000) -> xóa chữ số đứng trước dấu chấm
+    if (e.key === "Backspace" && start === end && start > 0 && val[start - 1] === ".") {
+      e.preventDefault();
+      const digitsBeforeDot = val.slice(0, start - 1).replace(/\D/g, "");
+      if (digitsBeforeDot.length === 0) return;
+      const deleteIdx = digitsBeforeDot.length - 1;
+      const allDigits = val.replace(/\D/g, "");
+      const nextRaw =
+        allDigits.slice(0, deleteIdx) + allDigits.slice(deleteIdx + 1);
+      updateGiaWithCaret(nextRaw, deleteIdx);
+      return;
+    }
+
+    // 2. Khi nhấn Delete ngay trước dấu chấm (VD: 3|.500.000) -> xóa chữ số đứng sau dấu chấm
+    if (e.key === "Delete" && start === end && start < val.length && val[start] === ".") {
+      e.preventDefault();
+      const deleteIdx = val.slice(0, start).replace(/\D/g, "").length;
+      const allDigits = val.replace(/\D/g, "");
+      if (deleteIdx >= allDigits.length) return;
+      const nextRaw =
+        allDigits.slice(0, deleteIdx) + allDigits.slice(deleteIdx + 1);
+      updateGiaWithCaret(nextRaw, deleteIdx);
+      return;
+    }
+
+    // 3. Nhấn phím Mũi tên Lên / Xuống để tăng/giảm trực tiếp tại đúng hàng đang đặt con trỏ (đơn vị -> triệu)
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const allDigits = val.replace(/\D/g, "");
+      const currentNum = Number(allDigits || 0);
+      const rawDigitsToRight = val.slice(start).replace(/\D/g, "").length;
+      const digitsToRight =
+        allDigits.length > 0
+          ? Math.min(rawDigitsToRight, allDigits.length - 1)
+          : 0;
+      const step = Math.pow(10, digitsToRight);
+      const delta = e.key === "ArrowUp" ? step : -step;
+      const nextNum = Math.max(0, currentNum + delta);
+      const nextRaw = nextNum > 0 ? String(nextNum).slice(0, 12) : "0";
+      const nextCaretDigitIdx = Math.max(0, nextRaw.length - digitsToRight);
+      updateGiaWithCaret(nextRaw, nextCaretDigitIdx);
+    }
+  };
+
+  // Khi rời khỏi ô nhập giá: chuẩn hóa số 0 ở đầu hoặc khôi phục giá cũ nếu xóa trắng
   const handleGiaBlur = () => {
     const currentNum = Number(formData.Gia);
     if (!formData.Gia.trim() || isNaN(currentNum) || currentNum <= 0) {
       if (giaGoc) {
         setFormData((prev) => ({ ...prev, Gia: giaGoc }));
+      } else {
+        setFormData((prev) => ({ ...prev, Gia: "" }));
+      }
+    } else {
+      const normalized = String(Math.round(currentNum));
+      if (normalized !== formData.Gia) {
+        setFormData((prev) => ({ ...prev, Gia: normalized }));
       }
     }
   };
@@ -254,8 +394,11 @@ export default function SuaTinDangPage() {
       return;
     }
 
-    // Nếu người dùng xóa trắng ô giá và nhấn Lưu ngay, tự động lấy giá niêm yết cũ
-    const finalGiaStr = formData.Gia.trim() || giaGoc;
+    const parsedInputGia = Number(formData.Gia);
+    const finalGiaStr =
+      formData.Gia.trim() && !isNaN(parsedInputGia) && parsedInputGia > 0
+        ? String(Math.round(parsedInputGia))
+        : giaGoc;
     const giaNum = Number(finalGiaStr);
     if (!finalGiaStr || isNaN(giaNum) || giaNum <= 0) {
       setFormError("Vui lòng nhập giá niêm yết phòng hợp lệ (lớn hơn 0).");
@@ -271,7 +414,6 @@ export default function SuaTinDangPage() {
       return;
     }
 
-    // Kiểm tra lại với getTodayDateString() ngay lúc nhấn Lưu
     const currentToday = getTodayDateString();
     const selectedDate = toLocalDateString(formData.NgayHetHan);
 
@@ -286,7 +428,6 @@ export default function SuaTinDangPage() {
       return;
     }
 
-    // Đảm bảo nếu trạng thái là HetHan thì ngày hết hạn gửi lên là ngày hiện tại
     const finalNgayHetHan =
       formData.TrangThai === "HetHan" ? currentToday : selectedDate || null;
 
@@ -327,9 +468,17 @@ export default function SuaTinDangPage() {
   };
 
   // Giá thực tế sẽ áp dụng (nếu đang xóa trống thì hiển thị giá cũ của phòng)
-  const effectiveGia = Number(formData.Gia || giaGoc || 0);
+  const parsedGia = Number(formData.Gia);
+  const effectiveGia =
+    formData.Gia.trim() && !isNaN(parsedGia) && parsedGia > 0
+      ? parsedGia
+      : Number(giaGoc || 0);
   const isGiaChanged = Boolean(
-    giaGoc && formData.Gia && formData.Gia !== giaGoc,
+    giaGoc &&
+      formData.Gia.trim() &&
+      !isNaN(parsedGia) &&
+      parsedGia > 0 &&
+      Math.round(parsedGia) !== Math.round(Number(giaGoc)),
   );
 
   const todayDisplay = formatDisplayDate(getTodayDateString());
@@ -428,8 +577,8 @@ export default function SuaTinDangPage() {
                       </select>
                     </div>
 
-                    {/* Ô chỉnh sửa Giá niêm yết tối ưu UX */}
-                    <div className="space-y-2">
+                    {/* Ô chỉnh sửa Giá niêm yết từ hàng đơn vị đến hàng triệu */}
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-bold text-slate-700">
                           Giá niêm yết phòng (VNĐ/tháng){" "}
@@ -438,9 +587,11 @@ export default function SuaTinDangPage() {
                         {isGiaChanged && (
                           <button
                             type="button"
-                            onClick={() =>
-                              setFormData((prev) => ({ ...prev, Gia: giaGoc }))
-                            }
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              pendingCaretDigitIndexRef.current = null;
+                              setFormData((prev) => ({ ...prev, Gia: giaGoc }));
+                            }}
                             className="text-[11px] font-bold text-teal-700 hover:text-teal-900 underline cursor-pointer"
                           >
                             ↺ Về giá cũ (
@@ -451,18 +602,13 @@ export default function SuaTinDangPage() {
 
                       <div className="relative">
                         <input
+                          ref={giaInputRef}
                           type="text"
                           inputMode="numeric"
                           disabled={isSubmitting || !formData.MaPhong}
-                          value={
-                            formData.Gia
-                              ? Number(formData.Gia).toLocaleString("vi-VN")
-                              : ""
-                          }
-                          onChange={(e) => {
-                            const rawValue = e.target.value.replace(/\D/g, "");
-                            setFormData({ ...formData, Gia: rawValue });
-                          }}
+                          value={formatGiaInput(formData.Gia)}
+                          onChange={handleGiaChange}
+                          onKeyDown={handleGiaKeyDown}
                           onBlur={handleGiaBlur}
                           placeholder={
                             giaGoc
@@ -576,7 +722,6 @@ export default function SuaTinDangPage() {
                       </div>
                     </div>
 
-                    {/* Cảnh báo nhắc người dùng khi ngày hết hạn <= getTodayDateString() */}
                     {isExpiredDateWarning && (
                       <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 space-y-2.5">
                         <p className="text-xs font-bold leading-relaxed">

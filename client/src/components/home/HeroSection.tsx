@@ -105,14 +105,14 @@ export default function HeroSection({
             <button
               type="button"
               onClick={onOpenChat}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-[#00FFCC] text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer"
+              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
-              Hỏi Trợ lý ảo AI
+              Hỏi trợ lý AI
             </button>
             <button
               type="button"
               onClick={() => onScrollToSection("bang-gia")}
-              className="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs sm:text-sm font-semibold rounded-xl transition cursor-pointer"
+              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
               Xem bảng giá niêm yết
             </button>
