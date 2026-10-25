@@ -1,10 +1,10 @@
-const pool = require("../../database/db");
+const db = require("../../database/db");
 
 const TinDangModel = {
   // Kiểm tra thông tin và quyền của người dùng
   async getNguoiDungById(maND) {
     const sql = `SELECT MaND, HoTen, Quyen FROM NguoiDung WHERE MaND = ? LIMIT 1`;
-    const [rows] = await pool.query(sql, [maND]);
+    const [rows] = await db.query(sql, [maND]);
     return rows[0] || null;
   },
 
@@ -17,7 +17,7 @@ const TinDangModel = {
       WHERE p.MaPhong = ? AND k.MaND = ?
       LIMIT 1
     `;
-    const [rows] = await pool.query(sql, [maPhong, maND]);
+    const [rows] = await db.query(sql, [maPhong, maND]);
     return rows.length > 0;
   },
 
@@ -31,7 +31,7 @@ const TinDangModel = {
       WHERE td.MaTin = ? AND k.MaND = ?
       LIMIT 1
     `;
-    const [rows] = await pool.query(sql, [maTin, maND]);
+    const [rows] = await db.query(sql, [maTin, maND]);
     return rows.length > 0;
   },
 
@@ -73,7 +73,7 @@ const TinDangModel = {
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
 
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await db.query(sql, params);
     return rows.map((row) => ({
       ...row,
       DienTich: Number(row.DienTich),
@@ -110,7 +110,7 @@ const TinDangModel = {
       ORDER BY k.MaKhu ASC, p.MaPhong ASC
     `;
 
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await db.query(sql, params);
     return rows.map((row) => ({
       ...row,
       DienTich: Number(row.DienTich),
@@ -143,7 +143,7 @@ const TinDangModel = {
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
-    const [rows] = await pool.query(sql);
+    const [rows] = await db.query(sql);
     return rows.map((row) => ({
       ...row,
       DienTich: Number(row.DienTich),
@@ -157,7 +157,7 @@ const TinDangModel = {
       INSERT INTO TinDang (MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai)
       VALUES (?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await pool.query(sql, [
+    const [result] = await db.query(sql, [
       MaPhong,
       MaND,
       TieuDe,
@@ -179,7 +179,7 @@ const TinDangModel = {
           TrangThai = ?
       WHERE MaTin = ?
     `;
-    const [result] = await pool.query(sql, [
+    const [result] = await db.query(sql, [
       MaPhong,
       TieuDe,
       MoTa || null,
@@ -193,7 +193,17 @@ const TinDangModel = {
   // 6. Xóa tin đăng theo MaTin
   async deleteTinDang(maTin) {
     const sql = `DELETE FROM TinDang WHERE MaTin = ?`;
-    const [result] = await pool.query(sql, [maTin]);
+    const [result] = await db.query(sql, [maTin]);
+    return result.affectedRows > 0;
+  },
+  // 7. Cập nhật giá phòng
+  async updateGiaPhong(maPhong, giaMoi) {
+    const sql = `
+      UPDATE Phong
+      SET Gia = ?
+      WHERE MaPhong = ?
+    `;
+    const [result] = await db.query(sql, [Number(giaMoi), Number(maPhong)]);
     return result.affectedRows > 0;
   },
 };

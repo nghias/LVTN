@@ -9,6 +9,7 @@ import type { TrangThaiTin, PhongSelectOption } from "../page";
 
 interface TinDangFormData {
   MaPhong: string;
+  Gia: string;
   MaND: number;
   TieuDe: string;
   MoTa: string;
@@ -36,6 +37,7 @@ export default function ThemTinDangPage() {
 
   const [formData, setFormData] = useState<TinDangFormData>({
     MaPhong: "",
+    Gia: "",
     MaND: 1,
     TieuDe: "",
     MoTa: "",
@@ -106,10 +108,18 @@ export default function ThemTinDangPage() {
           defaultRoomId = String(rooms[0].MaPhong);
         }
 
+        const defaultRoom = rooms.find(
+          (r) => String(r.MaPhong) === String(defaultRoomId),
+        );
+
         setFormData((prev) => ({
           ...prev,
           MaND: maND,
           MaPhong: defaultRoomId,
+          Gia:
+            defaultRoom?.Gia !== undefined
+              ? String(Math.round(Number(defaultRoom.Gia)))
+              : "",
         }));
       } catch (err: unknown) {
         if (err instanceof Error) {
@@ -131,12 +141,32 @@ export default function ThemTinDangPage() {
     );
   }, [phongOptions, formData.MaPhong]);
 
+  // Khi đổi phòng, tự động điền giá hiện tại của phòng đó vào ô Giá niêm yết
+  const handlePhongChange = (newMaPhong: string) => {
+    const foundRoom = phongOptions.find(
+      (p) => String(p.MaPhong) === String(newMaPhong),
+    );
+    setFormData((prev) => ({
+      ...prev,
+      MaPhong: newMaPhong,
+      Gia:
+        foundRoom?.Gia !== undefined
+          ? String(Math.round(Number(foundRoom.Gia)))
+          : "",
+    }));
+  };
+
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
     if (!formData.MaPhong) {
       setFormError("Vui lòng chọn phòng trọ cần đăng tin.");
+      return;
+    }
+    const giaNum = Number(formData.Gia);
+    if (!formData.Gia.trim() || isNaN(giaNum) || giaNum <= 0) {
+      setFormError("Vui lòng nhập giá niêm yết phòng hợp lệ (lớn hơn 0).");
       return;
     }
     if (!formData.TieuDe.trim()) {
@@ -154,8 +184,10 @@ export default function ThemTinDangPage() {
       const response = await fetch(`${API_BASE_URL}/tin-dang`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           MaPhong: Number(formData.MaPhong),
+          Gia: giaNum,
           MaND: formData.MaND || getStoredMaND(),
           TieuDe: formData.TieuDe.trim(),
           MoTa: formData.MoTa.trim() || null,
@@ -196,8 +228,8 @@ export default function ThemTinDangPage() {
                   Đăng Tin Tìm Khách Thuê Mới
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Điền thông tin chi tiết để giới thiệu phòng trọ công khai đến
-                  khách tìm phòng
+                  Điền thông tin chi tiết và điều chỉnh giá niêm yết để giới
+                  thiệu phòng trọ đến khách tìm phòng
                 </p>
               </div>
 
@@ -206,7 +238,7 @@ export default function ThemTinDangPage() {
                 onClick={() => router.push(baseTinDangPath)}
                 className="self-start sm:self-auto px-4 py-2.5 rounded-full border border-slate-300 bg-white hover:bg-slate-100 text-xs font-bold text-slate-700 transition cursor-pointer"
               >
-                ← Quay lại danh sách
+                Quay lại
               </button>
             </div>
 
@@ -229,29 +261,53 @@ export default function ThemTinDangPage() {
                     </div>
                   )}
 
-                  {/* Chọn Phòng trọ (`MaPhong`) */}
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700">
-                      Chọn phòng cần đăng tin{" "}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.MaPhong}
-                      onChange={(e) =>
-                        setFormData({ ...formData, MaPhong: e.target.value })
-                      }
-                      disabled={isSubmitting}
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                    >
-                      <option value="">-- Chọn phòng trong cơ sở --</option>
-                      {phongOptions.map((p) => (
-                        <option key={p.MaPhong} value={String(p.MaPhong)}>
-                          {p.TenKhu} - Phòng {p.TenPhong} (
-                          {Number(p.Gia).toLocaleString("vi-VN")}đ -{" "}
-                          {p.DienTich}m²)
-                        </option>
-                      ))}
-                    </select>
+                  {/* Chọn Phòng trọ (`MaPhong`) & Giá niêm yết (`Gia`) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Chọn phòng cần đăng tin{" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.MaPhong}
+                        onChange={(e) => handlePhongChange(e.target.value)}
+                        disabled={isSubmitting}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                      >
+                        <option value="">-- Chọn phòng trong cơ sở --</option>
+                        {phongOptions.map((p) => (
+                          <option key={p.MaPhong} value={String(p.MaPhong)}>
+                            Phòng {p.TenPhong} - {p.TenKhu} (
+                            {Number(p.Gia).toLocaleString("vi-VN")}đ -{" "}
+                            {p.DienTich}m²)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Giá niêm yết phòng (VNĐ/tháng){" "}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        disabled={isSubmitting || !formData.MaPhong}
+                        value={
+                          formData.Gia
+                            ? Number(formData.Gia).toLocaleString("vi-VN")
+                            : ""
+                        }
+                        onChange={(e) => {
+                          // Chỉ giữ lại các chữ số (loại bỏ dấu chấm phân cách khi lưu vào state)
+                          const rawValue = e.target.value.replace(/\D/g, "");
+                          setFormData({ ...formData, Gia: rawValue });
+                        }}
+                        placeholder="VD: 3.500.000"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-semibold text-teal-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                      />
+                    </div>
                   </div>
 
                   {/* Khung xem nhanh thông tin phòng đã chọn */}
@@ -268,10 +324,12 @@ export default function ThemTinDangPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-xs text-slate-500 block">
-                          Giá niêm yết
+                          Giá niêm yết công khai
                         </span>
                         <span className="text-base font-extrabold text-teal-700">
-                          {Number(selectedRoomInfo.Gia).toLocaleString("vi-VN")}{" "}
+                          {Number(
+                            formData.Gia || selectedRoomInfo.Gia || 0,
+                          ).toLocaleString("vi-VN")}{" "}
                           đ / tháng
                         </span>
                       </div>

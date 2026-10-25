@@ -79,10 +79,10 @@ const TinDangController = {
     }
   },
 
-  // POST /tin-dang (Đăng tin mới - Xét quyền ChuTro được đăng mọi cơ sở, QuanLy chỉ đăng ở khu của mình)
+  // POST /tin-dang (Đăng tin mới + Cập nhật giá niêm yết phòng nếu có)
   async create(req, res) {
     try {
-      const { MaPhong, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
+      const { MaPhong, Gia, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
       const currentMaND = extractCurrentMaND(req);
 
       if (!MaPhong || !TieuDe) {
@@ -90,6 +90,16 @@ const TinDangController = {
           success: false,
           message: 'Vui lòng chọn phòng và nhập tiêu đề bài đăng.',
         });
+      }
+
+      if (Gia !== undefined && Gia !== null && Gia !== '') {
+        const giaNum = Number(Gia);
+        if (isNaN(giaNum) || giaNum <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Giá niêm yết phòng không hợp lệ.',
+          });
+        }
       }
 
       if (!currentMaND) {
@@ -122,6 +132,11 @@ const TinDangController = {
         }
       }
 
+      // Nếu người dùng truyền Gia lên thì cập nhật giá niêm yết của phòng đó
+      if (Gia !== undefined && Gia !== null && Gia !== '') {
+        await TinDangModel.updateGiaPhong(Number(MaPhong), Number(Gia));
+      }
+
       const insertId = await TinDangModel.createTinDang({
         MaPhong: Number(MaPhong),
         MaND: nguoiDung.MaND,
@@ -145,11 +160,11 @@ const TinDangController = {
     }
   },
 
-  // PUT /tin-dang/:maTin (Cập nhật tin đăng - Xét quyền tương tự)
+  // PUT /tin-dang/:maTin (Cập nhật tin đăng + Cập nhật giá niêm yết phòng nếu có)
   async update(req, res) {
     try {
       const { maTin } = req.params;
-      const { MaPhong, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
+      const { MaPhong, Gia, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
       const currentMaND = extractCurrentMaND(req);
 
       if (!currentMaND) {
@@ -157,6 +172,16 @@ const TinDangController = {
           success: false,
           message: 'Không xác định được người dùng thực hiện.',
         });
+      }
+
+      if (Gia !== undefined && Gia !== null && Gia !== '') {
+        const giaNum = Number(Gia);
+        if (isNaN(giaNum) || giaNum <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Giá niêm yết phòng không hợp lệ.',
+          });
+        }
       }
 
       const nguoiDung = await TinDangModel.getNguoiDungById(Number(currentMaND));
@@ -196,6 +221,11 @@ const TinDangController = {
           success: false,
           message: 'Không tìm thấy tin đăng cần chỉnh sửa.',
         });
+      }
+
+      // Cập nhật giá niêm yết của phòng trong bảng Phong
+      if (Gia !== undefined && Gia !== null && Gia !== '') {
+        await TinDangModel.updateGiaPhong(Number(MaPhong), Number(Gia));
       }
 
       return res.status(200).json({

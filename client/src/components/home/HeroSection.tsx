@@ -118,19 +118,20 @@ export default function HeroSection({
             </button>
           </div>
         </div>
-
         {/* Cột phải: Sơ đồ 4 bước Vòng lặp vận hành khép kín */}
-        <div className="lg:col-span-5 bg-slate-900 text-white rounded-3xl p-6 sm:p-7 space-y-5 border border-slate-800">
-          <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-4">
+
+        <div className="lg:col-span-5 bg-[#F0FDF4] text-slate-900 rounded-3xl p-6 sm:p-7 space-y-5 border border-emerald-200 shadow-sm">
+          <div className="flex items-center justify-between gap-2 border-b border-emerald-200 pb-4">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#00FFCC]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
                 Tự động hóa quy trình
               </span>
-              <h2 className="text-base sm:text-lg font-bold text-white mt-0.5">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
                 Vòng Lặp Vận Hành Khép Kín
               </h2>
             </div>
-            <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#00FFCC]/15 text-[#00FFCC] border border-[#00FFCC]/30">
+
+            <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
               IoT + AI Core
             </span>
           </div>
@@ -139,21 +140,24 @@ export default function HeroSection({
             {VONG_LAP_VAN_HANH.map((item) => (
               <div
                 key={item.buoc}
-                className="p-3.5 rounded-2xl bg-slate-800/70 border border-slate-700/80 flex items-start gap-3.5"
+                className="p-3.5 rounded-2xl bg-white border border-emerald-100 shadow-sm flex items-start gap-3.5 transition hover:border-emerald-300 hover:shadow-md"
               >
-                <div className="w-9 h-9 rounded-xl bg-[#00FFCC] text-slate-900 font-bold text-xs flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
                   {item.buoc}
                 </div>
+
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-xs sm:text-sm font-bold text-white">
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-900">
                       {item.tieuDe}
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-[#00FFCC] border border-slate-700 shrink-0">
+
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                       {item.nhan}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
+
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
                     {item.moTa}
                   </p>
                 </div>
