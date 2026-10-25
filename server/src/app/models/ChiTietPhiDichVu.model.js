@@ -1,49 +1,86 @@
-const db = require("../../database/db");
+// server/src/app/models/chiTietDichVu.model.js
+const db = require('../../database/db');
 
-const ChiTietPhiDichVuModel = {
-  // Lấy danh sách chi tiết phí dịch vụ theo Mã Hợp Đồng Thuê (MaHDT)
+// Đổi thành 'ChiTietDichVu' nếu tên bảng trong CSDL của bạn là ChiTietDichVu
+const TABLE_NAME = 'ChiTietPhiDichVu';
+
+const ChiTietDichVuModel = {
+  // 1. Lấy toàn bộ bản ghi (MaHDT, MaDV, SoLuong)
+  getAll: async () => {
+    const sql = `SELECT MaHDT, MaDV, SoLuong FROM ${TABLE_NAME}`;
+    const [rows] = await db.execute(sql);
+    return rows;
+  },
+
+  // 2. Lấy danh sách hợp đồng đang sử dụng 1 dịch vụ (MaDV)
+  getByMaDV: async (maDV) => {
+    const sql = `
+      SELECT MaHDT, MaDV, SoLuong
+      FROM ${TABLE_NAME}
+      WHERE MaDV = ?
+    `;
+    const [rows] = await db.execute(sql, [maDV]);
+    return rows;
+  },
+
+  // 3. Lấy danh sách dịch vụ đã đăng ký của 1 hợp đồng (Dùng khi xem/sửa Hợp đồng)
   getByMaHDT: async (maHDT) => {
     const sql = `
-      SELECT c.MaHDT, c.MaDV, c.SoLuong, 
-             d.TenDV, d.DonGia, d.DonViTinh
-      FROM ChiTietPhiDichVu c
-      JOIN PhiDichVu d ON c.MaDV = d.MaDV
-      WHERE c.MaHDT = ?
+      SELECT MaHDT, MaDV, SoLuong
+      FROM ${TABLE_NAME}
+      WHERE MaHDT = ?
     `;
     const [rows] = await db.execute(sql, [maHDT]);
     return rows;
   },
 
-  // Thêm mới một bản ghi chi tiết phí dịch vụ
-  create: async ({ MaHDT, MaDV, SoLuong }) => {
+  // 4. Lấy danh sách dịch vụ của nhiều hợp đồng cùng lúc
+  getByMaHDTList: async (maHDTIds = []) => {
+    if (!maHDTIds || maHDTIds.length === 0) return [];
+    const placeholders = maHDTIds.map(() => '?').join(',');
     const sql = `
-      INSERT INTO ChiTietPhiDichVu (MaHDT, MaDV, SoLuong)
+      SELECT MaHDT, MaDV, SoLuong
+      FROM ${TABLE_NAME}
+      WHERE MaHDT IN (${placeholders})
+    `;
+    const [rows] = await db.execute(sql, maHDTIds);
+    return rows;
+  },
+
+  // 5. Đếm tổng số hợp đồng đang áp dụng 1 dịch vụ (Kiểm tra trước khi xóa dịch vụ)
+  countByMaDV: async (maDV) => {
+    const sql = `SELECT COUNT(*) AS total FROM ${TABLE_NAME} WHERE MaDV = ?`;
+    const [rows] = await db.execute(sql, [maDV]);
+    return rows[0]?.total || 0;
+  },
+
+  // 6. Gán dịch vụ vào hợp đồng kèm số lượng (Dùng khi tạo/sửa Hợp đồng)
+  create: async (maHDT, maDV, soLuong = 1) => {
+    const sql = `
+      INSERT INTO ${TABLE_NAME} (MaHDT, MaDV, SoLuong)
       VALUES (?, ?, ?)
     `;
-    const [result] = await db.execute(sql, [MaHDT, MaDV, SoLuong]);
-    return result.affectedRows > 0;
+    await db.execute(sql, [
+      Number(maHDT),
+      Number(maDV),
+      Math.max(1, Number(soLuong) || 1),
+    ]);
+    return true;
   },
 
-  // Cập nhật số lượng dịch vụ của hợp đồng
-  update: async (maHDT, maDV, { SoLuong }) => {
-    const sql = `
-      UPDATE ChiTietPhiDichVu
-      SET SoLuong = ?
-      WHERE MaHDT = ? AND MaDV = ?
-    `;
-    const [result] = await db.execute(sql, [SoLuong, maHDT, maDV]);
-    return result.affectedRows > 0;
+  // 7. Xóa toàn bộ dịch vụ của 1 hợp đồng (Dùng khi cập nhật lại dịch vụ của Hợp đồng)
+  deleteByMaHDT: async (maHDT) => {
+    const sql = `DELETE FROM ${TABLE_NAME} WHERE MaHDT = ?`;
+    await db.execute(sql, [maHDT]);
+    return true;
   },
 
-  // Xóa dịch vụ khỏi hợp đồng
-  delete: async (maHDT, maDV) => {
-    const sql = `
-      DELETE FROM ChiTietPhiDichVu 
-      WHERE MaHDT = ? AND MaDV = ?
-    `;
-    const [result] = await db.execute(sql, [maHDT, maDV]);
-    return result.affectedRows > 0;
+  // 8. Xóa theo MaDV
+  deleteByMaDV: async (maDV) => {
+    const sql = `DELETE FROM ${TABLE_NAME} WHERE MaDV = ?`;
+    await db.execute(sql, [maDV]);
+    return true;
   },
 };
 
-module.exports = ChiTietPhiDichVuModel;
+module.exports = ChiTietDichVuModel;

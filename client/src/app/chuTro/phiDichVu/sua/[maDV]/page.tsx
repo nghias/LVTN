@@ -7,12 +7,14 @@ import ProtectedRoute from '@/components/common/ProtectedRoute';
 import QuanLyHeader from '@/components/layout/QuanLyHeader';
 import CurrencyInput from '@/components/common/CurrencyInput';
 import { useAlertModal } from '@/components/common/AlertModalProvider';
-import { cleanDecimalString } from '@/utils/format.util';
-import {
-  dichVuService,
-  KhuTroOption,
-  PhongOption,
-} from '@/services/dichVu.service';
+import { dichVuService } from '@/services/dichVu.service';
+
+// Làm sạch đuôi thập phân .00 từ kiểu DECIMAL(18,2) của MySQL
+const cleanDecimalString = (val: unknown): string => {
+  if (val === null || val === undefined || val === '') return '';
+  const num = Math.round(Number(val));
+  return Number.isNaN(num) ? '' : String(num);
+};
 
 export default function SuaPhiDichVuPage() {
   const params = useParams();
@@ -24,104 +26,38 @@ export default function SuaPhiDichVuPage() {
   const [donGia, setDonGia] = useState<string>('');
   const [donViTinh, setDonViTinh] = useState<string>('');
   const [moTa, setMoTa] = useState<string>('');
+  const [soHopDongApDung, setSoHopDongApDung] = useState<number>(0);
 
-  const [khuTroList, setKhuTroList] = useState<KhuTroOption[]>([]);
-  const [phongList, setPhongList] = useState<PhongOption[]>([]);
-  const [activeMaKhu, setActiveMaKhu] = useState<number>(0);
-
-  const [selectedRooms, setSelectedRooms] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   useEffect(() => {
-    const loadData = async () => {
+    if (!maDV) return;
+
+    const fetchDetail = async () => {
       try {
         setLoading(true);
-        const [optionsRes, detailRes] = await Promise.all([
-          dichVuService.getPhongOptions(),
-          dichVuService.getById(maDV),
-        ]);
+        const res = await dichVuService.getById(maDV);
 
-        if (optionsRes.success && optionsRes.data) {
-          const khus: KhuTroOption[] = optionsRes.data.khuTroList || [];
-          setKhuTroList(khus);
-          setPhongList(optionsRes.data.phongList || []);
-          if (khus.length === 1) {
-            setActiveMaKhu(khus[0].MaKhu);
-          }
-        }
-
-        if (detailRes.success && detailRes.data) {
-          const dv = detailRes.data;
-          setTenDV(dv.TenDV || '');
-          setDonGia(cleanDecimalString(dv.DonGia));
-          setDonViTinh(dv.DonViTinh || '');
-          setMoTa(dv.MoTa || '');
-
-          const roomMap: Record<number, number> = {};
-          (dv.PhongApDung || []).forEach(
-            (item: { MaPhong: number; SoLuong: number }) => {
-              roomMap[Number(item.MaPhong)] = Number(item.SoLuong) || 1;
-            }
-          );
-          setSelectedRooms(roomMap);
+        if (res.success && res.data) {
+          setTenDV(res.data.TenDV || '');
+          setDonGia(cleanDecimalString(res.data.DonGia));
+          setDonViTinh(res.data.DonViTinh || '');
+          setMoTa(res.data.MoTa || '');
+          setSoHopDongApDung(Number(res.data.SoHopDongApDung) || 0);
         } else {
-          showError(detailRes.message || 'Không tìm thấy phí dịch vụ');
-          router.replace('/chuTro/phiDichVu');
+          showError(res.message || 'Không tìm thấy phí dịch vụ cần sửa');
+          router.push('/chuTro/phiDichVu');
         }
       } catch {
-        showError('Lỗi kết nối máy chủ khi tải dữ liệu');
+        showError('Lỗi kết nối khi tải thông tin phí dịch vụ');
       } finally {
         setLoading(false);
       }
     };
 
-    if (maDV) loadData();
+    fetchDetail();
   }, [maDV, router, showError]);
-
-  const filteredRooms =
-    activeMaKhu === 0
-      ? phongList
-      : phongList.filter((p) => Number(p.MaKhu) === Number(activeMaKhu));
-
-  const toggleRoom = (maPhong: number) => {
-    setSelectedRooms((prev) => {
-      const next = { ...prev };
-      if (next[maPhong]) {
-        delete next[maPhong];
-      } else {
-        next[maPhong] = 1;
-      }
-      return next;
-    });
-  };
-
-  const changeRoomQuantity = (maPhong: number, qty: number) => {
-    setSelectedRooms((prev) => ({
-      ...prev,
-      [maPhong]: Math.max(1, qty),
-    }));
-  };
-
-  const selectAllFilteredRooms = () => {
-    setSelectedRooms((prev) => {
-      const next = { ...prev };
-      filteredRooms.forEach((r) => {
-        if (!next[r.MaPhong]) next[r.MaPhong] = 1;
-      });
-      return next;
-    });
-  };
-
-  const unselectAllFilteredRooms = () => {
-    setSelectedRooms((prev) => {
-      const next = { ...prev };
-      filteredRooms.forEach((r) => {
-        delete next[r.MaPhong];
-      });
-      return next;
-    });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,13 +67,6 @@ export default function SuaPhiDichVuPage() {
       return;
     }
 
-    const phongApDungPayload = Object.entries(selectedRooms).map(
-      ([maPhong, soLuong]) => ({
-        MaPhong: Number(maPhong),
-        SoLuong: Number(soLuong) || 1,
-      })
-    );
-
     try {
       setSubmitting(true);
       const res = await dichVuService.update(maDV, {
@@ -145,13 +74,17 @@ export default function SuaPhiDichVuPage() {
         DonGia: Number(donGia),
         DonViTinh: donViTinh.trim(),
         MoTa: moTa.trim(),
-        PhongApDung: phongApDungPayload,
       });
 
       if (res.success) {
-        showSuccess(res.message || 'Cập nhật phí dịch vụ thành công!', 'Thành công', 1.5, () => {
-          router.push('/chuTro/phiDichVu');
-        });
+        showSuccess(
+          res.message || 'Cập nhật phí dịch vụ thành công!',
+          'Thành công',
+          1.5,
+          () => {
+            router.push('/chuTro/phiDichVu');
+          }
+        );
       } else {
         showError(res.message || 'Không thể cập nhật phí dịch vụ');
       }
@@ -168,7 +101,7 @@ export default function SuaPhiDichVuPage() {
         <div className="min-h-screen flex flex-col bg-white text-slate-900">
           <QuanLyHeader user={user} />
 
-          <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
+          <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
             <div className="mb-6">
               <Link
                 href="/chuTro/phiDichVu"
@@ -176,19 +109,22 @@ export default function SuaPhiDichVuPage() {
               >
                 ← Quay lại danh sách Phí dịch vụ
               </Link>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
-                Chỉnh Sửa Phí Dịch Vụ #{maDV}
-              </h1>
+              <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  Chỉnh Sửa Phí Dịch Vụ #{maDV}
+                </h1>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC]/30 text-slate-900 border border-[#00FFCC]">
+                  Đang áp dụng cho {soHopDongApDung} hợp đồng
+                </span>
+              </div>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                {user.Quyen === 'ChuTro'
-                  ? 'Quản lý thông tin dịch vụ và gán phòng áp dụng trên toàn bộ các cơ sở.'
-                  : 'Cập nhật phòng áp dụng trong cơ sở bạn quản lý (dữ liệu phòng ở cơ sở khác được giữ nguyên).'}
+                Cập nhật tên, đơn giá, đơn vị tính hoặc mô tả cho khoản phí dịch vụ này.
               </p>
             </div>
 
             {loading ? (
-              <div className="py-12 text-center text-sm text-slate-500">
-                Đang tải dữ liệu phí dịch vụ...
+              <div className="py-16 text-center text-slate-500 text-sm font-medium">
+                Đang tải thông tin phí dịch vụ...
               </div>
             ) : (
               <form
@@ -204,6 +140,7 @@ export default function SuaPhiDichVuPage() {
                       type="text"
                       value={tenDV}
                       onChange={(e) => setTenDV(e.target.value)}
+                      placeholder="VD: WiFi tốc độ cao, Giữ xe máy..."
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                       required
                     />
@@ -216,7 +153,7 @@ export default function SuaPhiDichVuPage() {
                     <CurrencyInput
                       value={donGia}
                       onChange={setDonGia}
-                      placeholder="VD: 3.500"
+                      placeholder="VD: 100.000"
                       suffix="VNĐ"
                     />
                   </div>
@@ -227,18 +164,18 @@ export default function SuaPhiDichVuPage() {
                     </label>
                     <input
                       type="text"
-                      list="donViTinhOptionsEdit"
+                      list="donViTinhOptions"
                       value={donViTinh}
                       onChange={(e) => setDonViTinh(e.target.value)}
+                      placeholder="VD: Tháng, Xe/Tháng..."
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                       required
                     />
-                    <datalist id="donViTinhOptionsEdit">
-                      <option value="kWh" />
-                      <option value="m3" />
+                    <datalist id="donViTinhOptions">
                       <option value="Tháng" />
                       <option value="Xe/Tháng" />
                       <option value="Người/Tháng" />
+                      <option value="Phòng/Tháng" />
                     </datalist>
                   </div>
                 </div>
@@ -248,141 +185,15 @@ export default function SuaPhiDichVuPage() {
                     Mô tả chi tiết
                   </label>
                   <textarea
-                    rows={3}
+                    rows={4}
                     value={moTa}
                     onChange={(e) => setMoTa(e.target.value)}
+                    placeholder="VD: Bãi để xe tầng trệt có camera an ninh..."
                     className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
 
-                {/* Khu vực Gán phòng áp dụng */}
-                <div className="pt-4 border-t border-slate-200 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                        Phòng Áp Dụng Phí Dịch Vụ
-                      </h2>
-                      <p className="text-xs text-slate-500">
-                        Đang áp dụng cho{' '}
-                        <span className="font-bold text-slate-900">
-                          {Object.keys(selectedRooms).length}
-                        </span>{' '}
-                        phòng {user.Quyen === 'QuanLy' ? 'thuộc cơ sở của bạn' : 'trên hệ thống'}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={selectAllFilteredRooms}
-                        className="px-3 py-1.5 rounded-lg bg-[#00FFCC]/30 hover:bg-[#00FFCC]/50 text-slate-900 text-xs font-bold transition cursor-pointer whitespace-nowrap"
-                      >
-                        Chọn tất cả phòng đang lọc
-                      </button>
-                      <button
-                        type="button"
-                        onClick={unselectAllFilteredRooms}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer whitespace-nowrap"
-                      >
-                        Bỏ chọn
-                      </button>
-                    </div>
-                  </div>
-
-                  {khuTroList.length > 1 && (
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setActiveMaKhu(0)}
-                        className={`px-3.5 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                          activeMaKhu === 0
-                            ? 'bg-[#00FFCC] text-slate-900 shadow-2xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        Tất cả cơ sở ({phongList.length})
-                      </button>
-                      {khuTroList.map((khu) => {
-                        const countInKhu = phongList.filter(
-                          (p) => Number(p.MaKhu) === Number(khu.MaKhu)
-                        ).length;
-                        return (
-                          <button
-                            key={khu.MaKhu}
-                            type="button"
-                            onClick={() => setActiveMaKhu(khu.MaKhu)}
-                            className={`px-3.5 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
-                              activeMaKhu === khu.MaKhu
-                                ? 'bg-[#00FFCC] text-slate-900 shadow-2xs'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                            }`}
-                          >
-                            {khu.TenKhu} ({countInKhu})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto p-1">
-                    {filteredRooms.map((room) => {
-                      const isChecked = Boolean(selectedRooms[room.MaPhong]);
-                      const soLuong = selectedRooms[room.MaPhong] || 1;
-
-                      return (
-                        <div
-                          key={room.MaPhong}
-                          className={`p-3 rounded-2xl border transition flex items-center justify-between gap-2 ${
-                            isChecked
-                              ? 'bg-[#00FFCC]/20 border-teal-500'
-                              : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <div
-                            onClick={() => toggleRoom(room.MaPhong)}
-                            className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {}}
-                              className="w-4 h-4 accent-teal-600 cursor-pointer shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 truncate">
-                                {room.TenPhong}
-                              </p>
-                              <p className="text-[11px] text-slate-500 truncate">
-                                {room.TenKhu}
-                              </p>
-                            </div>
-                          </div>
-
-                          {isChecked && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="text-[11px] font-semibold text-slate-600">
-                                SL:
-                              </span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={soLuong}
-                                onChange={(e) =>
-                                  changeRoomQuantity(
-                                    room.MaPhong,
-                                    Number(e.target.value)
-                                  )
-                                }
-                                className="w-14 px-2 py-1 rounded-lg border border-teal-500 bg-white text-xs font-bold text-center focus:outline-none"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
+                {/* Nút Lưu / Hủy */}
                 <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
                   <Link
                     href="/chuTro/phiDichVu"

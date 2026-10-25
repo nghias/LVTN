@@ -77,14 +77,14 @@ export default function QuanLyPhiDichVuPage() {
           <QuanLyHeader user={user} />
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            {/* Tiêu đề trang đồng bộ font-bold */}
+            {/* Tiêu đề trang */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Quản Lý Phí Dịch Vụ
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Thiết lập đơn giá Điện, Nước, Wifi, Máy giặt, Vệ sinh, Giữ xe và gán phòng áp dụng.
+                  Thiết lập danh mục và đơn giá các dịch vụ (WiFi, Máy giặt chung, Vệ sinh & Rác, Giữ xe...) để chọn khi lập hợp đồng thuê.
                 </p>
               </div>
 
@@ -161,14 +161,14 @@ export default function QuanLyPhiDichVuPage() {
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap w-20">Mã DV</th>
-                        <th className="py-3.5 px-4 font-bold whitespace-nowrap w-48">Tên Dịch Vụ</th>
+                        <th className="py-3.5 px-4 font-bold whitespace-nowrap w-52">Tên Dịch Vụ</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap w-36">Đơn Giá</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap w-32">Đơn Vị Tính</th>
                         <th className="py-3.5 px-4 font-bold">Mô Tả</th>
                         <th className="py-3.5 px-4 font-bold text-center whitespace-nowrap w-40">
-                          Phòng Áp Dụng
+                          Hợp Đồng Áp Dụng
                         </th>
-                        <th className="py-3.5 px-4 font-bold text-right whitespace-nowrap w-48">
+                        <th className="py-3.5 px-4 font-bold text-right whitespace-nowrap w-36">
                           Thao Tác
                         </th>
                       </tr>
@@ -197,9 +197,7 @@ export default function QuanLyPhiDichVuPage() {
                           </td>
                           <td className="py-4 px-4 text-center whitespace-nowrap">
                             <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC]/30 text-slate-900 border border-[#00FFCC] whitespace-nowrap">
-                              {user.Quyen === 'ChuTro'
-                                ? `${item.TongSoPhongApDung || 0} phòng`
-                                : `${item.SoPhongApDungTrongQuyen || 0} phòng`}
+                              {item.SoHopDongApDung || 0} hợp đồng
                             </span>
                           </td>
                           <td className="py-4 px-4 text-right whitespace-nowrap">
@@ -209,7 +207,7 @@ export default function QuanLyPhiDichVuPage() {
                                 onClick={() => router.push(`/chuTro/phiDichVu/sua/${item.MaDV}`)}
                                 className="px-3.5 py-1.5 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold hover:bg-amber-200 transition cursor-pointer whitespace-nowrap"
                               >
-                                Sửa & Gán phòng
+                                Sửa
                               </button>
                               <button
                                 type="button"
@@ -245,9 +243,7 @@ export default function QuanLyPhiDichVuPage() {
                           </p>
                         </div>
                         <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC]/30 text-slate-900 border border-[#00FFCC] whitespace-nowrap shrink-0">
-                          {user.Quyen === 'ChuTro'
-                            ? `${item.TongSoPhongApDung || 0} phòng`
-                            : `${item.SoPhongApDungTrongQuyen || 0} phòng`}
+                          {item.SoHopDongApDung || 0} hợp đồng
                         </span>
                       </div>
 
@@ -261,7 +257,7 @@ export default function QuanLyPhiDichVuPage() {
                           onClick={() => router.push(`/chuTro/phiDichVu/sua/${item.MaDV}`)}
                           className="px-4 py-2 rounded-xl bg-amber-100 text-amber-800 text-xs font-bold cursor-pointer"
                         >
-                          Sửa & Gán phòng
+                          Sửa
                         </button>
                         <button
                           type="button"

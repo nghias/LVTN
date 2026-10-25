@@ -8,31 +8,23 @@ const {
   authorizeRoles,
 } = require('../middlewares/auth.middleware');
 
-// ==========================================
-// 1. ROUTES CÔNG KHAI - KHÔNG CẦN ĐĂNG NHẬP
-// ==========================================
+// 1. Route công khai (nếu cần hiển thị bảng giá dịch vụ trên tin đăng)
 router.get('/public', DichVuController.getDanhSachDichVu);
 
-// ==========================================
-// 2. ROUTES QUẢN LÝ PHÍ DỊCH VỤ - CẦN ĐĂNG NHẬP
-// Chỉ ChuTro hoặc QuanLy được truy cập
-// ==========================================
+// 2. Routes quản lý phí dịch vụ (Yêu cầu đăng nhập quyền ChuTro hoặc QuanLy)
 router.use(verifyToken);
 router.use(authorizeRoles('ChuTro', 'QuanLy'));
-
-// Lấy danh sách Cơ sở & Phòng được phép gán dịch vụ
-router.get('/phong-ap-dung-options', DichVuController.getPhongOptions);
 
 // Xem danh sách & Tìm kiếm phí dịch vụ (?search=...)
 router.get('/', DichVuController.getDanhSachDichVu);
 
-// Xem chi tiết 1 phí dịch vụ kèm danh sách phòng đang áp dụng
+// Xem chi tiết 1 phí dịch vụ
 router.get('/:maDV', DichVuController.getChiTietDichVu);
 
-// Thêm phí dịch vụ mới (kèm gán phòng)
+// Thêm phí dịch vụ mới
 router.post('/', DichVuController.themDichVu);
 
-// Sửa phí dịch vụ (kèm cập nhật phòng áp dụng)
+// Sửa phí dịch vụ
 router.put('/:maDV', DichVuController.suaDichVu);
 
 // Xóa phí dịch vụ
