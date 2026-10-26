@@ -8,6 +8,8 @@ const khachThueRouter = require('./khachThue.route');
 const tienIchRouter = require('./tienIch.router');
 const tinDangRouter = require('./tinDang.router');
 const dichVuRouter = require('./dichVu.router');
+const dienNuocRouter = require('./dienNuoc.router');
+
 
 router.use('/auth', authRouter);
 router.use('/phong-tro', phongTroRouter);
@@ -15,5 +17,6 @@ router.use('/khach-thue', khachThueRouter);
 router.use('/tien-ich', tienIchRouter);
 router.use('/tin-dang', tinDangRouter);
 router.use('/dich-vu', dichVuRouter);
+router.use('/dien-nuoc', dienNuocRouter);
 
 module.exports = router;

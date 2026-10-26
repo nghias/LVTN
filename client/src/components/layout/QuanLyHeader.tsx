@@ -51,7 +51,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
       groupLabel: 'Tài chính & Dịch vụ',
       items: [
         { label: 'Phí dịch vụ', href: '/chuTro/phiDichVu' },
-        { label: 'Điện nước & IoT', href: '/chuTro/dienNuoc' },
+        { label: 'Điện nước', href: '/chuTro/dienNuoc' },
         { label: 'Hóa đơn', href: '/chuTro/hoaDon' },
       ],
     },
@@ -66,7 +66,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
     { label: 'Đăng tin', href: '/chuTro/tinDang' },
     { label: 'Khách thuê', href: '/chuTro/khachThue' },
     { label: 'Hợp đồng', href: '/chuTro/hopDong' },
-    { label: 'Điện nước & IoT', href: '/chuTro/dienNuoc' },
+    { label: 'Điện nước', href: '/chuTro/dienNuoc' },
     { label: 'Hóa đơn', href: '/chuTro/hoaDon' },
     { label: 'Thông báo', href: '/chuTro/thongBao' },
   ];
