@@ -1,10 +1,17 @@
-const pool = require("../../database/db");
+const db = require("../../database/db");
 
 const TinDangModel = {
   // Kiểm tra thông tin và quyền của người dùng
   async getNguoiDungById(maND) {
     const sql = `SELECT MaND, HoTen, Quyen FROM NguoiDung WHERE MaND = ? LIMIT 1`;
-    const [rows] = await pool.query(sql, [maND]);
+    const [rows] = await db.query(sql, [maND]);
+    return rows[0] || null;
+  },
+
+  // Lấy thông tin chi tiết 1 tin đăng theo MaTin
+  async getTinDangById(maTin) {
+    const sql = `SELECT * FROM TinDang WHERE MaTin = ? LIMIT 1`;
+    const [rows] = await db.query(sql, [maTin]);
     return rows[0] || null;
   },
 
@@ -17,7 +24,7 @@ const TinDangModel = {
       WHERE p.MaPhong = ? AND k.MaND = ?
       LIMIT 1
     `;
-    const [rows] = await pool.query(sql, [maPhong, maND]);
+    const [rows] = await db.query(sql, [maPhong, maND]);
     return rows.length > 0;
   },
 
@@ -31,21 +38,71 @@ const TinDangModel = {
       WHERE td.MaTin = ? AND k.MaND = ?
       LIMIT 1
     `;
-    const [rows] = await pool.query(sql, [maTin, maND]);
+    const [rows] = await db.query(sql, [maTin, maND]);
     return rows.length > 0;
   },
 
-  // 1. Lấy danh sách tin đăng cho trang Quản lý (Lấy cả tin hết hạn, chỉ xét quyền ChuTro / QuanLy)
+  // Kiểm tra phòng có đủ điều kiện đăng tin mới không (Phải còn trống VÀ chưa có trạng thái tin)
+  async checkPhongCoTheDangTin(maPhong, excludeMaTin = null) {
+    const params = [maPhong];
+    let excludeClause = "";
+
+    if (excludeMaTin) {
+      excludeClause = "AND td.MaTin <> ?";
+      params.push(excludeMaTin);
+    }
+
+    const sql = `
+      SELECT 
+        p.MaPhong,
+        p.TrangThai AS TrangThaiPhong,
+        td.MaTin,
+        td.TrangThai AS TrangThaiTin
+      FROM Phong p
+      LEFT JOIN TinDang td 
+        ON p.MaPhong = td.MaPhong 
+        AND td.TrangThai IS NOT NULL 
+        AND TRIM(td.TrangThai) <> ''
+        ${excludeClause}
+      WHERE p.MaPhong = ?
+      LIMIT 1
+    `;
+
+    const [rows] = await db.query(sql, params);
+    if (!rows.length) {
+      return { valid: false, reason: "NOT_FOUND" };
+    }
+
+    const phong = rows[0];
+    const danhSachTrangThaiTrong = ["Trong", "ConTrong", "Trống", "Còn trống"];
+
+    if (!danhSachTrangThaiTrong.includes(phong.TrangThaiPhong)) {
+      return { valid: false, reason: "NOT_EMPTY" };
+    }
+
+    if (phong.MaTin) {
+      return { valid: false, reason: "ALREADY_HAS_STATUS" };
+    }
+
+    return { valid: true };
+  },
+
+  // 1. Lấy danh sách tin đăng cho trang Quản lý (Chỉ lấy những tin đang có trạng thái)
   async getAllTinDang(maND, quyen) {
-    // Chỉ duy nhất quyền ChuTro mới xem được tất cả tin đăng ở tất cả khu trọ
     const isChuTro = quyen === "ChuTro";
     const params = [];
 
-    let whereClause = "";
+    const conditions = [
+      "td.TrangThai IS NOT NULL",
+      "TRIM(td.TrangThai) <> ''",
+    ];
+
     if (!isChuTro) {
-      whereClause = "WHERE k.MaND = ?";
+      conditions.push("k.MaND = ?");
       params.push(maND);
     }
+
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
     const sql = `
       SELECT 
@@ -73,7 +130,7 @@ const TinDangModel = {
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
 
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await db.query(sql, params);
     return rows.map((row) => ({
       ...row,
       DienTich: Number(row.DienTich),
@@ -81,16 +138,23 @@ const TinDangModel = {
     }));
   },
 
-  // 2. Lấy danh sách Phòng để chọn khi đăng tin (Chỉ ChuTro lấy tất cả, QuanLy chỉ lấy khu của mình)
+  // 2. Lấy danh sách Phòng gửi qua FE để chọn khi đăng tin mới
+  // Chỉ lấy phòng CÒN TRỐNG và KHÔNG CÓ TRẠNG THÁI TIN
   async getPhongListForSelect(maND, quyen) {
     const isChuTro = quyen === "ChuTro";
     const params = [];
 
-    let whereClause = "";
+    const conditions = [
+      "p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống')",
+      "td.MaTin IS NULL",
+    ];
+
     if (!isChuTro) {
-      whereClause = "WHERE k.MaND = ?";
+      conditions.push("k.MaND = ?");
       params.push(maND);
     }
+
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
     const sql = `
       SELECT 
@@ -99,18 +163,23 @@ const TinDangModel = {
         p.DienTich,
         p.Gia,
         p.TrangThai,
+        NULL AS TrangThaiTin,
         k.MaKhu,
         k.TenKhu,
         nd.HoTen AS TenChuTro,
         nd.SDT AS SDTChuTro
       FROM Phong p
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND 
+      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
+      LEFT JOIN TinDang td 
+        ON p.MaPhong = td.MaPhong 
+        AND td.TrangThai IS NOT NULL 
+        AND TRIM(td.TrangThai) <> ''
       ${whereClause}
       ORDER BY k.MaKhu ASC, p.MaPhong ASC
     `;
 
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await db.query(sql, params);
     return rows.map((row) => ({
       ...row,
       DienTich: Number(row.DienTich),
@@ -143,7 +212,7 @@ const TinDangModel = {
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
-    const [rows] = await pool.query(sql);
+    const [rows] = await db.query(sql);
     return rows.map((row) => ({
       ...row,
       DienTich: Number(row.DienTich),
@@ -151,19 +220,30 @@ const TinDangModel = {
     }));
   },
 
-  // 4. Thêm mới tin đăng (Bảng TinDang)
+  // 4. Thêm mới tin đăng (Lúc này mới gán trạng thái tin cho phòng)
   async createTinDang({ MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai }) {
+    // Dọn bản ghi rỗng (không có trạng thái) của phòng này nếu có trước khi thêm mới
+    await db.query(
+      `DELETE FROM TinDang WHERE MaPhong = ? AND (TrangThai IS NULL OR TRIM(TrangThai) = '')`,
+      [MaPhong]
+    );
+
+    const trangThaiTin =
+      TrangThai && String(TrangThai).trim() !== ""
+        ? String(TrangThai).trim()
+        : "DangHienThi";
+
     const sql = `
-      INSERT INTO TinDang (MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO TinDang (MaPhong, MaND, TieuDe, MoTa,NgayDang, NgayHetHan, TrangThai)
+      VALUES (?, ?, ?, ?, NOW(), ?, ?)
     `;
-    const [result] = await pool.query(sql, [
+    const [result] = await db.query(sql, [
       MaPhong,
       MaND,
       TieuDe,
       MoTa || null,
       NgayHetHan || null,
-      TrangThai || "DangHienThi",
+      trangThaiTin,
     ]);
     return result.insertId;
   },
@@ -179,21 +259,45 @@ const TinDangModel = {
           TrangThai = ?
       WHERE MaTin = ?
     `;
-    const [result] = await pool.query(sql, [
+    const [result] = await db.query(sql, [
       MaPhong,
       TieuDe,
       MoTa || null,
       NgayHetHan || null,
-      TrangThai,
+      TrangThai || "DangHienThi",
       maTin,
     ]);
     return result.affectedRows > 0;
   },
 
-  // 6. Xóa tin đăng theo MaTin
+  // 6. Xóa tin đăng theo MaTin (Xóa luôn trạng thái tin của phòng để phòng xuất hiện lại ở phần thêm tin)
   async deleteTinDang(maTin) {
-    const sql = `DELETE FROM TinDang WHERE MaTin = ?`;
-    const [result] = await pool.query(sql, [maTin]);
+    const [rows] = await db.query(
+      `SELECT MaPhong FROM TinDang WHERE MaTin = ? LIMIT 1`,
+      [maTin]
+    );
+    if (!rows.length) {
+      return false;
+    }
+
+    const maPhong = rows[0].MaPhong;
+
+    // Xóa tin đăng và toàn bộ trạng thái tin gắn với phòng đó
+    const [result] = await db.query(
+      `DELETE FROM TinDang WHERE MaTin = ? OR MaPhong = ?`,
+      [maTin, maPhong]
+    );
+    return result.affectedRows > 0;
+  },
+
+  // 7. Cập nhật giá phòng
+  async updateGiaPhong(maPhong, giaMoi) {
+    const sql = `
+      UPDATE Phong
+      SET Gia = ?
+      WHERE MaPhong = ?
+    `;
+    const [result] = await db.query(sql, [Number(giaMoi), Number(maPhong)]);
     return result.affectedRows > 0;
   },
 };

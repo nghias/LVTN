@@ -327,38 +327,6 @@ export default function ChiTietTinDangPage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Đổi nhanh trạng thái hiển thị */}
-                  <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-xs font-bold text-slate-600">
-                      Đổi nhanh trạng thái:
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(
-                        [
-                          { value: "DangHienThi", label: "Hiển thị công khai" },
-                          { value: "DaAn", label: "Tạm ẩn" },
-                          { value: "HetHan", label: "Đánh dấu hết hạn" },
-                        ] as { value: TrangThaiTin; label: string }[]
-                      ).map((st) => (
-                        <button
-                          key={st.value}
-                          type="button"
-                          disabled={
-                            updatingStatus || tinDang.TrangThai === st.value
-                          }
-                          onClick={() => handleQuickStatusChange(st.value)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                            tinDang.TrangThai === st.value
-                              ? "bg-[#00FFCC] text-slate-900 border border-teal-400"
-                              : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {st.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Cột phải (1/3): Thông tin Phòng trọ & Khu trọ */}

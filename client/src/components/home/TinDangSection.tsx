@@ -108,9 +108,7 @@ export default function TinDangSection({
             >
               <option value="ALL">Tất cả mức giá</option>
               <option value="DUOI_25">Dưới 2.500.000 đ</option>
-              <option value="TU_25_DEN_40">
-                Từ 2.500.000 đ - 4.000.000 đ
-              </option>
+              <option value="TU_25_DEN_40">Từ 2.500.000 đ - 4.000.000 đ</option>
               <option value="TREN_40">Trên 4.000.000 đ</option>
             </select>
           </div>
@@ -293,8 +291,7 @@ export default function TinDangSection({
                         {tin.TieuDe}
                       </h4>
                       <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
-                        {tin.MoTa ||
-                          "Chưa có mô tả chi tiết cho bài đăng này."}
+                        {tin.MoTa || "Chưa có mô tả chi tiết cho bài đăng này."}
                       </p>
                     </div>
                   </div>
@@ -325,7 +322,7 @@ export default function TinDangSection({
                           href={contact.zaloUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-[#00FFCC] transition text-center shrink-0"
+                          className="px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 text-[#0068FF] border border-[#0068FF] transition text-center shrink-0"
                           title={`Nhắn Zalo cho ${contact.tenQuanLy}`}
                         >
                           Chat Zalo
