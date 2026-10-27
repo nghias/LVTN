@@ -281,30 +281,30 @@ export default function QuanLyDienNuocPage() {
                 </div>
 
                 <div className="w-full">
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Kỳ ghi (Tháng/Năm)
-                    </label>
-                    <input
-                        type="month"
-                        value={thangNam}
-                        onChange={(e) => {
-                        const val = e.target.value;
-                        setThangNam(val);
-                        try {
-                            fetchDanhSach({
-                            maKhu: selectedMaKhu,
-                            maPhong: selectedMaPhong,
-                            thangNam: val,
-                            search,
-                            });
-                        } catch {
-                            // Thông báo chung an toàn, không hiển thị chi tiết mã lỗi/nội dung lỗi từ hệ thống
-                            showError('Không thể tải dữ liệu theo kỳ ghi đã chọn.');
-                        }
-                        }}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                    />
-                    </div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Kỳ ghi (Tháng/Năm)
+                  </label>
+                  <input
+                    type="month"
+                    value={thangNam}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setThangNam(val);
+                      try {
+                        fetchDanhSach({
+                          maKhu: selectedMaKhu,
+                          maPhong: selectedMaPhong,
+                          thangNam: val,
+                          search,
+                        });
+                      } catch {
+                        // Thông báo chung an toàn, tuyệt đối không hiển thị chi tiết mã lỗi/nội dung lỗi gốc từ hệ thống
+                        showError('Không thể tải dữ liệu theo kỳ ghi đã chọn.');
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  />
+                </div>
 
                 <div className="w-full">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
