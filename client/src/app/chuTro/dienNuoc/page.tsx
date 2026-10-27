@@ -17,6 +17,8 @@ export default function QuanLyDienNuocPage() {
   const router = useRouter();
   const { showConfirm, showSuccess, showError } = useAlertModal();
 
+  const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
+
   const [danhSach, setDanhSach] = useState<ChiSoDienNuocItem[]>([]);
   const [khuTroList, setKhuTroList] = useState<KhuTroOption[]>([]);
   const [phongList, setPhongList] = useState<PhongDienNuocOption[]>([]);
@@ -29,7 +31,8 @@ export default function QuanLyDienNuocPage() {
 
   const [selectedMaKhu, setSelectedMaKhu] = useState<string>('');
   const [selectedMaPhong, setSelectedMaPhong] = useState<string>('');
-  const [thangNam, setThangNam] = useState<string>('');
+  // Khởi tạo chuẩn YYYY-MM giống trang Hóa đơn để không bị lỗi hiển thị "---------- ----"
+  const [thangNam, setThangNam] = useState<string>(() => getCurrentMonth());
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -66,10 +69,10 @@ export default function QuanLyDienNuocPage() {
         if (res.phongList) setPhongList(res.phongList);
         if (res.giaHienTai) setGiaHienTai(res.giaHienTai);
       } else {
-        showError(res.message || 'Không thể tải danh sách chỉ số điện nước');
+        showError('Không thể tải danh sách chỉ số điện nước.');
       }
     } catch {
-      showError('Lỗi kết nối máy chủ');
+      showError('Lỗi kết nối máy chủ.');
     } finally {
       setLoading(false);
     }
@@ -97,9 +100,10 @@ export default function QuanLyDienNuocPage() {
   };
 
   const handleResetFilters = () => {
+    const currentMonth = getCurrentMonth();
     setSelectedMaKhu('');
     setSelectedMaPhong('');
-    setThangNam('');
+    setThangNam(currentMonth);
     setSearch('');
     fetchDanhSach({ maKhu: '', maPhong: '', thangNam: '', search: '' });
   };
@@ -112,13 +116,13 @@ export default function QuanLyDienNuocPage() {
         try {
           const res = await dienNuocService.deleteChiSo(item.MaCS);
           if (res.success) {
-            showSuccess(res.message || 'Đã xóa chỉ số điện nước thành công!');
+            showSuccess('Đã xóa chỉ số điện nước thành công!');
             fetchDanhSach();
           } else {
-            showError(res.message || 'Không thể xóa chỉ số điện nước');
+            showError('Không thể xóa chỉ số điện nước.');
           }
         } catch {
-          showError('Lỗi kết nối khi xóa chỉ số điện nước');
+          showError('Lỗi kết nối khi xóa chỉ số điện nước.');
         }
       },
       'Xác nhận xóa',
@@ -280,7 +284,7 @@ export default function QuanLyDienNuocPage() {
                   </select>
                 </div>
 
-                <div className="w-full">
+                <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     Kỳ ghi (Tháng/Năm)
                   </label>
@@ -289,7 +293,8 @@ export default function QuanLyDienNuocPage() {
                     value={thangNam}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setThangNam(val);
+                      const safeMonth = val || getCurrentMonth();
+                      setThangNam(safeMonth);
                       try {
                         fetchDanhSach({
                           maKhu: selectedMaKhu,
@@ -298,7 +303,6 @@ export default function QuanLyDienNuocPage() {
                           search,
                         });
                       } catch {
-                        // Thông báo chung an toàn, tuyệt đối không hiển thị chi tiết mã lỗi/nội dung lỗi gốc từ hệ thống
                         showError('Không thể tải dữ liệu theo kỳ ghi đã chọn.');
                       }
                     }}
@@ -327,15 +331,13 @@ export default function QuanLyDienNuocPage() {
                 >
                   Lọc dữ liệu
                 </button>
-                {(selectedMaKhu || selectedMaPhong || thangNam || search) && (
-                  <button
-                    type="button"
-                    onClick={handleResetFilters}
-                    className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-100 transition cursor-pointer whitespace-nowrap"
-                  >
-                    Đặt lại
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-100 transition cursor-pointer whitespace-nowrap"
+                >
+                  Xem hết
+                </button>
               </div>
             </form>
 

@@ -15,15 +15,15 @@ import {
 export default function QuanLyHoaDonPage() {
   const { showSuccess, showError, showConfirm } = useAlertModal();
 
+  const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
+
   const [hoaDonList, setHoaDonList] = useState<HoaDonItem[]>([]);
   const [khuTroList, setKhuTroList] = useState<KhuTroOption[]>([]);
   const [phongList, setPhongList] = useState<PhongOption[]>([]);
 
   const [selectedMaKhu, setSelectedMaKhu] = useState<number>(0);
   const [selectedMaPhong, setSelectedMaPhong] = useState<number>(0);
-  const [thangNam, setThangNam] = useState<string>(() =>
-    new Date().toISOString().slice(0, 7)
-  );
+  const [thangNam, setThangNam] = useState<string>(() => getCurrentMonth());
   const [trangThaiTT, setTrangThaiTT] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -38,6 +38,19 @@ export default function QuanLyHoaDonPage() {
     const parts = dateStr.slice(0, 10).split('-');
     if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
     return dateStr;
+  };
+
+  // Rút gọn "Xóm Trọ Cơ sở 1 - Tạ Quang Bửu" -> "Cơ sở 1" để không bị nhảy dòng
+  const formatShortKhu = (tenKhu?: string, maKhu?: number) => {
+    if (!tenKhu) return maKhu ? `Cơ sở ${maKhu}` : '';
+    const match = tenKhu.match(/cơ\s*sở\s*\d+/i);
+    if (match) {
+      return match[0].replace(/^c/i, 'C');
+    }
+    return tenKhu
+      .replace(/^xóm\s*trọ\s*/i, '')
+      .split('-')[0]
+      .trim();
   };
 
   const fetchDanhSach = useCallback(
@@ -104,7 +117,7 @@ export default function QuanLyHoaDonPage() {
             showSuccess('Đã xóa hóa đơn thành công!');
             fetchDanhSach();
           } else {
-            showError(res.message || 'Không thể xóa hóa đơn này.');
+            showError('Không thể xóa hóa đơn này.');
           }
         } catch {
           showError('Không thể thực hiện xóa hóa đơn vào lúc này.');
@@ -120,7 +133,6 @@ export default function QuanLyHoaDonPage() {
       ? phongList
       : phongList.filter((p) => Number(p.MaKhu) === Number(selectedMaKhu));
 
-  // Thống kê nhanh trên danh sách đang lọc
   const tongPhaiThu = hoaDonList.reduce(
     (sum, item) => sum + Math.round(Number(item.TongTien) || 0),
     0
@@ -151,17 +163,17 @@ export default function QuanLyHoaDonPage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
                 <Link
-                  href={`/chuTro/hoaDon/tao?thangNam=${thangNam}`}
-                  className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs sm:text-sm font-bold shadow-xs no-underline transition"
+                  href={`/chuTro/hoaDon/tao?thangNam=${thangNam || getCurrentMonth()}`}
+                  className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs sm:text-sm font-bold shadow-xs no-underline transition whitespace-nowrap"
                 >
                   + Tạo Hóa Đơn Hàng Tháng
                 </Link>
               </div>
             </div>
 
-            {/* Tabs chọn Cơ sở (Chủ trọ thấy Tất cả cơ sở, Quản lý chỉ thấy cơ sở của mình) */}
+            {/* Tabs chọn Cơ sở */}
             {khuTroList.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
                 {user.Quyen === 'ChuTro' && khuTroList.length > 1 && (
@@ -172,7 +184,7 @@ export default function QuanLyHoaDonPage() {
                       setSelectedMaPhong(0);
                       fetchDanhSach({ maKhu: 0, maPhong: 0 });
                     }}
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                       selectedMaKhu === 0
                         ? 'bg-[#00FFCC] text-slate-900 shadow-2xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -191,13 +203,13 @@ export default function QuanLyHoaDonPage() {
                       setSelectedMaPhong(0);
                       fetchDanhSach({ maKhu: khu.MaKhu, maPhong: 0 });
                     }}
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                       selectedMaKhu === khu.MaKhu
                         ? 'bg-[#00FFCC] text-slate-900 shadow-2xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {khu.TenKhu}
+                    {formatShortKhu(khu.TenKhu, khu.MaKhu)}
                   </button>
                 ))}
               </div>
@@ -231,91 +243,100 @@ export default function QuanLyHoaDonPage() {
               </div>
             </div>
 
-            {/* Bộ lọc Tìm kiếm, Phòng, Kỳ tháng, Trạng thái */}
-            <div className="p-4 sm:p-5 rounded-3xl border border-slate-200 bg-slate-50/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 items-end">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Kỳ hóa đơn (Tháng/Năm)
-                </label>
-                <input
-                  type="month"
-                  value={thangNam}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setThangNam(val);
-                    fetchDanhSach({ thangNam: val });
-                  }}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                />
+            {/* Bộ lọc dàn đều 100% chiều ngang - Nút bấm không bao giờ bị nhảy dòng */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                fetchDanhSach();
+              }}
+              className="w-full p-4 sm:p-5 rounded-3xl border border-slate-200 bg-slate-50/50 flex flex-col lg:flex-row lg:items-end justify-between gap-4"
+            >
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 w-full">
+                <div className="w-full">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 whitespace-nowrap">
+                    Kỳ hóa đơn (Tháng/Năm)
+                  </label>
+                  <input
+                    type="month"
+                    value={thangNam}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const safeMonth = val || getCurrentMonth();
+                      setThangNam(safeMonth);
+                      fetchDanhSach({ thangNam: val });
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  />
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 whitespace-nowrap">
+                    Phòng trọ
+                  </label>
+                  <select
+                    value={selectedMaPhong}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setSelectedMaPhong(val);
+                      fetchDanhSach({ maPhong: val });
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  >
+                    <option value={0}>-- Tất cả phòng --</option>
+                    {filteredPhongOptions.map((p) => (
+                      <option key={p.MaPhong} value={p.MaPhong}>
+                        {p.TenPhong}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 whitespace-nowrap">
+                    Trạng thái thanh toán
+                  </label>
+                  <select
+                    value={trangThaiTT}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTrangThaiTT(val);
+                      fetchDanhSach({ trangThaiTT: val });
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  >
+                    <option value="">-- Tất cả trạng thái --</option>
+                    <option value="ChuaThanhToan">Chưa thanh toán</option>
+                    <option value="MotPhan">Đã trả một phần</option>
+                    <option value="DaThanhToan">Đã thanh toán đủ</option>
+                  </select>
+                </div>
+
+                <div className="w-full">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 whitespace-nowrap">
+                    Tìm nhanh mã HĐ / tên phòng
+                  </label>
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Nhập tên phòng, mã HĐ..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Phòng trọ
-                </label>
-                <select
-                  value={selectedMaPhong}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setSelectedMaPhong(val);
-                    fetchDanhSach({ maPhong: val });
-                  }}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                >
-                  <option value={0}>-- Tất cả phòng --</option>
-                  {filteredPhongOptions.map((p) => (
-                    <option key={p.MaPhong} value={p.MaPhong}>
-                      {p.TenPhong}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Trạng thái thanh toán
-                </label>
-                <select
-                  value={trangThaiTT}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setTrangThaiTT(val);
-                    fetchDanhSach({ trangThaiTT: val });
-                  }}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                >
-                  <option value="">-- Tất cả trạng thái --</option>
-                  <option value="ChuaThanhToan">Chưa thanh toán</option>
-                  <option value="MotPhan">Đã trả một phần</option>
-                  <option value="DaThanhToan">Đã thanh toán đủ</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Tìm nhanh mã HĐ / tên phòng
-                </label>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Nhập tên phòng, mã HĐ..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5 shrink-0">
                 <button
-                  type="button"
-                  onClick={() => fetchDanhSach()}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold cursor-pointer transition"
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold cursor-pointer transition whitespace-nowrap"
                 >
                   Lọc dữ liệu
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setThangNam('');
+                    const currentMonth = getCurrentMonth();
+                    setThangNam(currentMonth);
                     setSelectedMaPhong(0);
                     setTrangThaiTT('');
                     setSearch('');
@@ -326,12 +347,12 @@ export default function QuanLyHoaDonPage() {
                       search: '',
                     });
                   }}
-                  className="px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer transition"
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer transition whitespace-nowrap"
                 >
                   Xem hết
                 </button>
               </div>
-            </div>
+            </form>
 
             {/* Bảng Danh sách hóa đơn */}
             {loading ? (
@@ -345,7 +366,7 @@ export default function QuanLyHoaDonPage() {
                 </p>
                 <Link
                   href={`/chuTro/hoaDon/tao?thangNam=${
-                    thangNam || new Date().toISOString().slice(0, 7)
+                    thangNam || getCurrentMonth()
                   }`}
                   className="inline-block px-5 py-2.5 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold no-underline"
                 >
@@ -357,16 +378,36 @@ export default function QuanLyHoaDonPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                      <th className="py-3.5 px-4 font-bold">Mã HĐ</th>
-                      <th className="py-3.5 px-4 font-bold">Phòng / Cơ Sở</th>
-                      <th className="py-3.5 px-4 font-bold text-right">Tiền Phòng</th>
-                      <th className="py-3.5 px-4 font-bold text-right">Điện + Nước</th>
-                      <th className="py-3.5 px-4 font-bold text-right">Dịch Vụ</th>
-                      <th className="py-3.5 px-4 font-bold text-right">Phát Sinh</th>
-                      <th className="py-3.5 px-4 font-bold text-right">Tổng Tiền</th>
-                      <th className="py-3.5 px-4 font-bold text-right">Đã Trả / Còn Nợ</th>
-                      <th className="py-3.5 px-4 font-bold text-center">Trạng Thái</th>
-                      <th className="py-3.5 px-4 font-bold text-right">Thao Tác</th>
+                      <th className="py-3.5 px-3 font-bold whitespace-nowrap">
+                        Mã HĐ
+                      </th>
+                      <th className="py-3.5 px-3 font-bold whitespace-nowrap">
+                        Phòng / Cơ Sở
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-right whitespace-nowrap">
+                        Tiền Phòng
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-right whitespace-nowrap">
+                        Điện + Nước
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-right whitespace-nowrap">
+                        Dịch Vụ
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-right whitespace-nowrap">
+                        Phát Sinh
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-right whitespace-nowrap">
+                        Tổng Tiền
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-right whitespace-nowrap">
+                        Đã Trả / Còn Nợ
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-center whitespace-nowrap">
+                        Trạng Thái
+                      </th>
+                      <th className="py-3.5 px-3 font-bold text-right whitespace-nowrap">
+                        Thao Tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
@@ -380,49 +421,59 @@ export default function QuanLyHoaDonPage() {
                           key={item.MaHD}
                           className="hover:bg-slate-50/80 transition"
                         >
-                          <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">
+                          {/* Mã HĐ */}
+                          <td className="py-3.5 px-3 font-bold text-slate-900 whitespace-nowrap">
                             #{item.MaHD}
                             <div className="text-[11px] font-semibold text-slate-500">
                               {formatDateVN(item.NgayTinh)}
                             </div>
                           </td>
 
-                          <td className="py-4 px-4">
-                            <div className="font-bold text-slate-900">
-                              {item.TenPhong}
-                            </div>
-                            <div className="text-xs font-semibold text-slate-500">
-                              {item.TenKhu}
+                          {/* Phòng & Cơ sở rút gọn trên 1 dòng, không nhảy chữ */}
+                          <td className="py-3.5 px-3 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900">
+                                {item.TenPhong}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold">
+                                {formatShortKhu(item.TenKhu, item.MaKhu)}
+                              </span>
                             </div>
                           </td>
 
-                          <td className="py-4 px-4 text-right font-bold text-slate-800 whitespace-nowrap">
+                          {/* Tiền phòng */}
+                          <td className="py-3.5 px-3 text-right font-bold text-slate-800 whitespace-nowrap">
                             {formatVND(item.TienPhong)}
                           </td>
 
-                          <td className="py-4 px-4 text-right whitespace-nowrap">
+                          {/* Điện + Nước */}
+                          <td className="py-3.5 px-3 text-right whitespace-nowrap">
                             <div className="font-bold text-amber-700">
                               {formatVND(dienNuoc)}
                             </div>
                             <div className="text-[11px] font-semibold text-slate-500">
-                              Đ: {item.SoDienCu}→{item.SoDienMoi} | N: {item.SoNuocCu}→
-                              {item.SoNuocMoi}
+                              Đ: {item.SoDienCu}→{item.SoDienMoi} | N:{' '}
+                              {item.SoNuocCu}→{item.SoNuocMoi}
                             </div>
                           </td>
 
-                          <td className="py-4 px-4 text-right font-bold text-teal-700 whitespace-nowrap">
+                          {/* Dịch vụ */}
+                          <td className="py-3.5 px-3 text-right font-bold text-teal-700 whitespace-nowrap">
                             {formatVND(item.TienPhuPhi)}
                           </td>
 
-                          <td className="py-4 px-4 text-right font-bold text-purple-700 whitespace-nowrap">
+                          {/* Phát sinh */}
+                          <td className="py-3.5 px-3 text-right font-bold text-purple-700 whitespace-nowrap">
                             {formatVND(item.TienPhatSinh)}
                           </td>
 
-                          <td className="py-4 px-4 text-right font-bold text-slate-900 whitespace-nowrap">
+                          {/* Tổng tiền */}
+                          <td className="py-3.5 px-3 text-right font-bold text-slate-900 whitespace-nowrap">
                             {formatVND(item.TongTien)}
                           </td>
 
-                          <td className="py-4 px-4 text-right whitespace-nowrap">
+                          {/* Đã trả / Còn nợ */}
+                          <td className="py-3.5 px-3 text-right whitespace-nowrap">
                             <div className="font-bold text-emerald-700">
                               Đã trả: {formatVND(item.TienDaTra)}
                             </div>
@@ -433,40 +484,42 @@ export default function QuanLyHoaDonPage() {
                             )}
                           </td>
 
-                          <td className="py-4 px-4 text-center whitespace-nowrap">
+                          {/* Trạng thái */}
+                          <td className="py-3.5 px-3 text-center whitespace-nowrap">
                             {item.TrangThaiThanhToan === 'DaThanhToan' ? (
-                              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+                              <span className="inline-block px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
                                 Đã thanh toán
                               </span>
                             ) : item.TrangThaiThanhToan === 'MotPhan' ? (
-                              <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
+                              <span className="inline-block px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
                                 Trả một phần
                               </span>
                             ) : (
-                              <span className="inline-block px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+                              <span className="inline-block px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
                                 Chưa trả
                               </span>
                             )}
                           </td>
 
-                          <td className="py-4 px-4 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center gap-1.5">
+                          {/* Thao tác */}
+                          <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center justify-end gap-1.5">
                               <Link
                                 href={`/chuTro/hoaDon/chiTiet/${item.MaHD}`}
-                                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold no-underline"
+                                className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold no-underline"
                               >
                                 Chi tiết
                               </Link>
                               <Link
                                 href={`/chuTro/hoaDon/sua/${item.MaHD}`}
-                                className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold no-underline"
+                                className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-bold no-underline"
                               >
                                 Sửa
                               </Link>
                               <button
                                 type="button"
                                 onClick={() => handleDelete(item)}
-                                className="px-3 py-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold cursor-pointer"
+                                className="px-2.5 py-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold cursor-pointer"
                               >
                                 Xóa
                               </button>
