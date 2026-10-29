@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 
-const TienIchController = require('../app/controllers/TienIchController');
+const TienIchController = require('../app/controllers/tienIch.controller');
 const {
   verifyToken,
   authorizeRoles,

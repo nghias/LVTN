@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 
-const KhachThueController = require('../app/controllers/KhachThueController');
+const KhachThueController = require('../app/controllers/khachThue.controller');
 const {
   verifyToken,
   authorizeRoles,

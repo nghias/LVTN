@@ -1,335 +1,295 @@
 // client/src/app/chuTro/khachThue/sua/[maND]/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import QuanLyHeader from '@/components/layout/QuanLyHeader';
 import { useAlertModal } from '@/components/common/AlertModalProvider';
-import { khachThueService } from '@/services/khachThue.service';
-import { UserProfile } from '@/types/auth.type';
+import { KhachThueService } from '@/services/khachThue.service';
 
-function SuaKhachThueContent({ user }: { user: UserProfile }) {
+export default function SuaKhachThuePage() {
   const params = useParams();
   const router = useRouter();
-  const maND = Number(params?.maND);
+  const maND = params?.maND as string;
   const { showSuccess, showError } = useAlertModal();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
-    TenTK: '',
-    HoTen: '',
-    GioiTinh: 'Nam',
-    NamSinh: '',
-    CCCD: '',
-    NgayCap: '',
-    NoiCap: 'Cục Cảnh sát QLHC về TTXH',
-    SDT: '',
-    Email: '',
-    DiaChi: '',
-    NgheNghiep: '',
-  });
+  const [tenTK, setTenTK] = useState('');
+  const [hoTen, setHoTen] = useState('');
+  const [gioiTinh, setGioiTinh] = useState('Nam');
+  const [namSinh, setNamSinh] = useState('');
+  const [sdt, setSdt] = useState('');
+  const [cccd, setCccd] = useState('');
+  const [ngayCap, setNgayCap] = useState('');
+  const [noiCap, setNoiCap] = useState('');
+  const [email, setEmail] = useState('');
+  const [ngheNghiep, setNgheNghiep] = useState('');
+  const [diaChi, setDiaChi] = useState('');
 
   useEffect(() => {
+    if (!maND) return;
     const fetchDetail = async () => {
       try {
         setLoading(true);
-        const data = await khachThueService.getDetail(maND);
-        setFormData({
-          TenTK: data.TenTK || '',
-          HoTen: data.HoTen || '',
-          GioiTinh: data.GioiTinh || 'Nam',
-          NamSinh: data.NamSinh ? String(data.NamSinh) : '',
-          CCCD: data.CCCD || '',
-          NgayCap: data.NgayCap ? String(data.NgayCap).slice(0, 10) : '',
-          NoiCap: data.NoiCap || 'Cục Cảnh sát QLHC về TTXH',
-          SDT: data.SDT || '',
-          Email: data.Email || '',
-          DiaChi: data.DiaChi || '',
-          NgheNghiep: data.NgheNghiep || '',
-        });
+        const data = await KhachThueService.getDetail(maND);
+        setTenTK(data.TenTK || '');
+        setHoTen(data.HoTen || '');
+        setGioiTinh(data.GioiTinh || 'Nam');
+        setNamSinh(data.NamSinh ? String(data.NamSinh) : '');
+        setSdt(data.SDT || '');
+        setCccd(data.CCCD || '');
+        setNgayCap(data.NgayCap ? String(data.NgayCap).slice(0, 10) : '');
+        setNoiCap(data.NoiCap || '');
+        setEmail(data.Email || '');
+        setNgheNghiep(data.NgheNghiep || '');
+        setDiaChi(data.DiaChi || '');
       } catch (err: any) {
-        showError(
-          err?.response?.data?.message || 'Không tìm thấy thông tin khách thuê!',
-          'Lỗi truy cập',
-          2
-        );
+        showError(err?.message || 'Không thể tải thông tin khách thuê');
+        router.push('/chuTro/khachThue');
       } finally {
         setLoading(false);
       }
     };
+    fetchDetail();
+  }, [maND]);
 
-    if (maND) fetchDetail();
-  }, [maND, router, showError]);
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.HoTen.trim() || !formData.SDT.trim() || !formData.TenTK.trim()) {
-      showError('Họ tên, Số điện thoại và Tên tài khoản không được để trống!');
+    if (!hoTen.trim()) {
+      showError('Vui lòng nhập họ và tên khách thuê!');
+      return;
+    }
+    if (!sdt.trim()) {
+      showError('Vui lòng nhập số điện thoại!');
       return;
     }
 
     try {
       setSubmitting(true);
-      await khachThueService.update(maND, {
-        TenTK: formData.TenTK.trim(),
-        HoTen: formData.HoTen.trim(),
-        GioiTinh: formData.GioiTinh,
-        NamSinh: formData.NamSinh ? Number(formData.NamSinh) : null,
-        CCCD: formData.CCCD.trim() || undefined,
-        NgayCap: formData.NgayCap || null,
-        NoiCap: formData.NoiCap.trim() || 'Cục Cảnh sát QLHC về TTXH',
-        SDT: formData.SDT.trim(),
-        Email: formData.Email.trim() || undefined,
-        DiaChi: formData.DiaChi.trim() || undefined,
-        NgheNghiep: formData.NgheNghiep.trim() || undefined,
+      await KhachThueService.update(maND, {
+        TenTK: tenTK.trim(),
+        HoTen: hoTen.trim(),
+        GioiTinh: gioiTinh,
+        NamSinh: namSinh ? Number(namSinh) : null,
+        SDT: sdt.trim(),
+        CCCD: cccd.trim() || undefined,
+        NgayCap: ngayCap || null,
+        NoiCap: noiCap.trim() || undefined,
+        Email: email.trim() || undefined,
+        NgheNghiep: ngheNghiep.trim() || undefined,
+        DiaChi: diaChi.trim() || undefined,
       });
 
-      showSuccess('Cập nhật hồ sơ khách thuê thành công!', 'Thành công', 2, () => {
-        router.push('/chuTro/khachThue');
-      });
+      showSuccess('Cập nhật thông tin khách thuê thành công!');
+      router.push('/chuTro/khachThue');
     } catch (err: any) {
-      showError(
-        err?.response?.data?.message || 'Lỗi khi cập nhật thông tin khách thuê!'
-      );
+      showError(err?.message || 'Cập nhật hồ sơ khách thuê thất bại!');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      <QuanLyHeader user={user} />
+    <ProtectedRoute allowedRoles={['ChuTro', 'QuanLy']}>
+      {(user) => (
+        <div className="min-h-screen bg-slate-50/60 flex flex-col">
+          <QuanLyHeader user={user} />
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-900">
-              Chỉnh Sửa Hồ Sơ Khách Thuê #{maND}
-            </h1>
-            <p className="text-xs font-semibold text-slate-500 mt-1">
-              Cập nhật đồng bộ thông tin tài khoản (NguoiDung) và định danh cá nhân (ThongTinCaNhan)
-            </p>
-          </div>
-
-          <Link
-            href="/chuTro/khachThue"
-            className="px-4 py-2 rounded-full text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 no-underline"
-          >
-            ← Quay lại danh sách
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center text-sm font-bold text-slate-500">
-            Đang tải hồ sơ khách thuê...
-          </div>
-        ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6"
-          >
-            {/* Phần 1: Bảng NguoiDung */}
-            <div>
-              <h2 className="text-sm font-extrabold uppercase tracking-wider text-teal-700 mb-4 pb-2 border-b border-slate-100">
-                1. Tài khoản đăng nhập (Bảng NguoiDung)
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Tên tài khoản (TenTK) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="TenTK"
-                    value={formData.TenTK}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
+          <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  Chỉnh Sửa Hồ Sơ & Tài Khoản Khách Thuê
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  Cập nhật thông tin định danh cá nhân và tài khoản khách thuê #{maND}
+                </p>
               </div>
-            </div>
 
-            {/* Phần 2: Bảng ThongTinCaNhan */}
-            <div>
-              <h2 className="text-sm font-extrabold uppercase tracking-wider text-teal-700 mb-4 pb-2 border-b border-slate-100">
-                2. Hồ sơ cá nhân (Bảng ThongTinCaNhan)
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                <div className="sm:col-span-6">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Họ và tên <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="HoTen"
-                    value={formData.HoTen}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-3">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Giới tính
-                  </label>
-                  <select
-                    name="GioiTinh"
-                    value={formData.GioiTinh}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold bg-white focus:outline-none focus:border-teal-500"
-                  >
-                    <option value="Nam">Nam</option>
-                    <option value="Nữ">Nữ</option>
-                    <option value="Khác">Khác</option>
-                  </select>
-                </div>
-
-                <div className="sm:col-span-3">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Năm sinh
-                  </label>
-                  <input
-                    type="number"
-                    name="NamSinh"
-                    value={formData.NamSinh}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-4">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Số CCCD
-                  </label>
-                  <input
-                    type="text"
-                    name="CCCD"
-                    value={formData.CCCD}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-4">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Ngày cấp CCCD
-                  </label>
-                  <input
-                    type="date"
-                    name="NgayCap"
-                    value={formData.NgayCap}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-4">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Nơi cấp CCCD
-                  </label>
-                  <input
-                    type="text"
-                    name="NoiCap"
-                    value={formData.NoiCap}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-4">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Số điện thoại <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="SDT"
-                    value={formData.SDT}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-4">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="Email"
-                    value={formData.Email}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-4">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Nghề nghiệp
-                  </label>
-                  <input
-                    type="text"
-                    name="NgheNghiep"
-                    value={formData.NgheNghiep}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-12">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Địa chỉ thường trú / Quê quán
-                  </label>
-                  <input
-                    type="text"
-                    name="DiaChi"
-                    value={formData.DiaChi}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
               <Link
                 href="/chuTro/khachThue"
-                className="px-5 py-2.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 no-underline"
+                className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs sm:text-sm transition no-underline whitespace-nowrap"
               >
-                Hủy
+                ← Quay lại danh sách
               </Link>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-extrabold border border-teal-300 shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
-              </button>
             </div>
-          </form>
-        )}
-      </main>
-    </div>
-  );
-}
 
-export default function SuaKhachThuePage() {
-  return (
-    <ProtectedRoute allowedRoles={['ChuTro', 'QuanLy']}>
-      {(user) => <SuaKhachThueContent user={user} />}
+            {loading ? (
+              <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center text-sm text-slate-500">
+                Đang tải thông tin khách thuê...
+              </div>
+            ) : (
+              <form
+                onSubmit={handleSubmit}
+                className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-5 sm:p-8 space-y-6"
+              >
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Tên tài khoản đăng nhập (TenTK) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={tenTK}
+                    onChange={(e) => setTenTK(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 font-bold text-sm focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
+                    Thông tin định danh & Liên hệ
+                  </h2>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Họ và tên đầy đủ <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={hoTen}
+                        onChange={(e) => setHoTen(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Giới tính
+                      </label>
+                      <select
+                        value={gioiTinh}
+                        onChange={(e) => setGioiTinh(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 bg-white focus:outline-none focus:border-teal-500"
+                      >
+                        <option value="Nam">Nam</option>
+                        <option value="Nữ">Nữ</option>
+                        <option value="Khác">Khác</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Năm sinh
+                      </label>
+                      <input
+                        type="number"
+                        value={namSinh}
+                        onChange={(e) => setNamSinh(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Số điện thoại <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={sdt}
+                        onChange={(e) => setSdt(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Số CCCD / Định danh
+                      </label>
+                      <input
+                        type="text"
+                        value={cccd}
+                        onChange={(e) => setCccd(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Ngày cấp CCCD
+                      </label>
+                      <input
+                        type="date"
+                        value={ngayCap}
+                        onChange={(e) => setNgayCap(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Nơi cấp CCCD
+                      </label>
+                      <input
+                        type="text"
+                        value={noiCap}
+                        onChange={(e) => setNoiCap(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Địa chỉ Email
+                      </label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Nghề nghiệp
+                      </label>
+                      <input
+                        type="text"
+                        value={ngheNghiep}
+                        onChange={(e) => setNgheNghiep(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        Địa chỉ thường trú / Quê quán
+                      </label>
+                      <input
+                        type="text"
+                        value={diaChi}
+                        onChange={(e) => setDiaChi(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+                  <Link
+                    href="/chuTro/khachThue"
+                    className="px-5 py-2.5 rounded-full border border-slate-300 text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-100 transition no-underline"
+                  >
+                    Hủy
+                  </Link>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="px-7 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 font-bold text-xs sm:text-sm shadow-xs transition cursor-pointer disabled:opacity-50"
+                  >
+                    {submitting ? 'Đang lưu...' : 'Lưu cập nhật'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </main>
+        </div>
+      )}
     </ProtectedRoute>
   );
 }
