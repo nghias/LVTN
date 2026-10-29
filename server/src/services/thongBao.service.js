@@ -16,7 +16,7 @@ const ThongBaoService = {
 
   // Xác định phạm vi quyền hạn cho trang Quản lý (Chủ trọ / Quản lý khu)
   async resolveUserPermission(user) {
-    const { maND, quyen } = this.extractUser(user);
+    const { maND, quyen } = ThongBaoService.extractUser(user);
 
     if (quyen === "KhachThue") {
       const error = new Error("Khách thuê không có quyền truy cập trang quản lý thông báo.");
@@ -50,7 +50,7 @@ const ThongBaoService = {
   },
 
   async getMetadata(user) {
-    const perm = await this.resolveUserPermission(user);
+    const perm = await ThongBaoService.resolveUserPermission(user);
     const [loaiThongBao, danhSachPhong] = await Promise.all([
       ThongBaoModel.getLoaiThongBao(),
       ThongBaoModel.getPhongByKhuIds(perm.allowedKhuIds),
@@ -66,7 +66,7 @@ const ThongBaoService = {
   },
 
   async createThongBao(user, body) {
-    const perm = await this.resolveUserPermission(user);
+    const perm = await ThongBaoService.resolveUserPermission(user);
     const { maLTB, tieuDe, noiDung, phamVi, maKhu, maPhong } = body;
 
     if (!maLTB || !tieuDe?.trim() || !noiDung?.trim()) {
@@ -166,7 +166,7 @@ const ThongBaoService = {
   },
 
   async searchThongBao(user, query) {
-    const perm = await this.resolveUserPermission(user);
+    const perm = await ThongBaoService.resolveUserPermission(user);
     return await ThongBaoModel.searchThongBao({
       maND: perm.maND,
       isSupremeLandlord: perm.isSupremeLandlord,
@@ -180,7 +180,7 @@ const ThongBaoService = {
 
   // 1. Lấy danh sách thông báo cho NotificationBell & Trang Thông báo Người thuê
   async getThongBaoCuaToi(user, query = {}) {
-    const { maND } = this.extractUser(user);
+    const { maND } = ThongBaoService.extractUser(user);
     const options =
       typeof query === "number"
         ? { limit: query }
@@ -201,13 +201,13 @@ const ThongBaoService = {
     return {
       ...notiData,
       loaiThongBaoList,
-      thongTinPhong: roomData.thongTinPhong,
+      thongTinPhong: roomData?.thongTinPhong || null,
     };
   },
 
   // 1b. Khách thuê gửi phản ánh / báo cáo sự cố lên Quản lý khu & Chủ trọ
   async createPhanAnhKhachThue(user, body) {
-    const { maND } = this.extractUser(user);
+    const { maND } = ThongBaoService.extractUser(user);
     const { maLTB, tieuDe, noiDung } = body;
 
     if (!maLTB || !tieuDe?.trim() || !noiDung?.trim()) {
@@ -250,7 +250,7 @@ const ThongBaoService = {
 
   // 2. Xem chi tiết thông báo + Tự động đánh dấu đã đọc
   async getChiTietThongBao(user, maTB) {
-    const { maND } = this.extractUser(user);
+    const { maND } = ThongBaoService.extractUser(user);
     if (!maTB || isNaN(maTB)) {
       const err = new Error("Mã thông báo không hợp lệ.");
       err.statusCode = 400;
@@ -272,7 +272,7 @@ const ThongBaoService = {
 
   // 3. Trả lời thông báo
   async replyThongBao(user, maTB, body) {
-    const { maND } = this.extractUser(user);
+    const { maND } = ThongBaoService.extractUser(user);
     const { noiDung } = body;
 
     if (!noiDung || !noiDung.trim()) {
@@ -323,20 +323,20 @@ const ThongBaoService = {
 
   // 4. Đánh dấu đã đọc 1 thông báo
   async markAsRead(user, maTB) {
-    const { maND } = this.extractUser(user);
+    const { maND } = ThongBaoService.extractUser(user);
     await ThongBaoModel.markAsRead(maTB, maND);
     return { MaTB: maTB, TrangThai: "DaDoc" };
   },
 
   // 5. Đánh dấu đã đọc tất cả
   async markAllAsRead(user) {
-    const { maND } = this.extractUser(user);
+    const { maND } = ThongBaoService.extractUser(user);
     const updatedCount = await ThongBaoModel.markAllAsRead(maND);
     return { updatedCount };
   },
 
   async deleteThongBao(user, maTB) {
-    const perm = await this.resolveUserPermission(user);
+    const perm = await ThongBaoService.resolveUserPermission(user);
     const existing = await ThongBaoModel.getThongBaoById(maTB);
 
     if (!existing) {

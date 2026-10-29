@@ -1,6 +1,15 @@
 // server/src/app/models/thongBao.model.js
 const db = require("../../database/db");
 
+// Subquery lấy HoTen từ bảng ThongTinCaNhan (đảm bảo mỗi MaND chỉ có tối đa 1 dòng, không gây nhân bản bản ghi)
+const JOIN_THONG_TIN_CA_NHAN = `
+  LEFT JOIN (
+    SELECT MaND, MAX(HoTen) AS HoTen
+    FROM ThongTinCaNhan
+    GROUP BY MaND
+  ) tt ON nd.MaND = tt.MaND
+`;
+
 const ThongBaoModel = {
   // 1. Lấy tất cả loại thông báo
   async getLoaiThongBao() {
@@ -13,9 +22,11 @@ const ThongBaoModel = {
   // 2. Lấy tất cả KhuTrọ (Dành cho Chủ trọ tổng)
   async getAllKhuTro() {
     const [rows] = await db.query(`
-      SELECT kt.MaKhu, kt.MaND AS MaQuanLy, kt.TenKhu, kt.DiaChi, nd.HoTen AS TenQuanLy
+      SELECT kt.MaKhu, kt.MaND AS MaQuanLy, kt.TenKhu, kt.DiaChi,
+             COALESCE(tt.HoTen, nd.TenTK) AS TenQuanLy
       FROM KhuTro kt
       INNER JOIN NguoiDung nd ON kt.MaND = nd.MaND
+      ${JOIN_THONG_TIN_CA_NHAN}
       ORDER BY kt.MaKhu ASC
     `);
     return rows;
@@ -24,9 +35,11 @@ const ThongBaoModel = {
   // 3. Lấy KhuTrọ do một người dùng cụ thể quản lý
   async getKhuTroByManager(maND) {
     const [rows] = await db.query(
-      `SELECT kt.MaKhu, kt.MaND AS MaQuanLy, kt.TenKhu, kt.DiaChi, nd.HoTen AS TenQuanLy
+      `SELECT kt.MaKhu, kt.MaND AS MaQuanLy, kt.TenKhu, kt.DiaChi,
+              COALESCE(tt.HoTen, nd.TenTK) AS TenQuanLy
        FROM KhuTro kt
        INNER JOIN NguoiDung nd ON kt.MaND = nd.MaND
+       ${JOIN_THONG_TIN_CA_NHAN}
        WHERE kt.MaND = ?
        ORDER BY kt.MaKhu ASC`,
       [maND]
@@ -135,7 +148,8 @@ const ThongBaoModel = {
       const maTB = result.insertId;
 
       if (dsNguoiNhan && dsNguoiNhan.length > 0) {
-        const values = dsNguoiNhan.map((ndNhan) => [maTB, ndNhan, "ChuaDoc"]);
+        const uniqueRecipients = [...new Set(dsNguoiNhan.map(Number).filter(Boolean))];
+        const values = uniqueRecipients.map((ndNhan) => [maTB, ndNhan, "ChuaDoc"]);
         await conn.query(
           `INSERT INTO NhanThongBao (MaTB, NDNhan, TrangThai) VALUES ?`,
           [values]
@@ -145,13 +159,16 @@ const ThongBaoModel = {
       await conn.commit();
 
       const [detailRows] = await conn.query(
-        `SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui, nd.HoTen AS TenNguoiGui, nd.Quyen AS QuyenNguoiGui,
+        `SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
+                COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
+                nd.Quyen AS QuyenNguoiGui,
                 tb.MaLTB, ltb.TenLTB, tb.TieuDe, tb.NoiDung, tb.NgayGui,
                 'ChuaDoc' AS TrangThai,
                 (SELECT COUNT(*) FROM NhanThongBao ntb WHERE ntb.MaTB = tb.MaTB) AS SoNguoiNhan,
                 (SELECT COUNT(*) FROM ThongBao r WHERE r.MaTBGoc = COALESCE(tb.MaTBGoc, tb.MaTB)) AS SoPhanHoi
          FROM ThongBao tb
          INNER JOIN NguoiDung nd ON tb.NDGui = nd.MaND
+         ${JOIN_THONG_TIN_CA_NHAN}
          INNER JOIN LoaiThongBao ltb ON tb.MaLTB = ltb.MaLTB
          WHERE tb.MaTB = ?`,
         [maTB]
@@ -179,7 +196,9 @@ const ThongBaoModel = {
 
     if (tab === "da_nhan") {
       sql = `
-        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui, nd.HoTen AS TenNguoiGui, nd.Quyen AS QuyenNguoiGui,
+        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
+               COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
+               nd.Quyen AS QuyenNguoiGui,
                tb.MaLTB, ltb.TenLTB, tb.TieuDe, tb.NoiDung, tb.NgayGui,
                ntb.TrangThai,
                (SELECT COUNT(*) FROM NhanThongBao n2 WHERE n2.MaTB = tb.MaTB) AS SoNguoiNhan,
@@ -187,18 +206,22 @@ const ThongBaoModel = {
         FROM ThongBao tb
         INNER JOIN NhanThongBao ntb ON tb.MaTB = ntb.MaTB
         INNER JOIN NguoiDung nd ON tb.NDGui = nd.MaND
+        ${JOIN_THONG_TIN_CA_NHAN}
         INNER JOIN LoaiThongBao ltb ON tb.MaLTB = ltb.MaLTB
         WHERE ntb.NDNhan = ?
       `;
       params.push(maND);
     } else {
       sql = `
-        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui, nd.HoTen AS TenNguoiGui, nd.Quyen AS QuyenNguoiGui,
+        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
+               COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
+               nd.Quyen AS QuyenNguoiGui,
                tb.MaLTB, ltb.TenLTB, tb.TieuDe, tb.NoiDung, tb.NgayGui,
                (SELECT COUNT(*) FROM NhanThongBao ntb WHERE ntb.MaTB = tb.MaTB) AS SoNguoiNhan,
                (SELECT COUNT(*) FROM ThongBao r WHERE r.MaTBGoc = COALESCE(tb.MaTBGoc, tb.MaTB)) AS SoPhanHoi
         FROM ThongBao tb
         INNER JOIN NguoiDung nd ON tb.NDGui = nd.MaND
+        ${JOIN_THONG_TIN_CA_NHAN}
         INNER JOIN LoaiThongBao ltb ON tb.MaLTB = ltb.MaLTB
         WHERE tb.MaTBGoc IS NULL
       `;
@@ -210,7 +233,7 @@ const ThongBaoModel = {
     }
 
     if (keyword && keyword.trim() !== "") {
-      sql += ` AND (tb.TieuDe LIKE ? OR tb.NoiDung LIKE ? OR nd.HoTen LIKE ?)`;
+      sql += ` AND (tb.TieuDe LIKE ? OR tb.NoiDung LIKE ? OR COALESCE(tt.HoTen, nd.TenTK) LIKE ?)`;
       const likeKw = `%${keyword.trim()}%`;
       params.push(likeKw, likeKw, likeKw);
     }
@@ -229,21 +252,24 @@ const ThongBaoModel = {
   // 11. Lấy danh sách thông báo cho NotificationBell & Trang Thông báo Người thuê
   async getThongBaoCuaToi(
     maND,
-    { limit = 50, keyword = "", maLTB = "", trangThai = "", tab = "da_nhan" } = {}
+    { limit = 30, keyword = "", maLTB = "", trangThai = "", tab = "da_nhan" } = {}
   ) {
     const params = [];
     let sql = "";
 
     if (tab === "da_gui") {
-      // Các phản ánh / báo cáo sự cố do chính Khách thuê gửi đi
+      // Các phản ánh / báo cáo sự cố do chính người dùng gửi đi
       sql = `
-        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui, nd.HoTen AS TenNguoiGui, nd.Quyen AS QuyenNguoiGui,
+        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
+               COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
+               nd.Quyen AS QuyenNguoiGui,
                tb.MaLTB, ltb.TenLTB, tb.TieuDe, tb.NoiDung, tb.NgayGui,
                'DaDoc' AS TrangThai,
                (SELECT COUNT(*) FROM NhanThongBao ntb WHERE ntb.MaTB = tb.MaTB) AS SoNguoiNhan,
                (SELECT COUNT(*) FROM ThongBao r WHERE r.MaTBGoc = COALESCE(tb.MaTBGoc, tb.MaTB)) AS SoPhanHoi
         FROM ThongBao tb
         INNER JOIN NguoiDung nd ON tb.NDGui = nd.MaND
+        ${JOIN_THONG_TIN_CA_NHAN}
         INNER JOIN LoaiThongBao ltb ON tb.MaLTB = ltb.MaLTB
         WHERE tb.NDGui = ? AND tb.MaTBGoc IS NULL
       `;
@@ -251,13 +277,16 @@ const ThongBaoModel = {
     } else {
       // Hộp thư đến của người dùng
       sql = `
-        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui, nd.HoTen AS TenNguoiGui, nd.Quyen AS QuyenNguoiGui,
+        SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
+               COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
+               nd.Quyen AS QuyenNguoiGui,
                tb.MaLTB, ltb.TenLTB, tb.TieuDe, tb.NoiDung, tb.NgayGui,
                ntb.TrangThai,
                (SELECT COUNT(*) FROM ThongBao r WHERE r.MaTBGoc = COALESCE(tb.MaTBGoc, tb.MaTB)) AS SoPhanHoi
         FROM NhanThongBao ntb
         INNER JOIN ThongBao tb ON ntb.MaTB = tb.MaTB
         INNER JOIN NguoiDung nd ON tb.NDGui = nd.MaND
+        ${JOIN_THONG_TIN_CA_NHAN}
         INNER JOIN LoaiThongBao ltb ON tb.MaLTB = ltb.MaLTB
         WHERE ntb.NDNhan = ?
       `;
@@ -270,7 +299,7 @@ const ThongBaoModel = {
     }
 
     if (keyword && keyword.trim() !== "") {
-      sql += ` AND (tb.TieuDe LIKE ? OR tb.NoiDung LIKE ? OR nd.HoTen LIKE ?)`;
+      sql += ` AND (tb.TieuDe LIKE ? OR tb.NoiDung LIKE ? OR COALESCE(tt.HoTen, nd.TenTK) LIKE ?)`;
       const likeKw = `%${keyword.trim()}%`;
       params.push(likeKw, likeKw, likeKw);
     }
@@ -281,7 +310,7 @@ const ThongBaoModel = {
     }
 
     sql += ` ORDER BY tb.NgayGui DESC LIMIT ?`;
-    params.push(Number(limit) || 50);
+    params.push(Number(limit) || 30);
 
     const [rows] = await db.query(sql, params);
 
@@ -301,12 +330,14 @@ const ThongBaoModel = {
   // 11b. Lấy thông tin Phòng đang thuê của Khách & danh sách Quản lý/Chủ trọ nhận phản ánh
   async getThongTinPhongVaNguoiNhanCuaKhach(maND) {
     const [roomRows] = await db.query(
-      `SELECT p.MaPhong, p.TenPhong, kt.MaKhu, kt.TenKhu, kt.MaND AS MaQuanLy, nd.HoTen AS TenQuanLy
+      `SELECT p.MaPhong, p.TenPhong, kt.MaKhu, kt.TenKhu, kt.MaND AS MaQuanLy,
+              COALESCE(tt.HoTen, nd.TenTK) AS TenQuanLy
        FROM ChiTietHopDongThue cthdt
        INNER JOIN HopDongThue hdt ON cthdt.MaHDT = hdt.MaHDT
        INNER JOIN Phong p ON hdt.MaPhong = p.MaPhong
        INNER JOIN KhuTro kt ON p.MaKhu = kt.MaKhu
        INNER JOIN NguoiDung nd ON kt.MaND = nd.MaND
+       ${JOIN_THONG_TIN_CA_NHAN}
        WHERE cthdt.MaND = ?
          AND hdt.TrangThai = 'ConHieuLuc'
          AND (cthdt.NgayDi IS NULL OR cthdt.NgayDi >= CURDATE())
@@ -347,23 +378,24 @@ const ThongBaoModel = {
 
   // 12. Xem chi tiết 1 thông báo kèm toàn bộ luồng phản hồi (Replies)
   async getChiTietThongBao(maTB, maND) {
-    // Tìm thông báo hiện tại
     const [currentRows] = await db.query(
       `SELECT MaTB, MaTBGoc FROM ThongBao WHERE MaTB = ?`,
       [maTB]
     );
     if (!currentRows[0]) return null;
 
-    // Nếu người dùng bấm vào 1 thông báo phản hồi, tự động truy ngược về thông báo gốc (Root)
     const rootMaTB = currentRows[0].MaTBGoc || currentRows[0].MaTB;
 
     const [rootRows] = await db.query(
-      `SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui, nd.HoTen AS TenNguoiGui, nd.Quyen AS QuyenNguoiGui,
+      `SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
+              COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
+              nd.Quyen AS QuyenNguoiGui,
               tb.MaLTB, ltb.TenLTB, tb.TieuDe, tb.NoiDung, tb.NgayGui,
               (SELECT TrangThai FROM NhanThongBao ntb WHERE ntb.MaTB = tb.MaTB AND ntb.NDNhan = ? LIMIT 1) AS TrangThai,
               (SELECT COUNT(*) FROM NhanThongBao ntb2 WHERE ntb2.MaTB = tb.MaTB) AS SoNguoiNhan
        FROM ThongBao tb
        INNER JOIN NguoiDung nd ON tb.NDGui = nd.MaND
+       ${JOIN_THONG_TIN_CA_NHAN}
        INNER JOIN LoaiThongBao ltb ON tb.MaLTB = ltb.MaLTB
        WHERE tb.MaTB = ?`,
       [maND, rootMaTB]
@@ -371,12 +403,14 @@ const ThongBaoModel = {
 
     if (!rootRows[0]) return null;
 
-    // Lấy toàn bộ danh sách trả lời thuộc luồng thông báo gốc này
     const [replies] = await db.query(
-      `SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui, nd.HoTen AS TenNguoiGui, nd.Quyen AS QuyenNguoiGui,
+      `SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
+              COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
+              nd.Quyen AS QuyenNguoiGui,
               tb.MaLTB, tb.TieuDe, tb.NoiDung, tb.NgayGui
        FROM ThongBao tb
        INNER JOIN NguoiDung nd ON tb.NDGui = nd.MaND
+       ${JOIN_THONG_TIN_CA_NHAN}
        WHERE tb.MaTBGoc = ?
        ORDER BY tb.NgayGui ASC`,
       [rootMaTB]
@@ -405,17 +439,14 @@ const ThongBaoModel = {
 
     const recipientSet = new Set();
 
-    // Nếu người trả lời không phải là người tạo thông báo gốc -> Gửi cho người tạo thông báo gốc
     if (Number(root.NDGui) !== Number(senderMaND)) {
       recipientSet.add(Number(root.NDGui));
     }
 
-    // Nếu đang trả lời trực tiếp 1 tin nhắn con -> Gửi cho chủ tin nhắn con đó
     if (Number(target.NDGui) !== Number(senderMaND)) {
       recipientSet.add(Number(target.NDGui));
     }
 
-    // Nếu chính người tạo thông báo gốc trả lời trên luồng chung -> Gửi cho những người đã từng phản hồi hoặc người nhận ban đầu
     if (recipientSet.size === 0) {
       const [repliers] = await db.query(
         `SELECT DISTINCT NDGui AS MaND FROM ThongBao WHERE MaTBGoc = ? AND NDGui != ?`,

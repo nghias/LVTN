@@ -82,7 +82,16 @@ export default function QuanLyKhachThuePage() {
   }, []);
 
   const filteredList = useMemo(() => {
-    return khachThueList.filter((item) => {
+    // Khử trùng lặp theo MaND (nếu có bản ghi trùng, ưu tiên giữ bản ghi đang có MaPhong)
+    const uniqueMap = new Map<number, KhachThueItem>();
+    for (const item of khachThueList) {
+      const existing = uniqueMap.get(item.MaND);
+      if (!existing || (!existing.MaPhong && item.MaPhong)) {
+        uniqueMap.set(item.MaND, item);
+      }
+    }
+
+    return Array.from(uniqueMap.values()).filter((item) => {
       if (selectedFilter === 'UNASSIGNED') {
         if (item.MaPhong) return false;
       } else if (selectedFilter !== 'ALL') {

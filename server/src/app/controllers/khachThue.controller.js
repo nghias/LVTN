@@ -1,12 +1,24 @@
 // server/src/app/controllers/KhachThueController.js
 const bcrypt = require('bcrypt');
+const db = require('../../database/db');
 const NguoiDungModel = require('../models/nguoiDung.model');
-const KhuTroModel = require('../models/khuTro.model');
-const { successResponse, errorResponse } = require('../../utils/response.util');
 
-class KhachThueController {
-  // Kiểm tra quyền thao tác trên khách thuê của Quản lý / Chủ trọ
-  async verifyKhachThuePermission(maND, user) {
+const KhachThueController = {
+  // Lấy danh sách MaKhu mà người dùng hiện tại được phép quản lý (không phụ thuộc KhuTroModel cũ)
+  getAllowedKhuIds: async (userQuyen, userMaND) => {
+    if (userQuyen === 'QuanLy') {
+      const [rows] = await db.query(
+        `SELECT MaKhu FROM KhuTro WHERE MaND = ? ORDER BY MaKhu ASC`,
+        [Number(userMaND)]
+      );
+      return rows.map((r) => Number(r.MaKhu));
+    }
+    const [rows] = await db.query(`SELECT MaKhu FROM KhuTro ORDER BY MaKhu ASC`);
+    return rows.map((r) => Number(r.MaKhu));
+  },
+
+  // Hàm nội bộ kiểm tra quyền thao tác trên 1 khách thuê
+  verifyKhachThuePermission: async (maND, user) => {
     const allTenants = await NguoiDungModel.getAllKhachThueWithRoom();
     const tenant = allTenants.find((t) => Number(t.MaND) === Number(maND));
 
@@ -18,11 +30,11 @@ class KhachThueController {
       };
     }
 
-    const quyen = user.quyen || user.Quyen;
-    const currentMaND = user.maND || user.MaND;
+    const userQuyen = user?.quyen || user?.Quyen;
+    const userMaND = Number(user?.maND || user?.MaND);
 
-    if (quyen === 'QuanLy') {
-      if (tenant.MaKhu && Number(tenant.MaQuanLyKhu) !== Number(currentMaND)) {
+    if (userQuyen === 'QuanLy') {
+      if (tenant.MaKhu && Number(tenant.MaQuanLyKhu) !== userMaND) {
         return {
           error: 'Khách thuê này đang ở cơ sở khác, bạn không có quyền thao tác!',
           status: 403,
@@ -32,37 +44,42 @@ class KhachThueController {
     }
 
     return { error: null, status: 200, tenant };
-  }
+  },
 
   // 1. [GET] /api/khach-thue/danh-sach
-  getList = async (req, res, next) => {
+  getList: async (req, res) => {
     try {
-      const quyen = req.user.quyen || req.user.Quyen;
-      const maND = req.user.maND || req.user.MaND;
+      const userQuyen = req.user?.quyen || req.user?.Quyen;
+      const userMaND = Number(req.user?.maND || req.user?.MaND);
       const { maKhu, trangThaiPhong, keyword } = req.query;
 
-      const allowedKhus =
-        quyen === 'QuanLy'
-          ? await KhuTroModel.getByMaND(maND)
-          : await KhuTroModel.getAll();
+      const [allowedMaKhuIds, allTenants] = await Promise.all([
+        KhachThueController.getAllowedKhuIds(userQuyen, userMaND),
+        NguoiDungModel.getAllKhachThueWithRoom(),
+      ]);
 
-      const allowedMaKhuIds = allowedKhus.map((k) => Number(k.MaKhu));
+      let tenants = allTenants;
 
-      let tenants = await NguoiDungModel.getAllKhachThueWithRoom();
-
-      // Quản lý chỉ xem khách đang thuê tại cơ sở mình phụ trách HOẶC khách chưa xếp phòng
-      if (quyen === 'QuanLy') {
+      // Quản lý chỉ xem khách thuộc cơ sở mình phụ trách HOẶC khách chưa xếp phòng
+      if (userQuyen === 'QuanLy') {
         tenants = tenants.filter(
           (t) => !t.MaKhu || allowedMaKhuIds.includes(Number(t.MaKhu))
         );
       }
 
       if (maKhu) {
-        const khuId = Number(maKhu);
-        if (!allowedMaKhuIds.includes(khuId)) {
-          return errorResponse(res, 'Bạn không có quyền xem cơ sở này!', 403);
+        if (maKhu === 'chua-co-phong' || maKhu === 'UNASSIGNED') {
+          tenants = tenants.filter((t) => !t.MaPhong);
+        } else {
+          const khuId = Number(maKhu);
+          if (!allowedMaKhuIds.includes(khuId)) {
+            return res.status(403).json({
+              success: false,
+              message: 'Bạn không có quyền xem khách thuê của cơ sở này!',
+            });
+          }
+          tenants = tenants.filter((t) => Number(t.MaKhu) === khuId);
         }
-        tenants = tenants.filter((t) => Number(t.MaKhu) === khuId);
       }
 
       if (trangThaiPhong === 'DangThue') {
@@ -78,38 +95,59 @@ class KhachThueController {
             (t.HoTen && t.HoTen.toLowerCase().includes(kw)) ||
             (t.SDT && t.SDT.toLowerCase().includes(kw)) ||
             (t.CCCD && t.CCCD.toLowerCase().includes(kw)) ||
-            (t.NgheNghiep && t.NgheNghiep.toLowerCase().includes(kw)) ||
+            (t.Email && t.Email.toLowerCase().includes(kw)) ||
             (t.TenTK && t.TenTK.toLowerCase().includes(kw)) ||
-            (t.TenPhong && t.TenPhong.toLowerCase().includes(kw))
+            (t.TenPhong && t.TenPhong.toLowerCase().includes(kw)) ||
+            (t.NgheNghiep && t.NgheNghiep.toLowerCase().includes(kw)) ||
+            (t.DiaChi && t.DiaChi.toLowerCase().includes(kw))
         );
       }
 
-      return successResponse(res, 'Lấy danh sách khách thuê thành công!', tenants);
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách khách thuê thành công!',
+        data: tenants,
+      });
     } catch (error) {
-      next(error);
+      console.error('Lỗi getList KhachThue:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Lỗi máy chủ khi tải danh sách khách thuê.',
+      });
     }
-  };
+  },
 
   // 2. [GET] /api/khach-thue/:maND
-  getDetail = async (req, res, next) => {
+  getDetail: async (req, res) => {
     try {
       const maND = Number(req.params.maND);
-      const { error, status, tenant } = await this.verifyKhachThuePermission(
-        maND,
-        req.user
-      );
-      if (error) return errorResponse(res, error, status);
+      const { error, status, tenant } =
+        await KhachThueController.verifyKhachThuePermission(maND, req.user);
 
-      return successResponse(res, 'Lấy thông tin khách thuê thành công!', tenant);
+      if (error) {
+        return res.status(status).json({ success: false, message: error });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy chi tiết khách thuê thành công!',
+        data: tenant,
+      });
     } catch (error) {
-      next(error);
+      console.error('Lỗi getDetail KhachThue:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Lỗi máy chủ khi tải thông tin khách thuê.',
+      });
     }
-  };
+  },
 
   // 3. [POST] /api/khach-thue
-  create = async (req, res, next) => {
+  create: async (req, res) => {
     try {
       const {
+        TenTK,
+        MatKhau,
         HoTen,
         GioiTinh,
         NamSinh,
@@ -120,83 +158,100 @@ class KhachThueController {
         Email,
         DiaChi,
         NgheNghiep,
-        TenTK,
-        MatKhau,
       } = req.body;
 
       if (!HoTen || !SDT || !TenTK || !MatKhau) {
-        return errorResponse(
-          res,
-          'Vui lòng nhập đầy đủ Họ tên, Số điện thoại, Tên tài khoản và Mật khẩu!',
-          400
-        );
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng nhập đầy đủ Họ tên, Số điện thoại, Tên tài khoản và Mật khẩu!',
+        });
       }
 
       if (String(MatKhau).trim().length < 6) {
-        return errorResponse(res, 'Mật khẩu phải có ít nhất 6 ký tự!', 400);
+        return res.status(400).json({
+          success: false,
+          message: 'Mật khẩu phải có ít nhất 6 ký tự!',
+        });
       }
 
       const duplicate = await NguoiDungModel.checkDuplicateUser({
-        TenTK: TenTK.trim(),
-        SDT: SDT.trim(),
-        Email: Email ? Email.trim() : '',
-        CCCD: CCCD ? CCCD.trim() : '',
+        TenTK: String(TenTK).trim(),
+        Email: Email ? String(Email).trim() : '',
+        SDT: String(SDT).trim(),
+        CCCD: CCCD ? String(CCCD).trim() : '',
       });
 
       if (duplicate) {
-        if (duplicate.TenTK === TenTK.trim()) {
-          return errorResponse(res, 'Tên tài khoản đăng nhập này đã tồn tại!', 400);
+        if (TenTK && duplicate.TenTK === String(TenTK).trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tên tài khoản đăng nhập này đã tồn tại!',
+          });
         }
-        if (duplicate.SDT === SDT.trim()) {
-          return errorResponse(res, 'Số điện thoại này đã được đăng ký!', 400);
+        if (SDT && duplicate.SDT === String(SDT).trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại này đã được đăng ký cho tài khoản khác!',
+          });
         }
-        if (Email && duplicate.Email === Email.trim()) {
-          return errorResponse(res, 'Địa chỉ Email này đã được sử dụng!', 400);
+        if (CCCD && duplicate.CCCD === String(CCCD).trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số CCCD này đã tồn tại trên hệ thống!',
+          });
         }
-        if (CCCD && duplicate.CCCD === CCCD.trim()) {
-          return errorResponse(res, 'Số CCCD này đã tồn tại trên hệ thống!', 400);
+        if (Email && duplicate.Email === String(Email).trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Địa chỉ Email này đã được sử dụng!',
+          });
         }
       }
 
       const hashedPassword = await bcrypt.hash(String(MatKhau).trim(), 10);
 
       const newMaND = await NguoiDungModel.createKhachThue({
-        TenTK: TenTK.trim(),
+        TenTK: String(TenTK).trim(),
         MatKhau: hashedPassword,
-        HoTen: HoTen.trim(),
+        HoTen: String(HoTen).trim(),
         GioiTinh: GioiTinh || 'Nam',
         NamSinh: NamSinh ? Number(NamSinh) : null,
-        CCCD: CCCD ? CCCD.trim() : null,
+        CCCD: CCCD ? String(CCCD).trim() : null,
         NgayCap: NgayCap || null,
-        NoiCap: NoiCap ? NoiCap.trim() : 'Cục Cảnh sát QLHC về TTXH',
-        SDT: SDT.trim(),
-        Email: Email ? Email.trim() : null,
-        DiaChi: DiaChi ? DiaChi.trim() : null,
-        NgheNghiep: NgheNghiep ? NgheNghiep.trim() : null,
+        NoiCap: NoiCap ? String(NoiCap).trim() : 'Cục Cảnh sát QLHC về TTXH',
+        SDT: String(SDT).trim(),
+        Email: Email ? String(Email).trim() : null,
+        DiaChi: DiaChi ? String(DiaChi).trim() : null,
+        NgheNghiep: NgheNghiep ? String(NgheNghiep).trim() : null,
       });
 
-      return successResponse(
-        res,
-        'Tạo tài khoản khách thuê thành công!',
-        { MaND: newMaND },
-        201
-      );
+      return res.status(201).json({
+        success: true,
+        message: 'Tạo tài khoản và hồ sơ khách thuê thành công!',
+        data: { MaND: newMaND },
+      });
     } catch (error) {
-      next(error);
+      console.error('Lỗi create KhachThue:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Lỗi máy chủ khi tạo tài khoản khách thuê.',
+      });
     }
-  };
+  },
 
   // 4. [PUT] /api/khach-thue/:maND
-  update = async (req, res, next) => {
+  update: async (req, res) => {
     try {
       const maND = Number(req.params.maND);
-      const { error, status, tenant } = await this.verifyKhachThuePermission(
-        maND,
-        req.user
-      );
-      if (error) return errorResponse(res, error, status);
+      const { error, status, tenant } =
+        await KhachThueController.verifyKhachThuePermission(maND, req.user);
+
+      if (error) {
+        return res.status(status).json({ success: false, message: error });
+      }
 
       const {
+        TenTK,
         HoTen,
         GioiTinh,
         NamSinh,
@@ -207,109 +262,157 @@ class KhachThueController {
         Email,
         DiaChi,
         NgheNghiep,
-        TenTK,
       } = req.body;
 
-      if (!HoTen || !SDT) {
-        return errorResponse(res, 'Họ tên và Số điện thoại không được để trống!', 400);
-      }
+      const finalTenTK = TenTK ? String(TenTK).trim() : tenant.TenTK;
 
-      const finalTenTK = TenTK ? TenTK.trim() : tenant.TenTK;
+      if (!HoTen || !SDT) {
+        return res.status(400).json({
+          success: false,
+          message: 'Họ tên và Số điện thoại không được để trống!',
+        });
+      }
 
       const duplicate = await NguoiDungModel.checkDuplicateUser(
         {
           TenTK: finalTenTK,
-          SDT: SDT.trim(),
-          Email: Email ? Email.trim() : '',
-          CCCD: CCCD ? CCCD.trim() : '',
+          Email: Email ? String(Email).trim() : '',
+          SDT: String(SDT).trim(),
+          CCCD: CCCD ? String(CCCD).trim() : '',
         },
         maND
       );
 
       if (duplicate) {
-        if (duplicate.TenTK === finalTenTK) {
-          return errorResponse(res, 'Tên tài khoản này đã được người khác sử dụng!', 400);
+        if (finalTenTK && duplicate.TenTK === finalTenTK) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tên tài khoản đăng nhập này đã được sử dụng!',
+          });
         }
-        if (duplicate.SDT === SDT.trim()) {
-          return errorResponse(res, 'Số điện thoại này đã được đăng ký cho tài khoản khác!', 400);
+        if (SDT && duplicate.SDT === String(SDT).trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số điện thoại này đã thuộc về người dùng khác!',
+          });
         }
-        if (Email && duplicate.Email === Email.trim()) {
-          return errorResponse(res, 'Địa chỉ Email này đã được sử dụng!', 400);
+        if (CCCD && duplicate.CCCD === String(CCCD).trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Số CCCD này đã thuộc về người dùng khác!',
+          });
         }
-        if (CCCD && duplicate.CCCD === CCCD.trim()) {
-          return errorResponse(res, 'Số CCCD này đã tồn tại ở hồ sơ khác!', 400);
+        if (Email && duplicate.Email === String(Email).trim()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Địa chỉ Email này đã thuộc về người dùng khác!',
+          });
         }
       }
 
       await NguoiDungModel.updateKhachThue(maND, {
         TenTK: finalTenTK,
-        HoTen: HoTen.trim(),
+        HoTen: String(HoTen).trim(),
         GioiTinh: GioiTinh || 'Nam',
         NamSinh: NamSinh ? Number(NamSinh) : null,
-        CCCD: CCCD ? CCCD.trim() : null,
+        CCCD: CCCD ? String(CCCD).trim() : null,
         NgayCap: NgayCap || null,
-        NoiCap: NoiCap ? NoiCap.trim() : null,
-        SDT: SDT.trim(),
-        Email: Email ? Email.trim() : null,
-        DiaChi: DiaChi ? DiaChi.trim() : null,
-        NgheNghiep: NgheNghiep ? NgheNghiep.trim() : null,
+        NoiCap: NoiCap ? String(NoiCap).trim() : 'Cục Cảnh sát QLHC về TTXH',
+        SDT: String(SDT).trim(),
+        Email: Email ? String(Email).trim() : null,
+        DiaChi: DiaChi ? String(DiaChi).trim() : null,
+        NgheNghiep: NgheNghiep ? String(NgheNghiep).trim() : null,
       });
 
-      return successResponse(res, 'Cập nhật hồ sơ khách thuê thành công!');
+      return res.status(200).json({
+        success: true,
+        message: 'Cập nhật thông tin khách thuê thành công!',
+      });
     } catch (error) {
-      next(error);
+      console.error('Lỗi update KhachThue:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Lỗi máy chủ khi cập nhật thông tin khách thuê.',
+      });
     }
-  };
+  },
 
   // 5. [PUT] /api/khach-thue/:maND/cap-lai-mat-khau
-  resetPassword = async (req, res, next) => {
+  resetPassword: async (req, res) => {
     try {
       const maND = Number(req.params.maND);
-      const { error, status } = await this.verifyKhachThuePermission(
-        maND,
-        req.user
-      );
-      if (error) return errorResponse(res, error, status);
+      const rawNewPass = req.body.matKhauMoi || req.body.MatKhauMoi;
 
-      const rawNewPass = req.body.MatKhauMoi || req.body.matKhauMoi;
+      const { error, status } =
+        await KhachThueController.verifyKhachThuePermission(maND, req.user);
+      if (error) {
+        return res.status(status).json({ success: false, message: error });
+      }
+
       if (!rawNewPass || String(rawNewPass).trim().length < 6) {
-        return errorResponse(res, 'Mật khẩu mới phải có ít nhất 6 ký tự!', 400);
+        return res.status(400).json({
+          success: false,
+          message: 'Mật khẩu mới phải có ít nhất 6 ký tự!',
+        });
       }
 
       const hashedPassword = await bcrypt.hash(String(rawNewPass).trim(), 10);
       await NguoiDungModel.updatePassword(maND, hashedPassword);
 
-      return successResponse(res, 'Cấp lại mật khẩu cho khách thuê thành công!');
+      return res.status(200).json({
+        success: true,
+        message: 'Đã cấp lại mật khẩu mới cho khách thuê thành công!',
+      });
     } catch (error) {
-      next(error);
+      console.error('Lỗi resetPassword KhachThue:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Lỗi máy chủ khi cấp lại mật khẩu.',
+      });
     }
-  };
+  },
 
   // 6. [DELETE] /api/khach-thue/:maND
-  delete = async (req, res, next) => {
+  delete: async (req, res) => {
     try {
       const maND = Number(req.params.maND);
-      const { error, status } = await this.verifyKhachThuePermission(
-        maND,
-        req.user
-      );
-      if (error) return errorResponse(res, error, status);
+      const { error, status, tenant } =
+        await KhachThueController.verifyKhachThuePermission(maND, req.user);
 
-      const isRenting = await NguoiDungModel.hasActiveContract(maND);
-      if (isRenting) {
-        return errorResponse(
-          res,
-          'Không thể xóa khách thuê đang có hợp đồng thuê phòng còn hiệu lực!',
-          400
-        );
+      if (error) {
+        return res.status(status).json({ success: false, message: error });
+      }
+
+      if (tenant.MaPhong) {
+        return res.status(400).json({
+          success: false,
+          message: `Khách thuê đang ở phòng ${tenant.TenPhong} (${tenant.TenKhu}). Vui lòng thanh lý hợp đồng trước khi xóa tài khoản!`,
+        });
+      }
+
+      const hasHistory = await NguoiDungModel.hasContractHistory(maND);
+      if (hasHistory) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Tài khoản này đã có lịch sử hợp đồng thuê phòng trong hệ thống, không thể xóa để bảo toàn dữ liệu hóa đơn!',
+        });
       }
 
       await NguoiDungModel.deleteKhachThue(maND);
-      return successResponse(res, 'Xóa tài khoản khách thuê thành công!');
-    } catch (error) {
-      next(error);
-    }
-  };
-}
 
-module.exports = new KhachThueController();
+      return res.status(200).json({
+        success: true,
+        message: 'Đã xóa tài khoản và hồ sơ khách thuê thành công!',
+      });
+    } catch (error) {
+      console.error('Lỗi delete KhachThue:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Lỗi máy chủ khi xóa khách thuê.',
+      });
+    }
+  },
+};
+
+module.exports = KhachThueController;

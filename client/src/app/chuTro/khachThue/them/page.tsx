@@ -81,22 +81,22 @@ export default function ThemKhachThuePage() {
           <QuanLyHeader user={user} />
 
           <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+            >
+              ← Quay lại trang trước
+            </button>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Tạo Tài Khoản & Hồ Sơ Khách Thuê
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Khởi tạo tài khoản đăng nhập (NguoiDung) và hồ sơ định danh cá nhân (ThongTinCaNhan)
+                  Khởi tạo tài khoản đăng nhập và hồ sơ định danh cá nhân
                 </p>
               </div>
-
-              <Link
-                href="/chuTro/khachThue"
-                className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs sm:text-sm transition no-underline whitespace-nowrap"
-              >
-                ← Quay lại danh sách
-              </Link>
             </div>
 
             <form
@@ -106,13 +106,13 @@ export default function ThemKhachThuePage() {
               {/* 1. Thông tin tài khoản đăng nhập */}
               <div className="space-y-4">
                 <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
-                  1. Thông tin tài khoản đăng nhập (Bảng NguoiDung)
+                  1. Thông tin tài khoản đăng nhập
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Tên tài khoản (TenTK) <span className="text-red-500">*</span>
+                      Tên tài khoản <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -141,7 +141,7 @@ export default function ThemKhachThuePage() {
               {/* 2. Thông tin định danh cá nhân */}
               <div className="space-y-4">
                 <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
-                  2. Hồ sơ định danh cá nhân (Bảng ThongTinCaNhan)
+                  2. Hồ sơ định danh cá nhân
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

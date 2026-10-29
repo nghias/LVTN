@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import QuanLyHeader from '@/components/layout/QuanLyHeader';
@@ -16,6 +17,7 @@ const getApiBaseUrl = () => {
 };
 
 function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
+  const router = useRouter();
   const { showSuccess, showError } = useAlertModal();
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -144,6 +146,13 @@ function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
   return (
     <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header trang */}
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
+        >
+          ← Quay lại trang trước
+        </button>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
@@ -153,13 +162,6 @@ function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
             Thông tin định danh dùng để liên hệ, lập hợp đồng thuê phòng và khai báo tạm trú
           </p>
         </div>
-
-        <Link
-          href="/taiKhoan/doiMatKhau"
-          className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 font-bold text-xs sm:text-sm transition no-underline whitespace-nowrap"
-        >
-          Đổi mật khẩu
-        </Link>
       </div>
 
       {/* Khung biểu mẫu */}
