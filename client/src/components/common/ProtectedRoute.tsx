@@ -21,7 +21,7 @@ export default function ProtectedRoute({ allowedRoles, children }: ProtectedRout
     const verifySession = async () => {
       try {
         const res = await AuthService.getMe();
-        const currentUser = res.data;
+        const currentUser = res.data?.user;
 
         if (!currentUser) {
           router.replace('/auth');

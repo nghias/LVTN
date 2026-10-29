@@ -37,7 +37,7 @@ const NguoiDungModel = {
     return rows;
   },
 
-  // 4. Tìm tài khoản theo MaND (Có lấy MatKhau để kiểm tra khi đổi mật khẩu)
+  // 4. Tìm tài khoản theo MaND
   findById: async (maND) => {
     const sql = `
       SELECT MaND, TenTK, MatKhau, Quyen
@@ -45,11 +45,11 @@ const NguoiDungModel = {
       WHERE MaND = ?
       LIMIT 1
     `;
-    const [rows] = await db.execute(sql, [maND]);
+    const [rows] = await db.execute(sql, [Number(maND)]);
     return rows[0] || null;
   },
 
-  // 5. Tìm tài khoản theo TenTK (Dùng khi đăng nhập)
+  // 5. Tìm tài khoản theo TenTK
   findByTenTK: async (tenTK) => {
     const sql = `
       SELECT MaND, TenTK, MatKhau, Quyen
@@ -61,7 +61,19 @@ const NguoiDungModel = {
     return rows[0] || null;
   },
 
-  // 6. Kiểm tra trùng Tên tài khoản (trừ chính maND đang sửa)
+  // 6. Tìm tài khoản khi đăng nhập (Khắc phục lỗi NguoiDungModel.findByLoginIdentifier is not a function)
+  findByLoginIdentifier: async (identifier) => {
+    const sql = `
+      SELECT MaND, TenTK, MatKhau, Quyen
+      FROM NguoiDung
+      WHERE TenTK = ?
+      LIMIT 1
+    `;
+    const [rows] = await db.execute(sql, [String(identifier).trim()]);
+    return rows[0] || null;
+  },
+
+  // 7. Kiểm tra trùng Tên tài khoản (trừ chính maND đang sửa)
   checkDuplicateTenTK: async (maND, tenTK) => {
     if (!tenTK || String(tenTK).trim() === '') return null;
     const sql = `
@@ -77,7 +89,7 @@ const NguoiDungModel = {
     return rows[0] || null;
   },
 
-  // 7. Tạo tài khoản mới trong bảng NguoiDung
+  // 8. Tạo tài khoản mới trong bảng NguoiDung
   create: async ({ TenTK, MatKhau, Quyen = 'KhachThue' }) => {
     const sql = `
       INSERT INTO NguoiDung (TenTK, MatKhau, Quyen)
@@ -91,7 +103,7 @@ const NguoiDungModel = {
     return result.insertId;
   },
 
-  // 8. Cập nhật Tên tài khoản hoặc Quyền
+  // 9. Cập nhật Tên tài khoản hoặc Quyền
   update: async (maND, { TenTK, Quyen }) => {
     const sql = `
       UPDATE NguoiDung
@@ -107,7 +119,7 @@ const NguoiDungModel = {
     return result.affectedRows > 0;
   },
 
-  // 9. Cập nhật mật khẩu mới
+  // 10. Cập nhật mật khẩu mới
   updatePassword: async (maND, hashedPassword) => {
     const sql = `
       UPDATE NguoiDung
@@ -118,7 +130,7 @@ const NguoiDungModel = {
     return result.affectedRows > 0;
   },
 
-  // 10. Xóa tài khoản theo MaND
+  // 11. Xóa tài khoản theo MaND
   delete: async (maND) => {
     const sql = `
       DELETE FROM NguoiDung

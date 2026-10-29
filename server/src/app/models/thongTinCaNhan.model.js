@@ -31,6 +31,11 @@ const ThongTinCaNhanModel = {
     return rows[0] || null;
   },
 
+  // Hàm bí danh findByMaND để tương thích mọi nơi gọi
+  findByMaND: async (maND) => {
+    return ThongTinCaNhanModel.getByMaND(maND);
+  },
+
   // 3. Lấy thông tin cá nhân của nhiều người dùng theo danh sách MaND
   getByMaNDList: async (maNDIds = []) => {
     if (!maNDIds || maNDIds.length === 0) return [];
@@ -125,7 +130,7 @@ const ThongTinCaNhanModel = {
     return result.insertId;
   },
 
-  // 7. Cập nhật hồ sơ thông tin cá nhân theo MaND (Nếu chưa có dòng nào sẽ tự động tạo mới)
+  // 7. Cập nhật hồ sơ thông tin cá nhân theo MaND (Nếu chưa có sẽ tự động tạo mới)
   upsertByMaND: async (
     maND,
     {

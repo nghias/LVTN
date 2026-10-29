@@ -51,6 +51,7 @@ export default function LoginForm() {
       });
 
       const user = response.data?.user;
+      console.log('Thông tin người dùng:', user);
       if (!user) {
         showError('Không lấy được thông tin tài khoản!');
         return;
@@ -67,6 +68,7 @@ export default function LoginForm() {
         user.Quyen === 'ChuTro' || user.Quyen === 'QuanLy'
           ? '/chuTro/thongKe'
           : '/nguoiThue/thongKe';
+        console.log('Chuyển hướng đến:', targetUrl);
 
       showSuccess(
         `Xin chào ${user.HoTen}, đang chuyển vào hệ thống...`,

@@ -1,46 +1,89 @@
+// server/src/services/auth.service.js
 const NguoiDungModel = require('../app/models/nguoiDung.model');
-const { comparePassword, hashPassword, decryptAES } = require('../utils/crypto.util');
+const ThongTinCaNhanModel = require('../app/models/thongTinCaNhan.model');
+const { comparePassword, hashPassword, decryptAES, encryptAES } = require('../utils/crypto.util');
 const { generateAccessToken, generateRefreshToken } = require('../utils/jwt.util');
-const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]).{8,}$/;
+
+// Hàm giải mã an toàn (Nếu trong DB đang lưu dạng chữ thường như 0931493785 thì giữ nguyên)
+const safeDecrypt = (val) => {
+  if (!val) return '';
+  try {
+    const decrypted = decryptAES ? decryptAES(val) : val;
+    return decrypted || val;
+  } catch {
+    return val;
+  }
+};
+
+// Hàm ghép thông tin từ bảng NguoiDung và bảng ThongTinCaNhan
+const mergeAccountAndProfile = (account, profile) => {
+  if (!account) return null;
+  return {
+    MaND: account.MaND,
+    TenTK: account.TenTK,
+    Quyen: account.Quyen,
+    MaTT: profile?.MaTT || null,
+    HoTen: profile?.HoTen || account.TenTK,
+    GioiTinh: profile?.GioiTinh || 'Nam',
+    NamSinh: profile?.NamSinh || null,
+    CCCD: safeDecrypt(profile?.CCCD),
+    NgayCap: profile?.NgayCap || null,
+    NoiCap: safeDecrypt(profile?.NoiCap) || 'Cục Cảnh sát QLHC về TTXH',
+    SDT: safeDecrypt(profile?.SDT),
+    Email: profile?.Email || account.TenTK,
+    DiaChi: safeDecrypt(profile?.DiaChi),
+    NgheNghiep: profile?.NgheNghiep || '',
+  };
+};
 
 const AuthService = {
-  // 1. Xử lý Đăng nhập bằng Bcrypt
+  // 1. Xử lý Đăng nhập (Tìm ở NguoiDung theo TenTK, nếu không có thì tìm ở ThongTinCaNhan theo Email/SDT)
   login: async (taiKhoan, matKhau) => {
-    const user = await NguoiDungModel.findByLoginIdentifier(taiKhoan);
-    if (!user) {
+    const cleanIdentifier = String(taiKhoan).trim();
+
+    // Bước 1: Tìm trong bảng NguoiDung theo TenTK
+    let account = await NguoiDungModel.findByLoginIdentifier(cleanIdentifier);
+    let profile = null;
+
+    if (account) {
+      profile = await ThongTinCaNhanModel.getByMaND(account.MaND);
+    } else {
+      // Nếu người dùng nhập SĐT hoặc Email phụ trong bảng ThongTinCaNhan
+      profile = await ThongTinCaNhanModel.findByEmailOrSDT(cleanIdentifier);
+      if (!profile && encryptAES) {
+        profile = await ThongTinCaNhanModel.findByEmailOrSDT(encryptAES(cleanIdentifier));
+      }
+      if (profile) {
+        account = await NguoiDungModel.findById(profile.MaND);
+      }
+    }
+
+    if (!account) {
       const error = new Error('Tài khoản hoặc mật khẩu không chính xác!');
       error.statusCode = 401;
       throw error;
     }
 
-    const isMatch = await comparePassword(matKhau, user.MatKhau);
+    // Bước 2: Đối chiếu mật khẩu bằng Bcrypt
+    const isMatch = await comparePassword(matKhau, account.MatKhau);
     if (!isMatch) {
       const error = new Error('Tài khoản hoặc mật khẩu không chính xác!');
       error.statusCode = 401;
       throw error;
     }
 
+    const userProfile = mergeAccountAndProfile(account, profile);
+
+    // Bước 3: Tạo JWT Token
     const tokenPayload = {
-      maND: user.MaND,
-      tenTK: user.TenTK,
-      hoTen: user.HoTen,
-      quyen: user.Quyen,
+      maND: userProfile.MaND,
+      tenTK: userProfile.TenTK,
+      hoTen: userProfile.HoTen,
+      quyen: userProfile.Quyen,
     };
 
     const accessToken = generateAccessToken(tokenPayload);
-    const refreshToken = generateRefreshToken({ maND: user.MaND });
-
-    const userProfile = {
-      MaND: user.MaND,
-      HoTen: user.HoTen,
-      CCCD: decryptAES(user.CCCD),
-      NamSinh: user.NamSinh,
-      SDT: decryptAES(user.SDT),
-      Email: user.Email,
-      DiaChi: decryptAES(user.DiaChi),
-      TenTK: user.TenTK,
-      Quyen: user.Quyen,
-    };
+    const refreshToken = generateRefreshToken({ maND: userProfile.MaND });
 
     return {
       user: userProfile,
@@ -49,7 +92,7 @@ const AuthService = {
     };
   },
 
-  // 2. Lấy thông tin người dùng hiện tại cho API /api/auth/me (Khắc phục lỗi 500)
+  // 2. Lấy thông tin người dùng hiện tại cho API /api/auth/me và /api/auth/profile
   getCurrentUserProfile: async (maND) => {
     if (!maND) {
       const error = new Error('Không xác định được định danh người dùng!');
@@ -57,68 +100,40 @@ const AuthService = {
       throw error;
     }
 
-    const user = await NguoiDungModel.findById(maND);
-    if (!user) {
+    const account = await NguoiDungModel.findById(maND);
+    if (!account) {
       const error = new Error('Không tìm thấy tài khoản người dùng!');
       error.statusCode = 404;
       throw error;
     }
 
-    return {
-      MaND: user.MaND,
-      HoTen: user.HoTen,
-      CCCD: decryptAES(user.CCCD),
-      NamSinh: user.NamSinh,
-      SDT: decryptAES(user.SDT),
-      Email: user.Email,
-      DiaChi: decryptAES(user.DiaChi),
-      TenTK: user.TenTK,
-      Quyen: user.Quyen,
-    };
+    const profile = await ThongTinCaNhanModel.getByMaND(maND);
+    return mergeAccountAndProfile(account, profile);
   },
-// Bên trong AuthService:
+
+  // 3. Đổi mật khẩu
   changePassword: async (maND, matKhauCu, matKhauMoi) => {
-    // 1. Kiểm tra mật khẩu mới phải khác mật khẩu hiện tại
-    if (matKhauCu === matKhauMoi) {
-      const error = new Error('Mật khẩu mới phải khác mật khẩu hiện tại!');
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // 2. Kiểm tra độ mạnh mật khẩu bằng Regex
-    if (!STRONG_PASSWORD_REGEX.test(matKhauMoi)) {
-      const error = new Error(
-        'Mật khẩu mới phải có ít nhất 8 ký tự, bao gồm chữ in hoa, chữ số và ký tự đặc biệt!'
-      );
-      error.statusCode = 400;
-      throw error;
-    }
-
-    // 3. Tìm người dùng trong Database
-    const user = await NguoiDungModel.findById(maND);
-    if (!user) {
+    const account = await NguoiDungModel.findById(maND);
+    if (!account) {
       const error = new Error('Người dùng không tồn tại!');
       error.statusCode = 404;
       throw error;
     }
 
-    // 4. Đối chiếu mật khẩu hiện tại
-    const isMatch = await comparePassword(matKhauCu, user.MatKhau);
+    const isMatch = await comparePassword(matKhauCu, account.MatKhau);
     if (!isMatch) {
       const error = new Error('Mật khẩu hiện tại không chính xác!');
       error.statusCode = 400;
       throw error;
     }
 
-    // 5. Đảm bảo mật khẩu mới không trùng với bản băm hiện tại trong DB
-    const isSameAsOldHash = await comparePassword(matKhauMoi, user.MatKhau);
-    if (isSameAsOldHash) {
+    const isSameAsOld = await comparePassword(matKhauMoi, account.MatKhau);
+    if (isSameAsOld) {
       const error = new Error('Mật khẩu mới phải khác mật khẩu hiện tại!');
       error.statusCode = 400;
       throw error;
     }
 
-    // 6. Mã hóa mật khẩu mới và cập nhật
     const hashedNewPass = await hashPassword(matKhauMoi);
     await NguoiDungModel.updatePassword(maND, hashedNewPass);
     return true;
