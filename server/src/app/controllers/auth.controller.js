@@ -1,15 +1,15 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const AuthService = require('../../services/auth.service');
 const NguoiDungModel = require('../models/nguoiDung.model');
-const { setAuthCookies, clearAuthCookies } = require('../../utils/jwt.util');
+const ThongTinCaNhanModel = require('../models/thongTinCaNhan.model');
+const { sendResetOtpEmail } = require('../../utils/mail.util');
 const { successResponse, errorResponse } = require('../../utils/response.util');
 const { encryptAES, decryptAES } = require('../../utils/crypto.util');
 
 const otpStore = new Map();
 const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]).{8,}$/;
 
-// Nếu bạn đã có file validator.util.js thì require vào, nếu lỗi thì dùng hàm dự phòng bên dưới
+// Hàm kiểm tra và làm sạch dữ liệu hồ sơ cá nhân
 let validateAndSanitizeProfile;
 try {
   ({ validateAndSanitizeProfile } = require('../../utils/validator.util'));
@@ -19,79 +19,37 @@ try {
     message: 'Vui lòng nhập đầy đủ Họ tên và Số điện thoại!',
     cleanData: {
       HoTen: String(body?.HoTen || '').trim(),
-      CCCD: String(body?.CCCD || '').trim(),
-      SDT: String(body?.SDT || '').trim(),
+      GioiTinh: String(body?.GioiTinh || 'Nam').trim(),
       NamSinh: body?.NamSinh ? Number(body.NamSinh) : null,
+      CCCD: String(body?.CCCD || '').trim(),
+      NgayCap: body?.NgayCap || null,
+      NoiCap: String(body?.NoiCap || 'Cục Cảnh sát QLHC về TTXH').trim(),
+      SDT: String(body?.SDT || '').trim(),
       Email: String(body?.Email || '').trim(),
       DiaChi: String(body?.DiaChi || '').trim(),
+      NgheNghiep: String(body?.NgheNghiep || '').trim(),
     },
   });
 }
 
-// Hàm giải mã và chuẩn hóa dữ liệu người dùng trước khi trả về Frontend
-function formatUserProfile(user) {
+// Hàm giải mã và chuẩn hóa dữ liệu hồ sơ cá nhân người dùng trước khi trả về Frontend
+function formatUserProfile(user, profile) {
   if (!user) return null;
   return {
     MaND: user.MaND,
-    HoTen: user.HoTen,
-    CCCD: user.CCCD ? decryptAES(user.CCCD) : '',
-    NamSinh: user.NamSinh,
-    SDT: user.SDT ? decryptAES(user.SDT) : '',
-    Email: user.Email || '',
-    DiaChi: user.DiaChi ? decryptAES(user.DiaChi) : '',
     TenTK: user.TenTK,
     Quyen: user.Quyen,
+    HoTen: profile?.HoTen || user.HoTen || '',
+    GioiTinh: profile?.GioiTinh || user.GioiTinh || 'Nam',
+    NamSinh: profile?.NamSinh || user.NamSinh || null,
+    CCCD: profile?.CCCD ? decryptAES(profile.CCCD) : (user.CCCD ? decryptAES(user.CCCD) : ''),
+    NgayCap: profile?.NgayCap || user.NgayCap || null,
+    NoiCap: profile?.NoiCap || user.NoiCap || 'Cục Cảnh sát QLHC về TTXH',
+    SDT: profile?.SDT ? decryptAES(profile.SDT) : (user.SDT ? decryptAES(user.SDT) : ''),
+    Email: profile?.Email || user.Email || '',
+    DiaChi: profile?.DiaChi ? decryptAES(profile.DiaChi) : (user.DiaChi ? decryptAES(user.DiaChi) : ''),
+    NgheNghiep: profile?.NgheNghiep || user.NgheNghiep || '',
   };
-}
-
-// Hàm gửi email OTP qua Brevo Transactional Email API (Không cần cài thêm SDK)
-async function sendResetOtpEmail(toEmail, hoTen, otpCode) {
-  const apiKey = (process.env.BREVO_API_KEY || '').trim();
-  const senderEmail = (process.env.SMTP_EMAIL || 'tuannghia5839@gmail.com').trim();
-
-  if (!apiKey) {
-    throw new Error('Thiếu cấu hình BREVO_API_KEY trong file .env');
-  }
-
-  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: {
-      accept: 'application/json',
-      'api-key': apiKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      sender: {
-        name: 'Hệ thống Quản lý Nhà trọ Xóm Trọ',
-        email: senderEmail,
-      },
-      to: [
-        {
-          email: toEmail,
-          name: hoTen || 'Người dùng',
-        },
-      ],
-      subject: 'Mã xác thực OTP khôi phục mật khẩu - Xóm Trọ',
-      htmlContent: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px;">
-          <h2 style="color: #0d9488; margin-top: 0;">Khôi phục mật khẩu</h2>
-          <p>Xin chào <strong>${hoTen || 'bạn'}</strong>,</p>
-          <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản trên Hệ thống Quản lý Nhà trọ. Mã xác thực OTP của bạn là:</p>
-          <div style="background: #f0fdfa; border: 1px dashed #0d9488; padding: 16px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px; color: #0f766e; border-radius: 8px; margin: 20px 0;">
-            ${otpCode}
-          </div>
-          <p style="color: #6b7280; font-size: 14px;">Mã này có hiệu lực trong vòng <strong>5 phút</strong>. Tuyệt đối không chia sẻ mã này cho bất kỳ ai.</p>
-        </div>
-      `,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`Brevo API Error (${response.status}): ${JSON.stringify(errorData)}`);
-  }
-
-  return response.json();
 }
 
 const AuthController = {
@@ -104,11 +62,13 @@ const AuthController = {
         return errorResponse(res, 'Vui lòng nhập đầy đủ tài khoản và mật khẩu!', 400);
       }
 
+      const AuthService = require('../../services/auth.service');
       const { user, accessToken, refreshToken } = await AuthService.login(
         TenTK.trim(),
         MatKhau
       );
 
+      const { setAuthCookies } = require('../../utils/jwt.util');
       setAuthCookies(res, accessToken, refreshToken);
 
       return successResponse(res, 'Đăng nhập thành công!', {
@@ -123,6 +83,7 @@ const AuthController = {
   // [POST] /api/auth/logout
   logout: async (req, res, next) => {
     try {
+      const { clearAuthCookies } = require('../../utils/jwt.util');
       clearAuthCookies(res);
       return successResponse(res, 'Đăng xuất thành công!');
     } catch (error) {
@@ -133,6 +94,7 @@ const AuthController = {
   // [GET] /api/auth/me
   getMe: async (req, res, next) => {
     try {
+      const AuthService = require('../../services/auth.service');
       const userProfile = await AuthService.getCurrentUserProfile(req.user.maND);
       return successResponse(res, 'Lấy thông tin tài khoản thành công!', userProfile);
     } catch (error) {
@@ -206,15 +168,17 @@ const AuthController = {
         return errorResponse(res, 'Không tìm thấy tài khoản người dùng!', 404);
       }
 
+      const profile = await ThongTinCaNhanModel.getByMaND(maND);
+
       return successResponse(res, 'Lấy thông tin cá nhân thành công!', {
-        user: formatUserProfile(user),
+        user: formatUserProfile(user, profile),
       });
     } catch (error) {
       next(error);
     }
   },
 
-  // [PUT] /api/auth/profile
+  // [PUT] /api/auth/profile - Cập nhật đầy đủ các trường mới: HoTen, GioiTinh, NamSinh, CCCD, NgayCap, NoiCap, SDT, Email, DiaChi, NgheNghiep
   updateProfile: async (req, res, next) => {
     try {
       const maND = req.user.maND;
@@ -224,16 +188,26 @@ const AuthController = {
         return errorResponse(res, validation.message, 400);
       }
 
-      const { HoTen, CCCD, SDT, NamSinh, Email, DiaChi } = validation.cleanData;
+      const {
+        HoTen,
+        GioiTinh,
+        NamSinh,
+        CCCD,
+        NgayCap,
+        NoiCap,
+        SDT,
+        Email,
+        DiaChi,
+        NgheNghiep,
+      } = validation.cleanData;
 
       const encryptedSDT = typeof encryptAES === 'function' ? encryptAES(SDT) : SDT;
-      const encryptedCCCD =
-        CCCD && typeof encryptAES === 'function' ? encryptAES(CCCD) : CCCD;
-      const encryptedDiaChi =
-        DiaChi && typeof encryptAES === 'function' ? encryptAES(DiaChi) : DiaChi;
+      const encryptedCCCD = CCCD && typeof encryptAES === 'function' ? encryptAES(CCCD) : CCCD;
+      const encryptedDiaChi = DiaChi && typeof encryptAES === 'function' ? encryptAES(DiaChi) : DiaChi;
 
-      if (typeof NguoiDungModel.checkDuplicateProfile === 'function') {
-        const duplicate = await NguoiDungModel.checkDuplicateProfile(maND, {
+      // Kiểm tra trùng lặp thông tin cá nhân (SĐT, CCCD, Email)
+      if (typeof ThongTinCaNhanModel.checkDuplicate === 'function') {
+        const duplicate = await ThongTinCaNhanModel.checkDuplicate(maND, {
           Email,
           SDT: encryptedSDT,
           CCCD: encryptedCCCD,
@@ -252,19 +226,25 @@ const AuthController = {
         }
       }
 
-      await NguoiDungModel.updateProfile(maND, {
+      // Lưu cập nhật vào bảng ThongTinCaNhan bao gồm các trường mới
+      await ThongTinCaNhanModel.upsertByMaND(maND, {
         HoTen,
-        CCCD: encryptedCCCD,
+        GioiTinh,
         NamSinh,
+        CCCD: encryptedCCCD,
+        NgayCap,
+        NoiCap,
         SDT: encryptedSDT,
         Email,
         DiaChi: encryptedDiaChi,
+        NgheNghiep,
       });
 
       const updatedUser = await NguoiDungModel.findById(maND);
+      const updatedProfile = await ThongTinCaNhanModel.getByMaND(maND);
 
       return successResponse(res, 'Cập nhật thông tin cá nhân thành công!', {
-        user: formatUserProfile(updatedUser),
+        user: formatUserProfile(updatedUser, updatedProfile),
       });
     } catch (error) {
       next(error);
@@ -279,16 +259,19 @@ const AuthController = {
         return errorResponse(res, 'Vui lòng nhập địa chỉ Email hợp lệ!', 400);
       }
 
-      const user = await NguoiDungModel.findByEmail(email);
+      const profile = await ThongTinCaNhanModel.findByEmailOrSDT(email);
+      let user = null;
+      if (profile) {
+        user = await NguoiDungModel.findById(profile.MaND);
+      }
+
       if (!user) {
         return errorResponse(res, 'Email này chưa được đăng ký trong hệ thống!', 404);
       }
 
-      // Sinh mã OTP 6 chữ số ngẫu nhiên an toàn
       const otpCode = String(crypto.randomInt(100000, 999999));
       const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
 
-      // Lưu OTP với hạn 5 phút và giới hạn tối đa 5 lần nhập sai
       otpStore.set(email, {
         maND: user.MaND,
         otpHash,
@@ -297,19 +280,12 @@ const AuthController = {
         verified: false,
       });
 
-      await sendResetOtpEmail(user.Email, user.HoTen, otpCode);
+      await sendResetOtpEmail(profile.Email || email, profile.HoTen || 'Người dùng', otpCode);
 
-      return successResponse(
-        res,
-        'Mã xác thực gồm 6 chữ số đã được gửi đến Email của bạn!'
-      );
+      return successResponse(res, 'Mã xác thực gồm 6 chữ số đã được gửi đến Email của bạn!');
     } catch (error) {
       console.error('[ForgotPassword Send OTP Error]:', error.message || error);
-      return errorResponse(
-        res,
-        'Không thể gửi email xác thực lúc này. Vui lòng kiểm tra lại cấu hình email!',
-        500
-      );
+      return errorResponse(res, 'Không thể gửi email xác thực lúc này. Vui lòng kiểm tra lại cấu hình email!', 500);
     }
   },
 
@@ -322,20 +298,12 @@ const AuthController = {
       const record = otpStore.get(email);
       if (!record || Date.now() > record.expiresAt) {
         otpStore.delete(email);
-        return errorResponse(
-          res,
-          'Mã xác thực đã hết hạn hoặc không tồn tại. Vui lòng lấy mã mới!',
-          400
-        );
+        return errorResponse(res, 'Mã xác thực đã hết hạn hoặc không tồn tại. Vui lòng lấy mã mới!', 400);
       }
 
       if (record.attempts >= 5) {
         otpStore.delete(email);
-        return errorResponse(
-          res,
-          'Bạn đã nhập sai quá 5 lần. Vui lòng yêu cầu gửi lại mã mới!',
-          400
-        );
+        return errorResponse(res, 'Bạn đã nhập sai quá 5 lần. Vui lòng yêu cầu gửi lại mã mới!', 400);
       }
 
       const inputHash = crypto.createHash('sha256').update(otp).digest('hex');
@@ -364,11 +332,7 @@ const AuthController = {
       const record = otpStore.get(email);
       if (!record || !record.verified || Date.now() > record.expiresAt) {
         otpStore.delete(email);
-        return errorResponse(
-          res,
-          'Phiên khôi phục mật khẩu đã hết hạn. Vui lòng thực hiện lại!',
-          400
-        );
+        return errorResponse(res, 'Phiên khôi phục mật khẩu đã hết hạn. Vui lòng thực hiện lại!', 400);
       }
 
       const inputHash = crypto.createHash('sha256').update(otp).digest('hex');
@@ -395,11 +359,7 @@ const AuthController = {
           : matKhauMoi === user.MatKhau;
 
         if (isSameAsOld) {
-          return errorResponse(
-            res,
-            'Mật khẩu mới phải khác với mật khẩu đang sử dụng!',
-            400
-          );
+          return errorResponse(res, 'Mật khẩu mới phải khác với mật khẩu đang sử dụng!', 400);
         }
       }
 
@@ -412,11 +372,7 @@ const AuthController = {
       return successResponse(res, 'Cập nhật mật khẩu mới thành công!');
     } catch (error) {
       console.error('[ForgotPassword Reset Error]:', error.message || error);
-      return errorResponse(
-        res,
-        'Không thể đặt lại mật khẩu lúc này, vui lòng thử lại sau!',
-        400
-      );
+      return errorResponse(res, 'Không thể đặt lại mật khẩu lúc này, vui lòng thử lại sau!', 400);
     }
   },
 };
