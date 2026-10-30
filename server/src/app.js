@@ -74,6 +74,10 @@ app.use(express.json());
 //10. Đăng ký route thông báo
 app.use("/api/thong-bao", thongBaoRouter);
 
+//11. Đăng ký route hợp đồng
+const hopDongRouter = require('./routers/hopDong.router');
+app.use('/api/hop-dong', hopDongRouter);
+
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server & WebSocket đang chạy tại cổng ${PORT}`);

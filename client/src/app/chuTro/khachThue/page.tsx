@@ -240,105 +240,96 @@ export default function QuanLyKhachThuePage() {
               </div>
             </div>
 
-            {/* Bảng danh sách */}
-            {loading ? (
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-sm text-slate-500">
-                Đang tải danh sách khách thuê...
-              </div>
-            ) : filteredList.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-xs sm:text-sm font-semibold text-slate-500">
-                Không tìm thấy khách thuê nào phù hợp với bộ lọc hiện tại.
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-600 tracking-wider">
-                        <th className="py-3.5 px-4 whitespace-nowrap">Khách thuê</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap">Tài khoản</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap">Liên hệ & CCCD</th>
-                        <th className="py-3.5 px-4 whitespace-nowrap">Phòng / Cơ sở</th>
-                        <th className="py-3.5 px-4 text-right whitespace-nowrap">Thao tác</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
-                      {filteredList.map((item) => (
-                        <tr key={item.MaND} className="hover:bg-slate-50/80 transition">
-                          <td className="py-3.5 px-4">
-                            <div className="font-bold text-slate-900">
-                              {item.HoTen || 'Chưa cập nhật'}
-                            </div>
-                            <div className="text-xs text-slate-500 mt-0.5">
-                              {item.GioiTinh || '—'}{' '}
-                              {item.NamSinh ? `• Sinh năm ${item.NamSinh}` : ''}
-                              {item.NgheNghiep ? ` • ${item.NgheNghiep}` : ''}
-                            </div>
-                          </td>
+        {/* Danh Sách Thẻ Khách Thuê */}
+        {loading ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 text-sm">
+            Đang tải danh sách khách thuê...
+          </div>
+        ) : filteredTenants.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500 text-sm">
+            Không tìm thấy khách thuê nào phù hợp.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredTenants.map((kt) => (
+              <div
+                key={kt.MaND}
+                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="px-3 py-1 rounded-full bg-slate-800 text-white text-[11px] font-semibold truncate">
+                      {kt.TenKhu || 'Chưa gán cơ sở'}
+                    </span>
+                    {kt.TenPhong ? (
+                      <span className="px-3 py-1 rounded-full bg-[#00FFCC]/30 text-slate-900 text-xs font-bold shrink-0">
+                        Phòng {kt.TenPhong}
+                      </span>
+                    ) : (
+                      <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
+                        Chưa thuê phòng
+                      </span>
+                    )}
+                  </div>
 
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-semibold text-xs">
-                              {item.TenTK}
-                            </span>
-                          </td>
+                  <h3 className="text-lg font-bold text-slate-900">{kt.HoTen}</h3>
+                  <p className="text-xs text-teal-700 font-semibold mb-3">
+                    Tài khoản: <span className="font-bold">@{kt.TenTK}</span> • Mã ND: #{kt.MaND}
+                  </p>
 
-                          <td className="py-3.5 px-4">
-                            <div className="font-semibold text-slate-800">
-                              {item.SDT || '—'}
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              CCCD: {item.CCCD || 'Chưa cập nhật'}
-                            </div>
-                          </td>
+                  <div className="space-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">CCCD:</span>
+                      <span className="font-semibold text-slate-800">{kt.CCCD}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Năm sinh:</span>
+                      <span className="font-semibold text-slate-800">{kt.NamSinh || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Số điện thoại:</span>
+                      <span className="font-bold text-slate-900">{kt.SDT}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Email:</span>
+                      <span className="font-medium text-slate-800 truncate max-w-[190px]">
+                        {kt.Email || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Địa chỉ:</span>
+                      <span className="font-medium text-slate-800 truncate max-w-[190px]">
+                        {kt.DiaChi || '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                          <td className="py-3.5 px-4 whitespace-nowrap">
-                            {item.MaPhong ? (
-                              <div>
-                                <span className="px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-bold text-xs">
-                                  {item.TenPhong}
-                                </span>
-                                <div className="text-xs text-slate-500 mt-1">
-                                  {item.TenKhu}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold text-xs">
-                                Chưa xếp phòng
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-4 text-right whitespace-nowrap">
-                            <div className="inline-flex items-center justify-end gap-2">
-                              <Link
-                                href={`/chuTro/khachThue/sua/${item.MaND}`}
-                                className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition no-underline"
-                              >
-                                Sửa
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setResetModalUser(item);
-                                  setNewPassword('');
-                                }}
-                                className="px-3 py-1.5 rounded-full bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-bold text-xs transition cursor-pointer"
-                              >
-                                Cấp lại MK
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(item)}
-                                className="px-3 py-1.5 rounded-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs transition cursor-pointer"
-                              >
-                                Xóa
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                {/* 3 Nút: Sửa thông tin, Cấp lại mật khẩu, Xóa */}
+                <div className="grid grid-cols-3 gap-2 mt-5 pt-3 border-t border-slate-100">
+                  <Link
+                    href={`/chuTro/khachThue/sua/${kt.MaND}`}
+                    className="py-2 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 font-bold text-xs text-center transition no-underline"
+                  >
+                    Sửa
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetModalUser(kt);
+                      setNewPassword('');
+                    }}
+                    className="py-2 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer"
+                  >
+                    Cấp lại MK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTenant(kt)}
+                    className="py-2 rounded-full border border-red-200 hover:bg-red-50 text-red-600 font-bold text-xs transition cursor-pointer"
+                  >
+                    Xóa
+                  </button>
                 </div>
               </div>
             )}
