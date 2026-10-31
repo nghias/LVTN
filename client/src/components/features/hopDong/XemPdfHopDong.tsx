@@ -48,7 +48,7 @@ export default function XemPdfHopDongModal({ maHDT, onClose }: XemPdfHopDongModa
   return (
     <HopDongPdfModal
       hopDong={chiTietPdf}
-      tuDongIn={false}
+      tuDongTaiPdf={false}
       onClose={() => {
         setChiTietPdf(null);
         onClose();

@@ -85,9 +85,6 @@ export default function ThongBaoFormModal({
       <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-xl space-y-5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#00FFCC] text-slate-900">
-              WebSocket Push
-            </span>
             <h2 className="text-lg font-bold text-slate-900 mt-1">
               Soạn & Phát Thông Báo Trực Tiếp
             </h2>
@@ -244,7 +241,7 @@ export default function ThongBaoFormModal({
               disabled={submitting}
               className="px-5 py-2.5 rounded-2xl bg-teal-700 hover:bg-slate-900 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
             >
-              {submitting ? "Đang phát thông báo..." : "Gửi Ngay (Real-time) →"}
+              {submitting ? "Đang gửi thông báo..." : "Gửi Ngay →"}
             </button>
           </div>
         </form>

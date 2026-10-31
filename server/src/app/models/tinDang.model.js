@@ -1,9 +1,32 @@
 const db = require("../../database/db");
 
+// Chuẩn hóa chuỗi ngày về định dạng YYYY-MM-DD cho cột DATE của MySQL 8.4
+function normalizeDate(value) {
+  if (!value || String(value).trim() === "") return null;
+  const str = String(value).trim();
+  // Nếu FE gửi định dạng ISO (VD: 2026-11-20T00:00:00.000Z) thì cắt lấy YYYY-MM-DD
+  if (str.includes("T")) {
+    return str.split("T")[0];
+  }
+  return str;
+}
+
 const TinDangModel = {
-  // Kiểm tra thông tin và quyền của người dùng
+  // Kiểm tra thông tin và quyền của người dùng (JOIN với ThongTinCaNhan)
   async getNguoiDungById(maND) {
-    const sql = `SELECT MaND, HoTen, Quyen FROM NguoiDung WHERE MaND = ? LIMIT 1`;
+    const sql = `
+      SELECT 
+        nd.MaND,
+        nd.TenTK,
+        nd.Quyen,
+        COALESCE(ttcn.HoTen, nd.TenTK) AS HoTen,
+        ttcn.SDT,
+        ttcn.Email
+      FROM NguoiDung nd
+      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
+      WHERE nd.MaND = ?
+      LIMIT 1
+    `;
     const [rows] = await db.query(sql, [maND]);
     return rows[0] || null;
   },
@@ -44,13 +67,16 @@ const TinDangModel = {
 
   // Kiểm tra phòng có đủ điều kiện đăng tin mới không (Phải còn trống VÀ chưa có trạng thái tin)
   async checkPhongCoTheDangTin(maPhong, excludeMaTin = null) {
-    const params = [maPhong];
+    const params = [];
     let excludeClause = "";
 
+    // Lưu ý: excludeClause nằm trong LEFT JOIN (trước WHERE) nên phải push excludeMaTin trước
     if (excludeMaTin) {
       excludeClause = "AND td.MaTin <> ?";
       params.push(excludeMaTin);
     }
+
+    params.push(maPhong);
 
     const sql = `
       SELECT 
@@ -89,7 +115,7 @@ const TinDangModel = {
 
   // 1. Lấy danh sách tin đăng cho trang Quản lý (Chỉ lấy những tin đang có trạng thái)
   async getAllTinDang(maND, quyen) {
-    const isChuTro = quyen === "ChuTro";
+    const hasFullAccess = quyen === "ChuTro" || quyen === "Admin";
     const params = [];
 
     const conditions = [
@@ -97,7 +123,7 @@ const TinDangModel = {
       "TRIM(td.TrangThai) <> ''",
     ];
 
-    if (!isChuTro) {
+    if (!hasFullAccess) {
       conditions.push("k.MaND = ?");
       params.push(maND);
     }
@@ -122,10 +148,22 @@ const TinDangModel = {
         p.Gia,
         p.TrangThai AS TrangThaiPhong,
         k.MaKhu,
-        k.TenKhu
+        k.TenKhu,
+        k.DiaChi,
+        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
+        ttcn.SDT AS SDTChuTro,
+        (
+          SELECT ap.DuongDan
+          FROM AnhPhong ap
+          WHERE ap.MaPhong = p.MaPhong
+          ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
+          LIMIT 1
+        ) AS AnhDaiDien
       FROM TinDang td
       INNER JOIN Phong p ON td.MaPhong = p.MaPhong
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
+      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
       ${whereClause}
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
@@ -141,7 +179,7 @@ const TinDangModel = {
   // 2. Lấy danh sách Phòng gửi qua FE để chọn khi đăng tin mới
   // Chỉ lấy phòng CÒN TRỐNG và KHÔNG CÓ TRẠNG THÁI TIN
   async getPhongListForSelect(maND, quyen) {
-    const isChuTro = quyen === "ChuTro";
+    const hasFullAccess = quyen === "ChuTro" || quyen === "Admin";
     const params = [];
 
     const conditions = [
@@ -149,7 +187,7 @@ const TinDangModel = {
       "td.MaTin IS NULL",
     ];
 
-    if (!isChuTro) {
+    if (!hasFullAccess) {
       conditions.push("k.MaND = ?");
       params.push(maND);
     }
@@ -166,11 +204,13 @@ const TinDangModel = {
         NULL AS TrangThaiTin,
         k.MaKhu,
         k.TenKhu,
-        nd.HoTen AS TenChuTro,
-        nd.SDT AS SDTChuTro
+        k.DiaChi,
+        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
+        ttcn.SDT AS SDTChuTro
       FROM Phong p
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
       LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
+      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
       LEFT JOIN TinDang td 
         ON p.MaPhong = td.MaPhong 
         AND td.TrangThai IS NOT NULL 
@@ -204,10 +244,22 @@ const TinDangModel = {
         p.Gia,
         p.TrangThai AS TrangThaiPhong,
         k.MaKhu,
-        k.TenKhu
+        k.TenKhu,
+        k.DiaChi,
+        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
+        ttcn.SDT AS SDTChuTro,
+        (
+          SELECT ap.DuongDan
+          FROM AnhPhong ap
+          WHERE ap.MaPhong = p.MaPhong
+          ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
+          LIMIT 1
+        ) AS AnhDaiDien
       FROM TinDang td
       INNER JOIN Phong p ON td.MaPhong = p.MaPhong
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
+      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
       WHERE td.TrangThai = 'DangHienThi'
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
       ORDER BY td.NgayDang DESC, td.MaTin DESC
@@ -220,7 +272,7 @@ const TinDangModel = {
     }));
   },
 
-  // 4. Thêm mới tin đăng (Lúc này mới gán trạng thái tin cho phòng)
+  // 4. Thêm mới tin đăng
   async createTinDang({ MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai }) {
     // Dọn bản ghi rỗng (không có trạng thái) của phòng này nếu có trước khi thêm mới
     await db.query(
@@ -234,7 +286,7 @@ const TinDangModel = {
         : "DangHienThi";
 
     const sql = `
-      INSERT INTO TinDang (MaPhong, MaND, TieuDe, MoTa,NgayDang, NgayHetHan, TrangThai)
+      INSERT INTO TinDang (MaPhong, MaND, TieuDe, MoTa, NgayDang, NgayHetHan, TrangThai)
       VALUES (?, ?, ?, ?, NOW(), ?, ?)
     `;
     const [result] = await db.query(sql, [
@@ -242,7 +294,7 @@ const TinDangModel = {
       MaND,
       TieuDe,
       MoTa || null,
-      NgayHetHan || null,
+      normalizeDate(NgayHetHan),
       trangThaiTin,
     ]);
     return result.insertId;
@@ -263,7 +315,7 @@ const TinDangModel = {
       MaPhong,
       TieuDe,
       MoTa || null,
-      NgayHetHan || null,
+      normalizeDate(NgayHetHan),
       TrangThai || "DangHienThi",
       maTin,
     ]);

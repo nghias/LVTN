@@ -36,7 +36,7 @@ export default function ThongBaoSearchBar({
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            Thông báo đã phát
+            Thông báo đã gửi
           </button>
           <button
             type="button"

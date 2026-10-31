@@ -1,12 +1,18 @@
+// client/src/types/hopDong.type.ts
+
 export interface ThanhVienHopDong {
   MaND: number;
   MaHDT?: number;
   HoTen: string;
+  GioiTinh?: string | null;
   CCCD: string | null;
+  NgayCap?: string | null;
+  NoiCap?: string | null;
   NamSinh: number | null;
   SDT: string;
   Email: string | null;
   DiaChi: string | null;
+  NgheNghiep?: string | null;
   NgayVao: string;
   NgayDi: string | null;
   VaiTro: 'DaiDien' | 'ThanhVien';
@@ -23,9 +29,9 @@ export interface PhiDichVuItem {
   Gia: number;
   DonGia?: number;
   DonViTinh?: string;
+  SoLuong?: number;
   GhiChu?: string | null;
   MoTa?: string | null;
-  SoLuong?: number;
 }
 
 export interface TienIchItem {
@@ -50,6 +56,7 @@ export interface HopDongItem {
   MaKhu: number;
   TenKhu: string;
   DiaChiKhu?: string;
+  MaQuanLyKhu?: number;
   MaNDDaiDien?: number;
   TenDaiDien?: string;
   SDTDaiDien?: string;
@@ -61,7 +68,10 @@ export interface ChiTietHopDongFull extends HopDongItem {
   DiaChiKhuTro: string;
   MaChuTro: number;
   TenChuTro: string;
+  GioiTinhChuTro?: string | null;
   CCCDChuTro: string | null;
+  NgayCapChuTro?: string | null;
+  NoiCapChuTro?: string | null;
   NamSinhChuTro: number | null;
   SDTChuTro: string;
   EmailChuTro: string | null;

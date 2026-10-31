@@ -25,7 +25,7 @@ export default function XuatBanCungModal({ maHDT, onClose }: XuatBanCungModalPro
       .xemChiTiet(maHDT)
       .then((data) => setChiTietBanCung(data))
       .catch((error: any) => {
-        alert(error.message || 'Không thể chuẩn bị bản cứng hợp đồng');
+        alert(error.message || 'Không thể chuẩn bị file hợp đồng để tải về');
         onClose();
       })
       .finally(() => setDangChuanBi(false));
@@ -37,7 +37,7 @@ export default function XuatBanCungModal({ maHDT, onClose }: XuatBanCungModalPro
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
         <div className="rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-semibold text-[#059669] shadow-lg">
-          Đang chuẩn bị dữ liệu xuất bản cứng hợp đồng #{maHDT}...
+          Đang chuẩn bị và tải file PDF hợp đồng #{maHDT} về máy...
         </div>
       </div>
     );
@@ -48,7 +48,7 @@ export default function XuatBanCungModal({ maHDT, onClose }: XuatBanCungModalPro
   return (
     <HopDongPdfModal
       hopDong={chiTietBanCung}
-      tuDongIn={true}
+      tuDongTaiPdf={true}
       onClose={() => {
         setChiTietBanCung(null);
         onClose();
