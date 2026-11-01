@@ -24,11 +24,52 @@ interface SuaHopDongModalProps {
   onSuccess: () => void;
 }
 
+interface LoiFormState {
+  maPhong?: string;
+  ngayKy?: string;
+  ngayBD?: string;
+  ngayKT?: string;
+  tienCoc?: string;
+  chiSo?: string;
+  thanhVien?: string;
+  chung?: string;
+}
+
+// Lấy chuỗi YYYY-MM-DD chuẩn theo múi giờ Việt Nam (tránh lỗi lệch ngày của toISOString)
+const dinhDangNgayLocal = (date: Date = new Date()): string => {
+  const nam = date.getFullYear();
+  const thang = String(date.getMonth() + 1).padStart(2, "0");
+  const ngay = String(date.getDate()).padStart(2, "0");
+  return `${nam}-${thang}-${ngay}`;
+};
+
+// Cộng thêm số tháng chính xác từ một chuỗi ngày YYYY-MM-DD (xử lý cả ngày 29, 30, 31)
+const congThemThang = (chuoiNgay: string, soThang: number): string => {
+  if (!chuoiNgay) return "";
+  const [nam, thang, ngay] = chuoiNgay.split("-").map(Number);
+  if (!nam || !thang || !ngay) return "";
+
+  const thangDich = new Date(nam, thang - 1 + soThang, 1);
+  const soNgayToiDa = new Date(
+    thangDich.getFullYear(),
+    thangDich.getMonth() + 1,
+    0,
+  ).getDate();
+  thangDich.setDate(Math.min(ngay, soNgayToiDa));
+
+  return dinhDangNgayLocal(thangDich);
+};
+
+// Định dạng YYYY-MM-DD sang DD/MM/YYYY để hiển thị thông báo dễ đọc
+const hienThiNgayVN = (chuoiNgay: string): string => {
+  if (!chuoiNgay) return "";
+  return chuoiNgay.split("-").reverse().join("/");
+};
+
 // Hàm thêm dấu chấm vào chuỗi số (hỗ trợ từ hàng đơn vị đến hàng triệu/tỷ)
 const dinhDangSoCoDauCham = (giaTri: string | number): string => {
   const chuoiSo = String(giaTri).replace(/\D/g, "");
   if (!chuoiSo) return "";
-  // Loại bỏ số 0 vô nghĩa ở đầu (trừ khi chỉ có 1 số 0)
   const soSach = chuoiSo.replace(/^0+(?=\d)/, "");
   return soSach.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
@@ -49,7 +90,7 @@ export default function SuaHopDongModal({
   onClose,
   onSuccess,
 }: SuaHopDongModalProps) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dinhDangNgayLocal();
 
   // State dữ liệu form
   const [maPhong, setMaPhong] = useState<number | "">("");
@@ -72,14 +113,12 @@ export default function SuaHopDongModal({
   const [ngayKTGoc, setNgayKTGoc] = useState<string>("");
   const [daDoiNgayKT, setDaDoiNgayKT] = useState<boolean>(false);
 
-  // State thông báo lỗi UX/UI
-  const [loiForm, setLoiForm] = useState<{
-    ngayKT?: string;
-    tienCoc?: string;
-    thanhVien?: string;
-    chung?: string;
-  }>({});
+  // State thông báo lỗi UX/UI chi tiết cho từng trường
+  const [loiForm, setLoiForm] = useState<LoiFormState>({});
   const [dangLuu, setDangLuu] = useState<boolean>(false);
+
+  // Ngày kết thúc tối thiểu (cách ngày bắt đầu ít nhất 1 tháng)
+  const ngayKTToiThieu = congThemThang(ngayBD, 1);
 
   useEffect(() => {
     if (!moModal) return;
@@ -92,10 +131,13 @@ export default function SuaHopDongModal({
         .xemChiTiet(maHDTSua)
         .then((ct) => {
           const ngayKTCu = ct.NgayKT ? ct.NgayKT.slice(0, 10) : "";
+          const ngayBDCu = ct.NgayBD ? ct.NgayBD.slice(0, 10) : today;
+          const ngayKyCu = ct.NgayKy ? ct.NgayKy.slice(0, 10) : today;
+
           setMaPhong(ct.MaPhong);
           setMaHDTCu(ct.MaHDTCu || "");
-          setNgayKy(ct.NgayKy ? ct.NgayKy.slice(0, 10) : today);
-          setNgayBD(ct.NgayBD ? ct.NgayBD.slice(0, 10) : today);
+          setNgayKy(ngayKyCu);
+          setNgayBD(ngayBDCu);
           setNgayKT(ngayKTCu);
           setTienCocHienThi(dinhDangSoCoDauCham(Number(ct.TienCoc || 0)));
           setTrangThaiHD(ct.TrangThai);
@@ -103,27 +145,23 @@ export default function SuaHopDongModal({
           setNgayKTGoc(ngayKTCu);
           setKieuHopDong("DaiDienChung");
           setThanhVienChon(
-            ct.DanhSachThanhVien.map((tv) => ({
+            (ct.DanhSachThanhVien || []).map((tv: any) => ({
               MaND: tv.MaND,
               VaiTro: tv.VaiTro,
               TamTru: tv.TamTru,
-              NgayVao: tv.NgayVao
-                ? tv.NgayVao.slice(0, 10)
-                : ct.NgayBD.slice(0, 10),
+              NgayVao: tv.NgayVao ? tv.NgayVao.slice(0, 10) : ngayBDCu,
               NgayDi: tv.NgayDi ? tv.NgayDi.slice(0, 10) : "",
             })),
           );
-          setMaPDVChon(ct.DanhSachPhiDichVu.map((p) => p.MaPDV));
+          setMaPDVChon((ct.DanhSachPhiDichVu || []).map((p: any) => p.MaPDV));
         })
         .catch((error: any) => {
           alert(error.message || "Không thể tải thông tin hợp đồng cần sửa");
           onClose();
         });
     } else {
-      // Khởi tạo mặc định khi Tạo mới
-      const nextYear = new Date();
-      nextYear.setFullYear(nextYear.getFullYear() + 1);
-      const macDinhKT = nextYear.toISOString().slice(0, 10);
+      // Khởi tạo mặc định khi Tạo mới (mặc định hợp đồng 1 năm)
+      const macDinhKT = congThemThang(today, 12);
 
       setMaPhong("");
       setMaHDTCu("");
@@ -140,7 +178,7 @@ export default function SuaHopDongModal({
       setThanhVienChon([]);
       setMaPDVChon(danhSachPhiDichVu.map((p) => p.MaPDV));
     }
-  }, [moModal, maHDTSua]);
+  }, [moModal, maHDTSua, danhSachPhiDichVu]);
 
   if (!moModal) return null;
 
@@ -152,10 +190,12 @@ export default function SuaHopDongModal({
 
   // Xử lý chọn phòng -> gợi ý tiền cọc
   const xuLyChonPhong = (idPhong: number) => {
-    setMaPhong(idPhong);
+    setMaPhong(idPhong || "");
+    setLoiForm((prev) => ({ ...prev, maPhong: undefined, chung: undefined }));
+
     const phong = danhSachPhong.find((p) => p.MaPhong === idPhong);
     if (phong && !maHDTSua) {
-      setTienCocHienThi(dinhDangSoCoDauCham(Number(phong.Gia)));
+      setTienCocHienThi(dinhDangSoCoDauCham(Number(phong.Gia || 0)));
     }
   };
 
@@ -167,6 +207,87 @@ export default function SuaHopDongModal({
     if (loiForm.tienCoc) {
       setLoiForm((prev) => ({ ...prev, tienCoc: undefined }));
     }
+  };
+
+  // Xử lý đổi ngày ký (ngày tạo hợp đồng) + cảnh báo tức thì
+  const xuLyDoiNgayKy = (ngayMoi: string) => {
+    setNgayKy(ngayMoi);
+    let loiNgayKy: string | undefined = undefined;
+
+    if (!ngayMoi) {
+      loiNgayKy = "Vui lòng chọn ngày ký (tạo hợp đồng)!";
+    } else if (ngayMoi < today) {
+      loiNgayKy = `Ngày tạo hợp đồng không được nhỏ hơn ngày hiện tại (${hienThiNgayVN(today)})!`;
+    } else if (ngayBD && ngayMoi > ngayBD) {
+      loiNgayKy = "Ngày ký hợp đồng không được lớn hơn Ngày bắt đầu thuê!";
+    }
+
+    setLoiForm((prev) => ({ ...prev, ngayKy: loiNgayKy, chung: undefined }));
+  };
+
+  // Xử lý đổi ngày bắt đầu thuê + kiểm tra ràng buộc với Ngày ký và Ngày kết thúc
+  const xuLyDoiNgayBD = (ngayMoi: string) => {
+    const ngayBDCu = ngayBD;
+    setNgayBD(ngayMoi);
+
+    // Đồng bộ Ngày vào của thành viên nếu đang để mặc định theo ngày bắt đầu cũ
+    setThanhVienChon((prev) =>
+      prev.map((tv) =>
+        tv.NgayVao === ngayBDCu || !tv.NgayVao
+          ? { ...tv, NgayVao: ngayMoi }
+          : tv,
+      ),
+    );
+
+    let loiNgayBD: string | undefined = undefined;
+    let loiNgayKy = loiForm.ngayKy;
+    let loiNgayKT = loiForm.ngayKT;
+
+    if (!ngayMoi) {
+      loiNgayBD = "Vui lòng chọn ngày bắt đầu thuê!";
+    } else if (ngayMoi < today) {
+      loiNgayBD = `Ngày bắt đầu thuê không được nhỏ hơn ngày hiện tại (${hienThiNgayVN(today)})!`;
+    }
+
+    // Kiểm tra lại tương quan với ngày ký
+    if (ngayKy && ngayMoi && ngayKy > ngayMoi) {
+      loiNgayKy = "Ngày ký hợp đồng không được lớn hơn Ngày bắt đầu thuê!";
+    } else if (ngayKy >= today) {
+      loiNgayKy = undefined;
+    }
+
+    // Kiểm tra lại khoảng cách tối thiểu 1 tháng với ngày kết thúc
+    const mocToiThieu = congThemThang(ngayMoi, 1);
+    if (ngayKT && mocToiThieu && ngayKT < mocToiThieu) {
+      loiNgayKT = `Ngày kết thúc thuê phải ít nhất 01 tháng kể từ ngày bắt đầu (tối thiểu từ ${hienThiNgayVN(mocToiThieu)})!`;
+    } else if (ngayKT && mocToiThieu && ngayKT >= mocToiThieu) {
+      loiNgayKT = undefined;
+    }
+
+    setLoiForm((prev) => ({
+      ...prev,
+      ngayBD: loiNgayBD,
+      ngayKy: loiNgayKy,
+      ngayKT: loiNgayKT,
+      chung: undefined,
+    }));
+  };
+
+  // Xử lý đổi ngày kết thúc + kiểm tra tối thiểu 1 tháng
+  const xuLyDoiNgayKT = (ngayMoi: string) => {
+    setNgayKT(ngayMoi);
+    setDaDoiNgayKT(true);
+
+    let loiNgayKT: string | undefined = undefined;
+    if (!ngayMoi) {
+      loiNgayKT = "Vui lòng chọn ngày kết thúc hợp đồng!";
+    } else if (ngayBD && ngayMoi < ngayBD) {
+      loiNgayKT = "Ngày kết thúc thuê không được nhỏ hơn Ngày bắt đầu thuê!";
+    } else if (ngayKTToiThieu && ngayMoi < ngayKTToiThieu) {
+      loiNgayKT = `Ngày kết thúc thuê phải ít nhất 01 tháng kể từ ngày bắt đầu (tối thiểu từ ${hienThiNgayVN(ngayKTToiThieu)})!`;
+    }
+
+    setLoiForm((prev) => ({ ...prev, ngayKT: loiNgayKT, chung: undefined }));
   };
 
   // Xử lý đổi trạng thái hợp đồng
@@ -183,34 +304,34 @@ export default function SuaHopDongModal({
     }
   };
 
-  // Xử lý đổi ngày kết thúc
-  const xuLyDoiNgayKT = (ngayMoi: string) => {
-    setNgayKT(ngayMoi);
-    setDaDoiNgayKT(true);
-    setLoiForm((prev) => ({ ...prev, ngayKT: undefined }));
-  };
-
-  // Hàm chọn nhanh ngày kết thúc hỗ trợ UX
-  const chonNhanhNgayKT = (loai: "homNay" | "6thang" | "1nam") => {
-    const moc = new Date();
-    if (loai === "6thang") moc.setMonth(moc.getMonth() + 6);
-    if (loai === "1nam") moc.setFullYear(moc.getFullYear() + 1);
-    const chuoiNgay = moc.toISOString().slice(0, 10);
+  // Hàm chọn nhanh ngày kết thúc tính từ Ngày bắt đầu thuê
+  const chonNhanhNgayKT = (loai: "1thang" | "6thang" | "1nam") => {
+    const goc = ngayBD || today;
+    let chuoiNgay = "";
+    if (loai === "1thang") chuoiNgay = congThemThang(goc, 1);
+    if (loai === "6thang") chuoiNgay = congThemThang(goc, 6);
+    if (loai === "1nam") chuoiNgay = congThemThang(goc, 12);
     xuLyDoiNgayKT(chuoiNgay);
   };
 
   // Quản lý thành viên trong form
   const themThanhVienVaoForm = () => {
-    setThanhVienChon((prev) => [
-      ...prev,
-      {
-        MaND: 0,
-        VaiTro: prev.length === 0 ? "DaiDien" : "ThanhVien",
-        TamTru: "ChuaDangKy",
-        NgayVao: ngayBD,
-        NgayDi: "",
-      },
-    ]);
+    setThanhVienChon((prev) => {
+      const coDaiDien = prev.some((tv) => tv.VaiTro === "DaiDien");
+      return [
+        ...prev,
+        {
+          MaND: 0,
+          VaiTro:
+            kieuHopDong === "TachHopDongRieng" || !coDaiDien
+              ? "DaiDien"
+              : "ThanhVien",
+          TamTru: "ChuaDangKy",
+          NgayVao: ngayBD || today,
+          NgayDi: "",
+        },
+      ];
+    });
     setLoiForm((prev) => ({ ...prev, thanhVien: undefined }));
   };
 
@@ -227,40 +348,79 @@ export default function SuaHopDongModal({
         kieuHopDong === "DaiDienChung"
       ) {
         copy.forEach((item, idx) => {
-          item.VaiTro = idx === index ? "DaiDien" : "ThanhVien";
+          copy[idx] = {
+            ...item,
+            VaiTro: idx === index ? "DaiDien" : "ThanhVien",
+          };
         });
       } else {
         copy[index] = { ...copy[index], [field]: value };
       }
       return copy;
     });
+    setLoiForm((prev) => ({ ...prev, thanhVien: undefined }));
   };
 
   const xoaThanhVienKhoiForm = (index: number) => {
-    setThanhVienChon((prev) => prev.filter((_, idx) => idx !== index));
+    setThanhVienChon((prev) => {
+      const conLai = prev.filter((_, idx) => idx !== index);
+      // Nếu ở chế độ Hộ gia đình mà xóa mất người đại diện, tự động đẩy người đầu tiên lên làm Đại diện
+      if (
+        kieuHopDong === "DaiDienChung" &&
+        conLai.length > 0 &&
+        !conLai.some((tv) => tv.VaiTro === "DaiDien")
+      ) {
+        conLai[0] = { ...conLai[0], VaiTro: "DaiDien" };
+      }
+      return conLai;
+    });
+    setLoiForm((prev) => ({ ...prev, thanhVien: undefined }));
   };
 
-  // Kiểm tra lỗi UX/UI trước khi gửi
-  const kiemTraHopLe = (): boolean => {
-    const loiMoi: typeof loiForm = {};
-    const soTienCoc = chuyenChuoiThanhSo(tienCocHienThi);
-    const dsHopLe = thanhVienChon.filter((tv) => Number(tv.MaND) > 0);
+  const phongDangChon = danhSachPhong.find(
+    (p) => p.MaPhong === Number(maPhong),
+  );
 
+  // Kiểm tra toàn bộ lỗi UX/UI trước khi gửi
+  const kiemTraHopLe = (): boolean => {
+    const loiMoi: LoiFormState = {};
+    const soTienCoc = chuyenChuoiThanhSo(tienCocHienThi);
+
+    // 1. Kiểm tra phòng trọ
     if (!maPhong) {
-      loiMoi.chung = "Vui lòng chọn phòng trọ!";
+      loiMoi.maPhong = "Vui lòng chọn phòng trọ!";
     }
-    if (dsHopLe.length === 0) {
-      loiMoi.thanhVien =
-        "Vui lòng thêm và chọn ít nhất 01 khách thuê lưu trú trong phòng!";
-    }
+
+    // 2. Kiểm tra tiền đặt cọc
     if (tienCocHienThi.trim() === "" || soTienCoc < 0) {
       loiMoi.tienCoc = "Vui lòng nhập số tiền đặt cọc hợp lệ!";
     }
+
+    // 3. Kiểm tra Ngày ký (tạo hợp đồng)
+    if (!ngayKy) {
+      loiMoi.ngayKy = "Vui lòng chọn ngày ký hợp đồng!";
+    } else if (ngayKy < today) {
+      loiMoi.ngayKy = `Ngày tạo hợp đồng không được nhỏ hơn ngày hiện tại (${hienThiNgayVN(today)})!`;
+    } else if (ngayBD && ngayKy > ngayBD) {
+      loiMoi.ngayKy = "Ngày ký hợp đồng không được sau Ngày bắt đầu thuê!";
+    }
+
+    // 4. Kiểm tra Ngày bắt đầu thuê
+    if (!ngayBD) {
+      loiMoi.ngayBD = "Vui lòng chọn ngày bắt đầu thuê!";
+    } else if (ngayBD < today) {
+      loiMoi.ngayBD = `Ngày bắt đầu thuê không được nhỏ hơn ngày hiện tại (${hienThiNgayVN(today)})!`;
+    }
+
+    // 5. Kiểm tra Ngày kết thúc thuê (ít nhất 1 tháng từ ngày bắt đầu)
+    const mocToiThieu1Thang = congThemThang(ngayBD, 1);
     if (!ngayKT) {
       loiMoi.ngayKT = "Vui lòng chọn ngày kết thúc hợp đồng!";
-    } else if (ngayKT < ngayBD) {
+    } else if (ngayBD && ngayKT < ngayBD) {
       loiMoi.ngayKT =
         "Ngày kết thúc thuê không được nhỏ hơn Ngày bắt đầu thuê!";
+    } else if (mocToiThieu1Thang && ngayKT < mocToiThieu1Thang) {
+      loiMoi.ngayKT = `Ngày kết thúc thuê phải ít nhất là 01 tháng từ ngày bắt đầu thuê (tối thiểu từ ${hienThiNgayVN(mocToiThieu1Thang)})!`;
     } else if (
       maHDTSua &&
       trangThaiHD !== trangThaiGoc &&
@@ -272,14 +432,52 @@ export default function SuaHopDongModal({
       loiMoi.ngayKT =
         'Hợp đồng ở trạng thái "Còn hiệu lực" phải có ngày kết thúc lớn hơn hoặc bằng ngày hôm nay!';
     }
-    if (!ngayKy) {
-      loiMoi.chung = "Vui lòng chọn ngày ký hợp đồng!";
-    } else if (ngayKy > ngayBD) {
-      loiMoi.chung = "Ngày ký không được sau ngày bắt đầu thuê!";
+
+    // 6. Kiểm tra chỉ số điện nước bàn giao khi tạo mới
+    if (!maHDTSua) {
+      if (
+        chiSoDienBanGiao.trim() === "" ||
+        Number(chiSoDienBanGiao) < 0 ||
+        chiSoNuocBanGiao.trim() === "" ||
+        Number(chiSoNuocBanGiao) < 0
+      ) {
+        loiMoi.chiSo = "Chỉ số điện và nước bàn giao phải lớn hơn hoặc bằng 0!";
+      }
     }
 
-    if (!ngayBD) {
-      loiMoi.chung = "Vui lòng chọn ngày bắt đầu thuê!";
+    // 7. Kiểm tra danh sách khách thuê
+    const coDongChuaChon = thanhVienChon.some((tv) => Number(tv.MaND) <= 0);
+    const dsHopLe = thanhVienChon.filter((tv) => Number(tv.MaND) > 0);
+    const maNDs = dsHopLe.map((tv) => Number(tv.MaND));
+
+    if (thanhVienChon.length === 0 || dsHopLe.length === 0) {
+      loiMoi.thanhVien =
+        "Vui lòng thêm và chọn ít nhất 01 khách thuê lưu trú trong phòng!";
+    } else if (coDongChuaChon) {
+      loiMoi.thanhVien =
+        "Có dòng thành viên chưa chọn khách thuê. Vui lòng chọn khách hoặc xóa dòng trống!";
+    } else if (new Set(maNDs).size !== maNDs.length) {
+      loiMoi.thanhVien =
+        "Không được chọn trùng một khách thuê nhiều lần trong cùng hợp đồng!";
+    } else if (
+      kieuHopDong === "DaiDienChung" &&
+      !dsHopLe.some((tv) => tv.VaiTro === "DaiDien")
+    ) {
+      loiMoi.thanhVien =
+        "Hợp đồng chung bắt buộc phải có 01 khách thuê giữ vai trò Người đại diện!";
+    } else if (
+      phongDangChon?.SoNguoiToiDa &&
+      dsHopLe.length > Number(phongDangChon.SoNguoiToiDa)
+    ) {
+      loiMoi.thanhVien = `Phòng ${phongDangChon.TenPhong} chỉ cho phép tối đa ${phongDangChon.SoNguoiToiDa} người lưu trú!`;
+    } else {
+      const tvSaiNgayVao = dsHopLe.find(
+        (tv) => !tv.NgayVao || tv.NgayVao < ngayBD || tv.NgayVao > ngayKT,
+      );
+      if (tvSaiNgayVao) {
+        loiMoi.thanhVien =
+          "Ngày vào ở của thành viên phải nằm trong khoảng từ Ngày bắt đầu đến Ngày kết thúc hợp đồng!";
+      }
     }
 
     setLoiForm(loiMoi);
@@ -290,17 +488,16 @@ export default function SuaHopDongModal({
     e.preventDefault();
     if (!kiemTraHopLe()) return;
 
-    const dsHopLe = thanhVienChon.filter((tv) => Number(tv.MaND) > 0);
-
-    // Kiểm tra trùng khách thuê
-    const maNDs = dsHopLe.map((tv) => Number(tv.MaND));
-    if (new Set(maNDs).size !== maNDs.length) {
-      setLoiForm((prev) => ({
-        ...prev,
-        thanhVien: "Không được chọn trùng khách thuê trong cùng hợp đồng!",
+    // Đồng bộ VaiTro chuẩn xác theo kiểu hợp đồng trước khi gửi
+    const dsHopLe = thanhVienChon
+      .filter((tv) => Number(tv.MaND) > 0)
+      .map((tv) => ({
+        ...tv,
+        VaiTro:
+          kieuHopDong === "TachHopDongRieng"
+            ? ("DaiDien" as const)
+            : tv.VaiTro,
       }));
-      return;
-    }
 
     const payload = {
       MaPhong: Number(maPhong),
@@ -338,10 +535,6 @@ export default function SuaHopDongModal({
     }
   };
 
-  const phongDangChon = danhSachPhong.find(
-    (p) => p.MaPhong === Number(maPhong),
-  );
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
       <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-emerald-200 bg-white shadow-2xl">
@@ -364,6 +557,7 @@ export default function SuaHopDongModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="rounded-full border border-emerald-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-100"
           >
@@ -373,11 +567,32 @@ export default function SuaHopDongModal({
 
         <form
           onSubmit={xuLyLuuHopDong}
+          noValidate
           className="space-y-6 p-6 text-sm text-[#0F172A]"
         >
-          {loiForm.chung && (
-            <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-medium text-rose-700">
-              ⚠️ {loiForm.chung}
+          {/* Khối cảnh báo tổng hợp nếu có lỗi */}
+          {(loiForm.chung ||
+            loiForm.maPhong ||
+            loiForm.ngayKy ||
+            loiForm.ngayBD ||
+            loiForm.ngayKT ||
+            loiForm.tienCoc ||
+            loiForm.chiSo ||
+            loiForm.thanhVien) && (
+            <div className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-xs text-rose-700">
+              <div className="mb-1 font-bold">
+                ⚠️ Vui lòng kiểm tra lại các thông tin sau:
+              </div>
+              <ul className="list-inside list-disc space-y-0.5 font-medium">
+                {loiForm.chung && <li>{loiForm.chung}</li>}
+                {loiForm.maPhong && <li>{loiForm.maPhong}</li>}
+                {loiForm.tienCoc && <li>{loiForm.tienCoc}</li>}
+                {loiForm.ngayKy && <li>{loiForm.ngayKy}</li>}
+                {loiForm.ngayBD && <li>{loiForm.ngayBD}</li>}
+                {loiForm.ngayKT && <li>{loiForm.ngayKT}</li>}
+                {loiForm.chiSo && <li>{loiForm.chiSo}</li>}
+                {loiForm.thanhVien && <li>{loiForm.thanhVien}</li>}
+              </ul>
             </div>
           )}
 
@@ -399,7 +614,15 @@ export default function SuaHopDongModal({
                     type="radio"
                     name="kieuHopDong"
                     checked={kieuHopDong === "DaiDienChung"}
-                    onChange={() => setKieuHopDong("DaiDienChung")}
+                    onChange={() => {
+                      setKieuHopDong("DaiDienChung");
+                      setThanhVienChon((prev) =>
+                        prev.map((tv, idx) => ({
+                          ...tv,
+                          VaiTro: idx === 0 ? "DaiDien" : "ThanhVien",
+                        })),
+                      );
+                    }}
                     className="mt-1 accent-[#059669]"
                   />
                   <div>
@@ -424,7 +647,12 @@ export default function SuaHopDongModal({
                     type="radio"
                     name="kieuHopDong"
                     checked={kieuHopDong === "TachHopDongRieng"}
-                    onChange={() => setKieuHopDong("TachHopDongRieng")}
+                    onChange={() => {
+                      setKieuHopDong("TachHopDongRieng");
+                      setThanhVienChon((prev) =>
+                        prev.map((tv) => ({ ...tv, VaiTro: "DaiDien" })),
+                      );
+                    }}
                     className="mt-1 accent-[#059669]"
                   />
                   <div>
@@ -451,16 +679,34 @@ export default function SuaHopDongModal({
                 required
                 value={maPhong}
                 onChange={(e) => xuLyChonPhong(Number(e.target.value))}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 focus:border-[#059669] focus:outline-none"
+                className={`w-full rounded-xl border px-3 py-2.5 focus:outline-none ${
+                  loiForm.maPhong
+                    ? "border-rose-500 bg-rose-50/40"
+                    : "border-slate-300 focus:border-[#059669]"
+                }`}
               >
                 <option value="">-- Chọn phòng --</option>
                 {danhSachPhong.map((p) => (
                   <option key={p.MaPhong} value={p.MaPhong}>
-                    {p.TenPhong} - {p.TenKhu} ({dinhDangTienVN(p.Gia)}đ -{" "}
-                    {p.TrangThai})
+                    {p.TenPhong} {p.TenKhu ? `- ${p.TenKhu}` : ""} (
+                    {dinhDangTienVN(p.Gia)}đ - {p.TrangThai})
                   </option>
                 ))}
               </select>
+              {phongDangChon && (
+                <p className="mt-1 text-[11px] text-emerald-700">
+                  Giá thuê:{" "}
+                  <strong>{dinhDangTienVN(phongDangChon.Gia)}đ/tháng</strong>
+                  {phongDangChon.SoNguoiToiDa
+                    ? ` • Tối đa ${phongDangChon.SoNguoiToiDa} người`
+                    : ""}
+                </p>
+              )}
+              {loiForm.maPhong && (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {loiForm.maPhong}
+                </p>
+              )}
             </div>
 
             <div>
@@ -493,7 +739,7 @@ export default function SuaHopDongModal({
                   type="text"
                   inputMode="numeric"
                   required
-                  placeholder="Ví dụ: 500 hoặc 2.500.000"
+                  placeholder="Ví dụ: 500.000 hoặc 2.500.000"
                   value={tienCocHienThi}
                   onChange={xuLyNhapTienCoc}
                   className={`w-full rounded-xl border px-3 py-2.5 pr-14 font-bold text-[#059669] focus:outline-none ${
@@ -502,7 +748,7 @@ export default function SuaHopDongModal({
                       : "border-slate-300 focus:border-[#059669]"
                   }`}
                 />
-                <span className=" pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-[#059669]">
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-[#059669]">
                   VNĐ
                 </span>
               </div>
@@ -543,6 +789,7 @@ export default function SuaHopDongModal({
               )}
             </div>
 
+            {/* Ngày ký hợp đồng */}
             <div>
               <label className="mb-1 block font-semibold text-slate-800">
                 Ngày ký hợp đồng *
@@ -550,12 +797,23 @@ export default function SuaHopDongModal({
               <input
                 type="date"
                 required
+                min={today}
                 value={ngayKy}
-                onChange={(e) => setNgayKy(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 focus:border-[#059669] focus:outline-none"
+                onChange={(e) => xuLyDoiNgayKy(e.target.value)}
+                className={`w-full rounded-xl border px-3 py-2.5 focus:outline-none ${
+                  loiForm.ngayKy
+                    ? "border-rose-500 bg-rose-50/40 ring-2 ring-rose-200"
+                    : "border-slate-300 focus:border-[#059669]"
+                }`}
               />
+              {loiForm.ngayKy && (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {loiForm.ngayKy}
+                </p>
+              )}
             </div>
 
+            {/* Ngày bắt đầu thuê */}
             <div>
               <label className="mb-1 block font-semibold text-slate-800">
                 Ngày bắt đầu thuê *
@@ -563,13 +821,23 @@ export default function SuaHopDongModal({
               <input
                 type="date"
                 required
+                min={today}
                 value={ngayBD}
-                onChange={(e) => setNgayBD(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 focus:border-[#059669] focus:outline-none"
+                onChange={(e) => xuLyDoiNgayBD(e.target.value)}
+                className={`w-full rounded-xl border px-3 py-2.5 focus:outline-none ${
+                  loiForm.ngayBD
+                    ? "border-rose-500 bg-rose-50/40 ring-2 ring-rose-200"
+                    : "border-slate-300 focus:border-[#059669]"
+                }`}
               />
+              {loiForm.ngayBD && (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {loiForm.ngayBD}
+                </p>
+              )}
             </div>
 
-            {/* Ngày kết thúc thuê có bắt lỗi UX/UI khi sửa trạng thái */}
+            {/* Ngày kết thúc thuê (Tối thiểu 1 tháng từ Ngày bắt đầu) */}
             <div>
               <label className="mb-1 flex items-center justify-between font-semibold text-slate-800">
                 <span>Ngày kết thúc thuê *</span>
@@ -582,41 +850,42 @@ export default function SuaHopDongModal({
               <input
                 type="date"
                 required
+                min={ngayKTToiThieu || today}
                 value={ngayKT}
                 onChange={(e) => xuLyDoiNgayKT(e.target.value)}
                 className={`w-full rounded-xl border px-3 py-2.5 focus:outline-none ${
-                  loiForm.ngayKT || canCapNhatNgayKTKhiDoiTrangThai
-                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-300"
-                    : "border-slate-300 focus:border-[#059669]"
+                  loiForm.ngayKT
+                    ? "border-rose-500 bg-rose-50/40 ring-2 ring-rose-200"
+                    : canCapNhatNgayKTKhiDoiTrangThai
+                      ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-300"
+                      : "border-slate-300 focus:border-[#059669]"
                 }`}
               />
 
-              {/* Gợi ý nút chọn nhanh ngày kết thúc khi sửa trạng thái */}
-              {maHDTSua && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => chonNhanhNgayKT("homNay")}
-                    className="rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 font-medium text-amber-800 hover:bg-amber-100"
-                  >
-                    Hôm nay ({today.split("-").reverse().join("/")})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => chonNhanhNgayKT("6thang")}
-                    className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
-                  >
-                    +6 tháng
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => chonNhanhNgayKT("1nam")}
-                    className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
-                  >
-                    +1 năm
-                  </button>
-                </div>
-              )}
+              {/* Gợi ý nút chọn nhanh ngày kết thúc tính từ Ngày bắt đầu */}
+              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => chonNhanhNgayKT("1thang")}
+                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
+                >
+                  +1 tháng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chonNhanhNgayKT("6thang")}
+                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
+                >
+                  +6 tháng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chonNhanhNgayKT("1nam")}
+                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
+                >
+                  +1 năm
+                </button>
+              </div>
 
               {loiForm.ngayKT && (
                 <p className="mt-1 text-xs font-medium text-rose-600">
@@ -638,7 +907,10 @@ export default function SuaHopDongModal({
                     type="number"
                     min={0}
                     value={chiSoDienBanGiao}
-                    onChange={(e) => setChiSoDienBanGiao(e.target.value)}
+                    onChange={(e) => {
+                      setChiSoDienBanGiao(e.target.value);
+                      setLoiForm((prev) => ({ ...prev, chiSo: undefined }));
+                    }}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 focus:border-[#059669] focus:outline-none"
                   />
                 </div>
@@ -650,7 +922,10 @@ export default function SuaHopDongModal({
                     type="number"
                     min={0}
                     value={chiSoNuocBanGiao}
-                    onChange={(e) => setChiSoNuocBanGiao(e.target.value)}
+                    onChange={(e) => {
+                      setChiSoNuocBanGiao(e.target.value);
+                      setLoiForm((prev) => ({ ...prev, chiSo: undefined }));
+                    }}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 focus:border-[#059669] focus:outline-none"
                   />
                 </div>
@@ -723,7 +998,8 @@ export default function SuaHopDongModal({
                       <option value={0}>-- Chọn khách thuê --</option>
                       {danhSachKhachThue.map((kt) => (
                         <option key={kt.MaND} value={kt.MaND}>
-                          {kt.HoTen} - SĐT: {kt.SDT} - CCCD: {kt.CCCD || "---"}
+                          {kt.HoTen} - SĐT: {kt.SDT} - CCCD:{" "}
+                          {kt.CCCD || "---"}
                         </option>
                       ))}
                     </select>
@@ -764,6 +1040,8 @@ export default function SuaHopDongModal({
                   <div className="md:col-span-2">
                     <input
                       type="date"
+                      min={ngayBD}
+                      max={ngayKT}
                       value={tv.NgayVao}
                       onChange={(e) =>
                         capNhatThanhVienForm(idx, "NgayVao", e.target.value)

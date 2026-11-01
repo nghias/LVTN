@@ -1,12 +1,14 @@
 // client/src/components/features/thongBao/ThongBaoList.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { thongBaoService } from "@/services/thongBao.service";
 import {
+  ThongBaoChiTiet,
   ThongBaoItem,
   ThongBaoReplyItem,
 } from "@/types/thongBao.type";
-import ThongBaoDetailModal, {
+import {
   formatTimeAgo,
   getRoleBadge,
   getSharedSocket,
@@ -20,6 +22,24 @@ interface ThongBaoListProps {
   onDelete: (maTB: number, tieuDe: string) => Promise<void> | void;
 }
 
+type MergedThongBaoItem = ThongBaoItem & {
+  mergedUnreadIds?: number[];
+};
+
+// Chuẩn hóa tiêu đề gốc (loại bỏ tiền tố "Phản hồi:" ở đầu)
+const getBaseTitle = (title?: string) =>
+  (title || "").replace(/^(Phản hồi:\s*)+/i, "").trim();
+
+// Kiểm tra xem bản ghi có phải là thông báo phản hồi con hay không
+const isReplyItem = (item: ThongBaoItem) => {
+  const raw = item as ThongBaoItem & {
+    MaTBCha?: number | null;
+    MaTBGoc?: number | null;
+  };
+  if (raw.MaTBCha || raw.MaTBGoc) return true;
+  return /^Phản hồi:\s*/i.test((item.TieuDe || "").trim());
+};
+
 export default function ThongBaoList({
   items,
   loading,
@@ -27,28 +47,88 @@ export default function ThongBaoList({
   onDelete,
 }: ThongBaoListProps) {
   // State quản lý xóa thông báo
-  const [deleteTarget, setDeleteTarget] = useState<ThongBaoItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    MaTB: number;
+    TieuDe: string;
+  } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
-  // Mã thông báo đang mở trong Modal Xem chi tiết & Trả lời dùng chung
-  const [selectedMaTB, setSelectedMaTB] = useState<number | null>(null);
+  // State chi tiết thông báo & phản hồi (Cột bên phải)
+  const [selectedDetail, setSelectedDetail] =
+    useState<ThongBaoChiTiet | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+  const [replyMessage, setReplyMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  // State lưu số lượng phản hồi & trạng thái đã đọc cục bộ khi có cập nhật Real-time
+  // State lưu số lượng phản hồi & trạng thái đã đọc cục bộ khi cập nhật Real-time
   const [replyCountMap, setReplyCountMap] = useState<Record<number, number>>(
     {},
   );
   const [readMap, setReadMap] = useState<Record<number, boolean>>({});
 
-  // Cập nhật số lượng phản hồi từ Modal dùng chung
-  const handleReplyCountChange = useCallback((maTB: number, count: number) => {
-    setReplyCountMap((prev) => ({
-      ...prev,
-      [maTB]: count,
-    }));
-  }, []);
+  // Lọc và gộp các thông báo phản hồi trùng với thông báo gốc
+  const filteredItems = useMemo<MergedThongBaoItem[]>(() => {
+    const groupMap = new Map<string, MergedThongBaoItem>();
 
-  // Lắng nghe phản hồi mới qua Shared Socket để tăng bộ đếm ngoài thẻ danh sách
+    for (const item of items) {
+      const baseTitle = getBaseTitle(item.TieuDe).toLowerCase();
+      const groupKey = `${item.MaLTB ?? item.TenLTB}::${baseTitle}`;
+      const existing = groupMap.get(groupKey);
+
+      if (!existing) {
+        groupMap.set(groupKey, {
+          ...item,
+          mergedUnreadIds:
+            item.TrangThai === "ChuaDoc" ? [item.MaTB] : [],
+        });
+        continue;
+      }
+
+      const existingIsReply = isReplyItem(existing);
+      const currentIsReply = isReplyItem(item);
+
+      const mergedUnreadIds = [
+        ...(existing.mergedUnreadIds || []),
+        ...(item.TrangThai === "ChuaDoc" ? [item.MaTB] : []),
+      ];
+
+      const mergedTrangThai =
+        existing.TrangThai === "ChuaDoc" || item.TrangThai === "ChuaDoc"
+          ? "ChuaDoc"
+          : "DaDoc";
+
+      const mergedSoPhanHoi = Math.max(
+        existing.SoPhanHoi ?? 0,
+        item.SoPhanHoi ?? 0,
+      );
+
+      // Ưu tiên giữ lại thông báo gốc (không có tiền tố "Phản hồi:") làm đại diện hiển thị
+      if (existingIsReply && !currentIsReply) {
+        groupMap.set(groupKey, {
+          ...item,
+          TrangThai: mergedTrangThai,
+          SoPhanHoi: mergedSoPhanHoi,
+          mergedUnreadIds,
+        });
+      } else {
+        groupMap.set(groupKey, {
+          ...existing,
+          TrangThai: mergedTrangThai,
+          SoPhanHoi: mergedSoPhanHoi,
+          mergedUnreadIds,
+        });
+      }
+    }
+
+    return Array.from(groupMap.values());
+  }, [items]);
+
+  // Lắng nghe phản hồi mới & sự kiện xóa qua Shared Socket
   useEffect(() => {
     const socket = getSharedSocket(currentUserId);
 
@@ -57,8 +137,28 @@ export default function ThongBaoList({
       phanHoi: ThongBaoReplyItem;
     }) => {
       const rootId = Number(payload.rootMaTB);
+
+      // Cập nhật chi tiết đang mở ở cột phải (nếu trùng thông báo)
+      setSelectedDetail((prev) => {
+        if (!prev || prev.MaTB !== rootId) return prev;
+        if (prev.dsPhanHoi.some((r) => r.MaTB === payload.phanHoi.MaTB)) {
+          return prev;
+        }
+        const updatedReplies = [...prev.dsPhanHoi, payload.phanHoi];
+        setReplyCountMap((mapPrev) => ({
+          ...mapPrev,
+          [rootId]: updatedReplies.length,
+        }));
+        return {
+          ...prev,
+          dsPhanHoi: updatedReplies,
+        };
+      });
+
+      // Cập nhật bộ đếm ở danh sách bên trái nếu đang không mở thông báo đó
       setReplyCountMap((prev) => {
-        const baseItem = items.find((i) => i.MaTB === rootId);
+        if (selectedDetail?.MaTB === rootId) return prev;
+        const baseItem = filteredItems.find((i) => i.MaTB === rootId);
         const currentCount = prev[rootId] ?? baseItem?.SoPhanHoi ?? 0;
         return {
           ...prev,
@@ -67,19 +167,99 @@ export default function ThongBaoList({
       });
     };
 
+    const handleDeleteNoti = ({ MaTB }: { MaTB: number }) => {
+      setSelectedDetail((prev) =>
+        prev?.MaTB === Number(MaTB) ? null : prev,
+      );
+    };
+
     socket.on("phan_hoi_thong_bao", handleNewReply);
+    socket.on("xoa_thong_bao", handleDeleteNoti);
 
     return () => {
       socket.off("phan_hoi_thong_bao", handleNewReply);
+      socket.off("xoa_thong_bao", handleDeleteNoti);
     };
-  }, [currentUserId, items]);
+  }, [currentUserId, filteredItems, selectedDetail?.MaTB]);
 
-  // Mở Modal xem chi tiết & luồng trả lời
-  const handleSelectNotification = (item: ThongBaoItem) => {
+  // Mở xem chi tiết 1 thông báo ở cột bên phải & đánh dấu đã đọc
+  const handleSelectItem = async (item: MergedThongBaoItem) => {
+    setDetailLoading(true);
+    setReplyMessage(null);
+    setReplyText("");
+
     if (item.TrangThai === "ChuaDoc") {
       setReadMap((prev) => ({ ...prev, [item.MaTB]: true }));
     }
-    setSelectedMaTB(item.MaTB);
+
+    try {
+      const detail = await thongBaoService.getChiTiet(item.MaTB);
+      setSelectedDetail(detail);
+      if (detail.dsPhanHoi) {
+        setReplyCountMap((prev) => ({
+          ...prev,
+          [item.MaTB]: detail.dsPhanHoi.length,
+        }));
+      }
+
+      // Đánh dấu đã đọc luôn cho các bản ghi phản hồi con được gộp (nếu có)
+      if (item.mergedUnreadIds && item.mergedUnreadIds.length > 0) {
+        item.mergedUnreadIds
+          .filter((id) => id !== item.MaTB)
+          .forEach((id) => {
+            thongBaoService.getChiTiet(id).catch(() => {});
+          });
+      }
+    } catch (error) {
+      console.error("Lỗi tải chi tiết thông báo:", error);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // Gửi trả lời trong luồng thông báo
+  const handleReplySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDetail || !replyText.trim()) return;
+
+    try {
+      setSendingReply(true);
+      setReplyMessage(null);
+      const newReply = await thongBaoService.traLoiThongBao(
+        selectedDetail.MaTB,
+        replyText.trim(),
+      );
+
+      setSelectedDetail((prev) => {
+        if (!prev) return null;
+        const exists = prev.dsPhanHoi.some((r) => r.MaTB === newReply.MaTB);
+        const updatedReplies = exists
+          ? prev.dsPhanHoi
+          : [...prev.dsPhanHoi, newReply];
+
+        setReplyCountMap((mapPrev) => ({
+          ...mapPrev,
+          [prev.MaTB]: updatedReplies.length,
+        }));
+
+        return {
+          ...prev,
+          dsPhanHoi: updatedReplies,
+        };
+      });
+
+      setReplyText("");
+      setReplyMessage({
+        type: "success",
+        text: "Đã gửi phản hồi thành công!",
+      });
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Không thể gửi phản hồi.";
+      setReplyMessage({ type: "error", text: msg });
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   // Xác nhận xóa thông báo
@@ -89,8 +269,8 @@ export default function ThongBaoList({
       setDeleting(true);
       setDeleteError("");
       await onDelete(deleteTarget.MaTB, deleteTarget.TieuDe);
-      if (selectedMaTB === deleteTarget.MaTB) {
-        setSelectedMaTB(null);
+      if (selectedDetail?.MaTB === deleteTarget.MaTB) {
+        setSelectedDetail(null);
       }
       setDeleteTarget(null);
     } catch (err: unknown) {
@@ -102,146 +282,269 @@ export default function ThongBaoList({
     }
   };
 
-  if (loading) {
-    return (
-      <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center text-sm text-slate-500">
-        Đang tải danh sách thông báo...
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="bg-white border border-slate-200 rounded-3xl p-10 text-center space-y-2">
-        <p className="text-base font-bold text-slate-800">
-          Chưa có thông báo nào phù hợp
-        </p>
-        <p className="text-xs text-slate-500">
-          Hãy thử thay đổi từ khóa tìm kiếm hoặc nhấn &ldquo;Soạn Thông Báo
-          Mới&rdquo; để gửi thông báo đầu tiên.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {items.map((tb) => {
-          const isUnread =
-            tb.TrangThai === "ChuaDoc" && !readMap[tb.MaTB];
-          const replyCount =
-            replyCountMap[tb.MaTB] ?? tb.SoPhanHoi ?? 0;
+      {/* Bố cục 2 cột: Danh sách bên trái (5 cột) - Chi tiết & Phản hồi bên phải (7 cột) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Cột trái: Danh sách thông báo (5 cột) */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-800">
+              Danh sách ({filteredItems.length})
+            </span>
+          </div>
 
-          return (
-            <div
-              key={tb.MaTB}
-              onClick={() => handleSelectNotification(tb)}
-              className={`bg-white border rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-4 hover:border-teal-400 hover:shadow-md transition cursor-pointer ${
-                isUnread
-                  ? "border-teal-300 bg-[#00FFCC]/5"
-                  : "border-slate-200"
-              }`}
-            >
-              <div className="space-y-3">
-                {/* Hàng Badge: Loại thông báo, Số người nhận, Số phản hồi */}
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/40 text-slate-900">
-                      {tb.TenLTB}
-                    </span>
+          <div className="divide-y divide-slate-100 max-h-160 overflow-y-auto">
+            {loading ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                Đang tải danh sách thông báo...
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                Không có thông báo nào phù hợp.
+              </div>
+            ) : (
+              filteredItems.map((item) => {
+                const isUnread =
+                  item.TrangThai === "ChuaDoc" && !readMap[item.MaTB];
+                const isSelected = selectedDetail?.MaTB === item.MaTB;
+                const replyCount =
+                  replyCountMap[item.MaTB] ?? item.SoPhanHoi ?? 0;
 
-                    {tb.SoNguoiNhan !== undefined && (
-                      <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
-                        Đã gửi tới {tb.SoNguoiNhan} người
-                      </span>
-                    )}
-                  </div>
+                return (
+                  <div
+                    key={item.MaTB}
+                    onClick={() => handleSelectItem(item)}
+                    className={`p-4 cursor-pointer transition ${
+                      isSelected
+                        ? "bg-[#00FFCC]/25 border-l-4 border-teal-500"
+                        : isUnread
+                        ? "bg-[#00FFCC]/10 hover:bg-[#00FFCC]/20"
+                        : "bg-white hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {item.TenLTB}
+                        </span>
+                        {item.SoNguoiNhan !== undefined && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                            Đã gửi {item.SoNguoiNhan} người
+                          </span>
+                        )}
+                        {replyCount > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700">
+                            {replyCount} phản hồi
+                          </span>
+                        )}
+                      </div>
 
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
-                        replyCount > 0
-                          ? "bg-amber-50 text-amber-700 border-amber-200"
-                          : "bg-slate-50 text-slate-500 border-slate-200"
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isUnread && (
+                          <span
+                            title="Chưa đọc"
+                            className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteError("");
+                            setDeleteTarget({
+                              MaTB: item.MaTB,
+                              TieuDe: item.TieuDe,
+                            });
+                          }}
+                          className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    </div>
+
+                    <h3
+                      className={`text-xs text-slate-900 mt-1.5 line-clamp-1 ${
+                        isUnread ? "font-bold" : "font-semibold"
                       }`}
                     >
-                      💬 {replyCount} phản hồi
-                    </span>
+                      {getBaseTitle(item.TieuDe)}
+                    </h3>
 
-                    {isUnread && (
-                      <span
-                        title="Chưa đọc"
-                        className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"
-                      />
-                    )}
+                    <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                      {item.NoiDung}
+                    </p>
+
+                    <div className="flex items-center justify-between mt-2.5 text-[11px] text-slate-400">
+                      <span>
+                        Người gửi:{" "}
+                        <strong className="text-slate-600">
+                          {item.TenNguoiGui}
+                        </strong>
+                      </span>
+                      <span>{formatTimeAgo(item.NgayGui)}</span>
+                    </div>
                   </div>
-                </div>
+                );
+              })
+            )}
+          </div>
+        </div>
 
-                {/* Tiêu đề & Nội dung */}
-                <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 line-clamp-1">
-                    {tb.TieuDe}
-                  </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed mt-1.5 whitespace-pre-line line-clamp-3">
-                    {tb.NoiDung}
-                  </p>
-                </div>
+        {/* Cột phải: Nội dung chi tiết & Trả lời thông báo (7 cột) */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col min-h-120">
+          {detailLoading ? (
+            <div className="flex-1 flex items-center justify-center p-10 text-xs text-slate-400">
+              Đang tải chi tiết thông báo...
+            </div>
+          ) : !selectedDetail ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-[#00FFCC]/20 border border-[#00FFCC] flex items-center justify-center text-slate-700 mb-3 font-bold">
+                🔔
               </div>
-
-              {/* Footer thẻ: Thông tin người gửi + Nút Trả lời & Xóa */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-                <div className="text-[11px] text-slate-500 space-y-0.5">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-semibold text-slate-700">
-                      Người gửi: {tb.TenNguoiGui}
+              <p className="text-sm font-bold text-slate-800">
+                Chọn một thông báo để xem chi tiết
+              </p>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                Bạn có thể xem toàn bộ nội dung thông báo và gửi phản hồi trao
+                đổi trực tiếp với khách thuê tại đây.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Header chi tiết */}
+              <div className="p-5 bg-slate-50 border-b border-slate-200">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900">
+                      {selectedDetail.TenLTB}
                     </span>
-                    {tb.QuyenNguoiGui && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">
-                        {getRoleBadge(tb.QuyenNguoiGui)}
+                    {selectedDetail.SoNguoiNhan !== undefined && (
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 border border-teal-200">
+                        Đã gửi tới {selectedDetail.SoNguoiNhan} người
                       </span>
                     )}
                   </div>
-                  <p>{formatTimeAgo(tb.NgayGui)}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400">
+                      Ngày gửi: {formatTimeAgo(selectedDetail.NgayGui)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError("");
+                        setDeleteTarget({
+                          MaTB: selectedDetail.MaTB,
+                          TieuDe: selectedDetail.TieuDe,
+                        });
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
+                    >
+                      Xóa thông báo
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelectNotification(tb);
-                    }}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-teal-800 bg-[#00FFCC]/40 hover:bg-[#00FFCC] border border-teal-300 transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>Xem & Trả lời</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteError("");
-                      setDeleteTarget(tb);
-                    }}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>Xóa thông báo</span>
-                  </button>
+                <h2 className="text-base font-bold text-slate-900 mt-2">
+                  {getBaseTitle(selectedDetail.TieuDe)}
+                </h2>
+                <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-600">
+                  <span>
+                    Từ: <strong>{selectedDetail.TenNguoiGui}</strong>
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                    {getRoleBadge(selectedDetail.QuyenNguoiGui)}
+                  </span>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
 
-      {/* Modal Xem Chi Tiết & Trả Lời Thông Báo Dùng Chung */}
-      <ThongBaoDetailModal
-        maTB={selectedMaTB}
-        userId={currentUserId}
-        onClose={() => setSelectedMaTB(null)}
-        onReplyCountChange={handleReplyCountChange}
-      />
+              {/* Nội dung chính & Danh sách phản hồi */}
+              <div className="p-5 space-y-5 flex-1 max-h-105 overflow-y-auto">
+                {/* Nội dung gốc */}
+                <div className="p-4 rounded-2xl bg-[#00FFCC]/10 border border-teal-200">
+                  <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                    {selectedDetail.NoiDung}
+                  </p>
+                </div>
+
+                {/* Luồng trao đổi / Phản hồi */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Trao đổi & Phản hồi (
+                    {selectedDetail.dsPhanHoi?.length || 0})
+                  </h4>
+
+                  {selectedDetail.dsPhanHoi?.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">
+                      Chưa có phản hồi nào cho thông báo này.
+                    </p>
+                  ) : (
+                    selectedDetail.dsPhanHoi.map((rep) => (
+                      <div
+                        key={rep.MaTB}
+                        className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900">
+                              {rep.TenNguoiGui}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white border border-slate-200 text-slate-600">
+                              {getRoleBadge(rep.QuyenNguoiGui)}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {formatTimeAgo(rep.NgayGui)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed">
+                          {rep.NoiDung}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Khung nhập trả lời thông báo */}
+              <form
+                onSubmit={handleReplySubmit}
+                className="p-4 bg-slate-50 border-t border-slate-200 space-y-2"
+              >
+                {replyMessage && (
+                  <p
+                    className={`text-xs font-semibold ${
+                      replyMessage.type === "success"
+                        ? "text-teal-700"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {replyMessage.text}
+                  </p>
+                )}
+
+                <div className="flex items-end gap-2.5">
+                  <textarea
+                    rows={2}
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    placeholder="Nhập nội dung phản hồi cho thông báo này..."
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-teal-500 resize-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingReply || !replyText.trim()}
+                    className="px-5 py-2.5 rounded-xl bg-[#00FFCC] hover:bg-teal-300 disabled:opacity-50 text-slate-900 text-xs font-bold shrink-0 cursor-pointer transition"
+                  >
+                    {sendingReply ? "Đang gửi..." : "Gửi trả lời"}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Modal xác nhận xóa thông báo */}
       {deleteTarget && (
