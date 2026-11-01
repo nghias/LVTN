@@ -174,7 +174,7 @@ export default function QuanLyKhachThuePage() {
 
               <Link
                 href="/chuTro/khachThue/them"
-                className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 font-bold text-xs sm:text-sm shadow-xs transition no-underline whitespace-nowrap"
+                className="cursor-pointer whitespace-nowrap rounded-full bg-[#00FFCC] px-5 py-2.5 text-xs font-bold text-slate-900 shadow-2xs transition hover:bg-[#00e6b8]"
               >
                 + Tạo tài khoản khách thuê
               </Link>

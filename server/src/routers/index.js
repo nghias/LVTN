@@ -10,7 +10,7 @@ const tinDangRouter = require('./tinDang.router');
 const dichVuRouter = require('./dichVu.router');
 const dienNuocRouter = require('./dienNuoc.router');
 const hoaDonRouter = require('./hoaDon.router');
-
+const thanhToanRouter = require('./thanhToan.router');
 
 
 router.use('/auth', authRouter);
@@ -21,6 +21,7 @@ router.use('/tin-dang', tinDangRouter);
 router.use('/dich-vu', dichVuRouter);
 router.use('/dien-nuoc', dienNuocRouter);
 router.use('/hoa-don', hoaDonRouter);
+router.use('/thanh-toan', thanhToanRouter);
 
 
 module.exports = router;

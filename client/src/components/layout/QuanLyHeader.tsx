@@ -1,3 +1,4 @@
+// client/src/components/layout/QuanLyHeader.tsx
 'use client';
 
 import { useState } from 'react';
@@ -53,6 +54,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
         { label: 'Phí dịch vụ', href: '/chuTro/phiDichVu' },
         { label: 'Điện nước', href: '/chuTro/dienNuoc' },
         { label: 'Hóa đơn', href: '/chuTro/hoaDon' },
+        { label: 'Thanh toán', href: '/chuTro/thanhToan' },
       ],
     },
   ];
@@ -68,6 +70,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
     { label: 'Hợp đồng', href: '/chuTro/hopDong' },
     { label: 'Điện nước', href: '/chuTro/dienNuoc' },
     { label: 'Hóa đơn', href: '/chuTro/hoaDon' },
+    { label: 'Thanh toán', href: '/chuTro/thanhToan' },
     { label: 'Thông báo', href: '/chuTro/thongBao' },
   ];
 

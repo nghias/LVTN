@@ -1,8 +1,9 @@
 // C:\Users\nhat nguyen\Desktop\LVTN\server\src\app\models\phongTro.model.js
 const db = require("../../database/db");
+const AnhPhongModel = require("./anhPhong.model");
 
 const PhongTroModel = {
-  // Lấy danh sách phòng theo danh sách MaKhu (dùng cho quản lý)
+  // 1. Lấy danh sách phòng theo danh sách MaKhu (dùng cho quản lý)
   getListByFilters: async ({ maKhuIds = [], trangThai, keyword }) => {
     if (!maKhuIds || maKhuIds.length === 0) return [];
     const placeholders = maKhuIds.map(() => "?").join(",");
@@ -25,7 +26,7 @@ const PhongTroModel = {
     return rows;
   },
 
-  // Lấy tất cả phòng thuộc 1 danh sách MaKhu (đếm tổng / trống)
+  // 2. Lấy tất cả phòng thuộc 1 danh sách MaKhu (đếm tổng / trống)
   getByMaKhuIds: async (maKhuIds = []) => {
     if (!maKhuIds || maKhuIds.length === 0) return [];
     const placeholders = maKhuIds.map(() => "?").join(",");
@@ -38,7 +39,7 @@ const PhongTroModel = {
     return rows;
   },
 
-  // ========== PUBLIC: Chỉ lấy phòng CÒN TRỐNG ==========
+  // 3. PUBLIC: Chỉ lấy phòng CÒN TRỐNG
   getPublicListByFilters: async () => {
     const sql = `
       SELECT MaPhong, MaKhu, TenPhong, DienTich, Gia, TrangThai
@@ -50,7 +51,7 @@ const PhongTroModel = {
     return rows;
   },
 
-  // Lấy toàn bộ phòng trống cho trang Home
+  // 4. Lấy toàn bộ phòng trống cho trang Home
   getAllPublicRooms: async () => {
     const sql = `
       SELECT MaPhong, MaKhu, TenPhong, DienTich, Gia, TrangThai
@@ -62,9 +63,7 @@ const PhongTroModel = {
     return rows;
   },
 
-  // ========== API RIÊNG CHO TRANG HOME ==========
-  // KHÔNG gọi nd.hoten để tránh lỗi Unknown column 'nd.hoten'
-  // Lấy trực tiếp AnhDaiDienDB từ bảng AnhPhong
+  // 5. API RIÊNG CHO TRANG HOME
   getPublicTinDangForHome: async ({ maKhu, mucGia, dienTich } = {}) => {
     let sql = `
       SELECT 
@@ -84,14 +83,7 @@ const PhongTroModel = {
         k.TenKhu,
         k.DiaChi,
         k.MoTa AS MoTaKhu,
-        k.MaND AS MaQuanLyKhu,
-        (
-          SELECT ap.DuongDan
-          FROM AnhPhong ap
-          WHERE ap.MaPhong = p.MaPhong
-          ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
-          LIMIT 1
-        ) AS AnhDaiDienDB
+        k.MaND AS MaQuanLyKhu
       FROM TinDang td
       INNER JOIN Phong p ON td.MaPhong = p.MaPhong
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
@@ -123,9 +115,23 @@ const PhongTroModel = {
 
     sql += ` ORDER BY td.NgayDang DESC, td.MaTin DESC `;
     const [rows] = await db.execute(sql, params);
-    return rows;
+
+    if (rows.length === 0) return [];
+
+    // Sử dụng AnhPhongModel đã tách để ghép AnhDaiDienDB thay vì truy vấn lồng bảng AnhPhong
+    const maPhongIds = [...new Set(rows.map((r) => r.MaPhong))];
+    const images = await AnhPhongModel.getByMaPhongList(maPhongIds);
+
+    return rows.map((row) => {
+      const roomImg = images.find((img) => img.MaPhong === row.MaPhong);
+      return {
+        ...row,
+        AnhDaiDienDB: roomImg ? roomImg.DuongDan : null,
+      };
+    });
   },
 
+  // 6. Lấy danh sách tin đăng đang hiển thị
   getActiveTinDang: async () => {
     const sql = `
       SELECT td.MaTin, td.MaPhong, td.MaND, td.TieuDe, td.MoTa, td.NgayDang, td.NgayHetHan, td.TrangThai
@@ -139,6 +145,7 @@ const PhongTroModel = {
     return rows;
   },
 
+  // 7. Lấy bảng giá điện nước mới nhất
   getLatestGiaDienNuoc: async () => {
     const sql = `
       SELECT MaGia, GiaDien, GiaNuoc, NgayApDung
@@ -150,6 +157,7 @@ const PhongTroModel = {
     return rows[0] || null;
   },
 
+  // 8. Lấy chi tiết 1 phòng theo MaPhong
   getById: async (maPhong) => {
     const sql = `
       SELECT MaPhong, MaKhu, TenPhong, DienTich, Gia, TrangThai
@@ -161,12 +169,14 @@ const PhongTroModel = {
     return rows[0] || null;
   },
 
+  // 9. Đếm tổng số phòng trong 1 Khu trọ
   countByMaKhu: async (maKhu) => {
     const sql = `SELECT COUNT(*) AS total FROM Phong WHERE MaKhu = ?`;
     const [rows] = await db.execute(sql, [maKhu]);
     return rows[0].total;
   },
 
+  // 10. Kiểm tra trùng tên phòng trong cùng 1 Khu trọ
   checkDuplicateTenPhong: async (maKhu, tenPhong, excludeMaPhong = null) => {
     let sql = `
       SELECT MaPhong
@@ -182,6 +192,7 @@ const PhongTroModel = {
     return rows.length > 0;
   },
 
+  // 11. Thêm phòng mới
   create: async ({ MaKhu, TenPhong, DienTich, Gia, TrangThai }) => {
     const sql = `
       INSERT INTO Phong (MaKhu, TenPhong, DienTich, Gia, TrangThai)
@@ -197,6 +208,7 @@ const PhongTroModel = {
     return result.insertId;
   },
 
+  // 12. Cập nhật thông tin phòng
   update: async (maPhong, { MaKhu, TenPhong, DienTich, Gia, TrangThai }) => {
     const sql = `
       UPDATE Phong
@@ -214,11 +226,19 @@ const PhongTroModel = {
     return result.affectedRows > 0;
   },
 
+  // 13. Xóa phòng
   delete: async (maPhong) => {
     const sql = `DELETE FROM Phong WHERE MaPhong = ?`;
     const [result] = await db.execute(sql, [maPhong]);
     return result.affectedRows > 0;
   },
+
+  // =========================================================================
+  // ỦY QUYỀN SANG AnhPhongModel ĐÃ TÁCH (Không viết SQL bảng AnhPhong ở đây)
+  // Giúp Controller gọi PhongTroModel.getAnhByMaPhongList không bị lỗi
+  // =========================================================================
+  getAnhByMaPhongList: (maPhongIds = []) => AnhPhongModel.getByMaPhongList(maPhongIds),
+  getAnhByMaPhong: (maPhong) => AnhPhongModel.getByMaPhong(maPhong),
 };
 
 module.exports = PhongTroModel;

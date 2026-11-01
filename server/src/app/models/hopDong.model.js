@@ -1,5 +1,6 @@
 // C:\Users\nhat nguyen\Desktop\LVTN\server\src\app\models\hopDong.model.js
 const db = require('../../database/db');
+const ChiTietHopDongModel = require('./chiTietHopDong.model');
 
 const HopDongModel = {
   // 0. Các hàm phục vụ xác thực và phân quyền ChuTro / QuanLy
@@ -165,57 +166,13 @@ const HopDongModel = {
     );
     hopDong.ThongTinThanhToan = nganHangRows[0] || null;
 
-    const sqlThanhVien = `
-      SELECT 
-        ct.MaND, ct.MaHDT, ct.NgayVao, ct.NgayDi, ct.VaiTro, ct.TamTru,
-        COALESCE(ttcn.HoTen, nd.TenTK) AS HoTen,
-        ttcn.GioiTinh,
-        ttcn.CCCD,
-        ttcn.NgayCap,
-        ttcn.NoiCap,
-        ttcn.NamSinh,
-        ttcn.SDT,
-        ttcn.Email,
-        ttcn.DiaChi,
-        ttcn.NgheNghiep,
-        GROUP_CONCAT(trv.GiaTri SEPARATOR ', ') AS DanhSachMaThe,
-        COUNT(trv.MaThe) AS SoLuongThe
-      FROM chitiethopdongthue ct
-      INNER JOIN nguoidung nd ON ct.MaND = nd.MaND
-      LEFT JOIN thongtincanhan ttcn ON nd.MaND = ttcn.MaND
-      LEFT JOIN theravao trv ON nd.MaND = trv.MaND AND trv.TrangThai = 'HoatDong'
-      WHERE ct.MaHDT = ?
-      GROUP BY 
-        ct.MaND, ct.MaHDT, ct.NgayVao, ct.NgayDi, ct.VaiTro, ct.TamTru,
-        nd.TenTK, ttcn.HoTen, ttcn.GioiTinh, ttcn.CCCD, ttcn.NgayCap, ttcn.NoiCap,
-        ttcn.NamSinh, ttcn.SDT, ttcn.Email, ttcn.DiaChi, ttcn.NgheNghiep
-      ORDER BY CASE WHEN ct.VaiTro = 'DaiDien' THEN 0 ELSE 1 END, ct.NgayVao ASC
-    `;
-    const [thanhVienRows] = await db.execute(sqlThanhVien, [maHDT]);
-    hopDong.DanhSachThanhVien = thanhVienRows;
-
-    const sqlThanhVienCungPhong = `
-      SELECT DISTINCT
-        ct.MaND, ct.MaHDT, ct.NgayVao, ct.NgayDi, ct.VaiTro, ct.TamTru,
-        COALESCE(ttcn.HoTen, nd.TenTK) AS HoTen,
-        ttcn.GioiTinh,
-        ttcn.CCCD,
-        ttcn.NgayCap,
-        ttcn.NoiCap,
-        ttcn.NamSinh,
-        ttcn.SDT,
-        ttcn.Email,
-        ttcn.DiaChi,
-        ttcn.NgheNghiep
-      FROM chitiethopdongthue ct
-      INNER JOIN hopdongthue hdt ON ct.MaHDT = hdt.MaHDT
-      INNER JOIN nguoidung nd ON ct.MaND = nd.MaND
-      LEFT JOIN thongtincanhan ttcn ON nd.MaND = ttcn.MaND
-      WHERE hdt.MaPhong = ? AND hdt.TrangThai = 'ConHieuLuc' AND ct.NgayDi IS NULL
-      ORDER BY ct.MaHDT ASC
-    `;
-    const [cungPhongRows] = await db.execute(sqlThanhVienCungPhong, [hopDong.MaPhong]);
-    hopDong.ThanhVienCungPhong = cungPhongRows;
+    // Gọi sang ChiTietHopDongModel để lấy DanhSachThanhVien và ThanhVienCungPhong
+    const [danhSachThanhVien, thanhVienCungPhong] = await Promise.all([
+      ChiTietHopDongModel.getThanhVienByMaHDT(maHDT),
+      ChiTietHopDongModel.getThanhVienCungPhong(hopDong.MaPhong),
+    ]);
+    hopDong.DanhSachThanhVien = danhSachThanhVien;
+    hopDong.ThanhVienCungPhong = thanhVienCungPhong;
 
     const [tienIchRows] = await db.execute(
       `SELECT ti.MaTI, ti.TenTI, ti.MoTa
@@ -385,19 +342,16 @@ const HopDongModel = {
     try {
       await conn.beginTransaction();
 
-      const danhSachTVDuyNhat = [];
-      const tapMaND = new Set();
-      for (const tv of DanhSachThanhVien) {
-        const idND = Number(tv.MaND);
-        if (idND > 0 && !tapMaND.has(idND)) {
-          tapMaND.add(idND);
-          danhSachTVDuyNhat.push(tv);
-        }
-      }
+      // Lọc danh sách thành viên duy nhất thông qua ChiTietHopDongModel
+      const danhSachTVDuyNhat =
+        ChiTietHopDongModel.filterUniqueMembers(DanhSachThanhVien);
 
       const mapDichVu = new Map();
       for (const item of DanhSachMaPDV) {
-        const rawMaDV = typeof item === 'object' && item !== null ? (item.MaDV ?? item.MaPDV) : item;
+        const rawMaDV =
+          typeof item === 'object' && item !== null
+            ? item.MaDV ?? item.MaPDV
+            : item;
         const maDV = Number(rawMaDV);
         const soLuong =
           typeof item === 'object' && item !== null && item.SoLuong
@@ -415,15 +369,30 @@ const HopDongModel = {
           const [resHD] = await conn.execute(
             `INSERT INTO hopdongthue (MaPhong, MaHDTCu, NgayBD, NgayKT, NgayKy, TienCoc, TrangThai)
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [MaPhong, MaHDTCu || null, NgayBD, NgayKT, NgayKy, TienCoc || 0, TrangThai]
+            [
+              MaPhong,
+              MaHDTCu || null,
+              NgayBD,
+              NgayKT,
+              NgayKy,
+              TienCoc || 0,
+              TrangThai,
+            ]
           );
           const maHDTMoi = resHD.insertId;
           danhSachMaHDTTaoMoi.push(maHDTMoi);
 
-          await conn.execute(
-            `INSERT INTO chitiethopdongthue (MaND, MaHDT, NgayVao, NgayDi, VaiTro, TamTru)
-             VALUES (?, ?, ?, ?, 'DaiDien', ?)`,
-            [tv.MaND, maHDTMoi, tv.NgayVao || NgayBD, tv.NgayDi || null, tv.TamTru || 'ChuaDangKy']
+          // Lưu chi tiết hợp đồng thông qua ChiTietHopDongModel
+          await ChiTietHopDongModel.create(
+            {
+              MaND: tv.MaND,
+              MaHDT: maHDTMoi,
+              NgayVao: tv.NgayVao || NgayBD,
+              NgayDi: tv.NgayDi || null,
+              VaiTro: 'DaiDien',
+              TamTru: tv.TamTru || 'ChuaDangKy',
+            },
+            conn
           );
 
           for (const [maDV, soLuong] of mapDichVu.entries()) {
@@ -437,20 +406,26 @@ const HopDongModel = {
         const [resHD] = await conn.execute(
           `INSERT INTO hopdongthue (MaPhong, MaHDTCu, NgayBD, NgayKT, NgayKy, TienCoc, TrangThai)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [MaPhong, MaHDTCu || null, NgayBD, NgayKT, NgayKy, TienCoc || 0, TrangThai]
+          [
+            MaPhong,
+            MaHDTCu || null,
+            NgayBD,
+            NgayKT,
+            NgayKy,
+            TienCoc || 0,
+            TrangThai,
+          ]
         );
         const maHDTMoi = resHD.insertId;
         danhSachMaHDTTaoMoi.push(maHDTMoi);
 
-        for (let i = 0; i < danhSachTVDuyNhat.length; i++) {
-          const tv = danhSachTVDuyNhat[i];
-          const vaiTro = tv.VaiTro || (i === 0 ? 'DaiDien' : 'ThanhVien');
-          await conn.execute(
-            `INSERT INTO chitiethopdongthue (MaND, MaHDT, NgayVao, NgayDi, VaiTro, TamTru)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [tv.MaND, maHDTMoi, tv.NgayVao || NgayBD, tv.NgayDi || null, vaiTro, tv.TamTru || 'ChuaDangKy']
-          );
-        }
+        // Lưu toàn bộ thành viên của hợp đồng thông qua ChiTietHopDongModel
+        await ChiTietHopDongModel.insertManyForHopDong(
+          maHDTMoi,
+          danhSachTVDuyNhat,
+          NgayBD,
+          conn
+        );
 
         for (const [maDV, soLuong] of mapDichVu.entries()) {
           await conn.execute(
@@ -471,7 +446,10 @@ const HopDongModel = {
       }
 
       if (TrangThai === 'ConHieuLuc') {
-        await conn.execute(`UPDATE phong SET TrangThai = 'DangThue' WHERE MaPhong = ?`, [MaPhong]);
+        await conn.execute(
+          `UPDATE phong SET TrangThai = 'DangThue' WHERE MaPhong = ?`,
+          [MaPhong]
+        );
       }
 
       await conn.commit();
@@ -513,29 +491,25 @@ const HopDongModel = {
         `UPDATE hopdongthue
          SET MaPhong = ?, MaHDTCu = ?, NgayBD = ?, NgayKT = ?, NgayKy = ?, TienCoc = ?, TrangThai = ?
          WHERE MaHDT = ?`,
-        [MaPhong, MaHDTCu || null, NgayBD, NgayKT, NgayKy, TienCoc || 0, TrangThai, maHDT]
+        [
+          MaPhong,
+          MaHDTCu || null,
+          NgayBD,
+          NgayKT,
+          NgayKy,
+          TienCoc || 0,
+          TrangThai,
+          maHDT,
+        ]
       );
 
-      const danhSachTVDuyNhat = [];
-      const tapMaND = new Set();
-      for (const tv of DanhSachThanhVien) {
-        const idND = Number(tv.MaND);
-        if (idND > 0 && !tapMaND.has(idND)) {
-          tapMaND.add(idND);
-          danhSachTVDuyNhat.push(tv);
-        }
-      }
-
-      await conn.execute(`DELETE FROM chitiethopdongthue WHERE MaHDT = ?`, [maHDT]);
-      for (let i = 0; i < danhSachTVDuyNhat.length; i++) {
-        const tv = danhSachTVDuyNhat[i];
-        const vaiTro = tv.VaiTro || (i === 0 ? 'DaiDien' : 'ThanhVien');
-        await conn.execute(
-          `INSERT INTO chitiethopdongthue (MaND, MaHDT, NgayVao, NgayDi, VaiTro, TamTru)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [tv.MaND, maHDT, tv.NgayVao || NgayBD, tv.NgayDi || null, vaiTro, tv.TamTru || 'ChuaDangKy']
-        );
-      }
+      // Thay thế danh sách thành viên trong chitiethopdongthue thông qua ChiTietHopDongModel
+      await ChiTietHopDongModel.replaceByMaHDT(
+        maHDT,
+        DanhSachThanhVien,
+        NgayBD,
+        conn
+      );
 
       const [oldPdvRows] = await conn.execute(
         `SELECT MaDV, SoLuong FROM chitietphidichvu WHERE MaHDT = ?`,
@@ -547,7 +521,10 @@ const HopDongModel = {
 
       const mapDichVuMoi = new Map();
       for (const item of DanhSachMaPDV) {
-        const rawMaDV = typeof item === 'object' && item !== null ? (item.MaDV ?? item.MaPDV) : item;
+        const rawMaDV =
+          typeof item === 'object' && item !== null
+            ? item.MaDV ?? item.MaPDV
+            : item;
         const maDV = Number(rawMaDV);
         const soLuong =
           typeof item === 'object' && item !== null && item.SoLuong
@@ -558,7 +535,9 @@ const HopDongModel = {
         }
       }
 
-      await conn.execute(`DELETE FROM chitietphidichvu WHERE MaHDT = ?`, [maHDT]);
+      await conn.execute(`DELETE FROM chitietphidichvu WHERE MaHDT = ?`, [
+        maHDT,
+      ]);
       for (const [maDV, soLuong] of mapDichVuMoi.entries()) {
         await conn.execute(
           `INSERT INTO chitietphidichvu (MaHDT, MaDV, SoLuong) VALUES (?, ?, ?)`,
@@ -571,7 +550,8 @@ const HopDongModel = {
           `SELECT COUNT(*) AS cnt FROM hopdongthue WHERE MaPhong = ? AND TrangThai = 'ConHieuLuc'`,
           [idPhong]
         );
-        const trangThaiPhongMoi = activeCount[0].cnt > 0 ? 'DangThue' : 'Trong';
+        const trangThaiPhongMoi =
+          activeCount[0].cnt > 0 ? 'DangThue' : 'Trong';
         await conn.execute(
           `UPDATE phong SET TrangThai = ? WHERE MaPhong = ?`,
           [trangThaiPhongMoi, idPhong]
@@ -601,16 +581,27 @@ const HopDongModel = {
       if (!rows.length) return false;
       const maPhong = rows[0].MaPhong;
 
-      await conn.execute(`DELETE FROM chitietphidichvu WHERE MaHDT = ?`, [maHDT]);
-      await conn.execute(`DELETE FROM chitiethopdongthue WHERE MaHDT = ?`, [maHDT]);
-      const [delRes] = await conn.execute(`DELETE FROM hopdongthue WHERE MaHDT = ?`, [maHDT]);
+      await conn.execute(`DELETE FROM chitietphidichvu WHERE MaHDT = ?`, [
+        maHDT,
+      ]);
+
+      // Xóa chi tiết hợp đồng thông qua ChiTietHopDongModel
+      await ChiTietHopDongModel.deleteByMaHDT(maHDT, conn);
+
+      const [delRes] = await conn.execute(
+        `DELETE FROM hopdongthue WHERE MaHDT = ?`,
+        [maHDT]
+      );
 
       const [activeCount] = await conn.execute(
         `SELECT COUNT(*) AS cnt FROM hopdongthue WHERE MaPhong = ? AND TrangThai = 'ConHieuLuc'`,
         [maPhong]
       );
       if (activeCount[0].cnt === 0) {
-        await conn.execute(`UPDATE phong SET TrangThai = 'Trong' WHERE MaPhong = ?`, [maPhong]);
+        await conn.execute(
+          `UPDATE phong SET TrangThai = 'Trong' WHERE MaPhong = ?`,
+          [maPhong]
+        );
       }
 
       await conn.commit();

@@ -1,5 +1,6 @@
 // C:\Users\nhat nguyen\Desktop\LVTN\server\src\app\controllers\hopDong.controller.js
 const HopDongModel = require('../models/hopDong.model');
+const ChiTietHopDongModel = require('../models/chiTietHopDong.model');
 
 // Hàm phụ lấy MaND từ JWT Cookie (req.user.maND) hoặc từ query/body
 function extractCurrentMaND(req) {
@@ -160,6 +161,18 @@ const HopDongController = {
         }
       }
 
+      // Đảm bảo DanhSachThanhVien và ThanhVienCungPhong luôn được nạp từ ChiTietHopDongModel
+      if (!chiTiet.DanhSachThanhVien) {
+        chiTiet.DanhSachThanhVien =
+          await ChiTietHopDongModel.getThanhVienByMaHDT(Number(maHDT));
+      }
+      if (!chiTiet.ThanhVienCungPhong && chiTiet.MaPhong) {
+        chiTiet.ThanhVienCungPhong =
+          await ChiTietHopDongModel.getThanhVienCungPhong(
+            Number(chiTiet.MaPhong)
+          );
+      }
+
       return res.status(200).json({
         thanhCong: true,
         duLieu: chiTiet,
@@ -212,7 +225,8 @@ const HopDongController = {
       if (!MaPhong || !NgayBD || !NgayKT || !NgayKy) {
         return res.status(400).json({
           thanhCong: false,
-          thongBao: 'Vui lòng nhập đầy đủ phòng, ngày ký, ngày bắt đầu và ngày kết thúc',
+          thongBao:
+            'Vui lòng nhập đầy đủ phòng, ngày ký, ngày bắt đầu và ngày kết thúc',
         });
       }
 
@@ -225,12 +239,17 @@ const HopDongController = {
         if (!isAllowed) {
           return res.status(403).json({
             thanhCong: false,
-            thongBao: 'Bạn chỉ được phép tạo hợp đồng cho phòng thuộc khu trọ mình quản lý.',
+            thongBao:
+              'Bạn chỉ được phép tạo hợp đồng cho phòng thuộc khu trọ mình quản lý.',
           });
         }
       }
 
-      if (!Array.isArray(DanhSachThanhVien) || DanhSachThanhVien.length === 0) {
+      const danhSachTVHopLe = ChiTietHopDongModel.filterUniqueMembers(
+        Array.isArray(DanhSachThanhVien) ? DanhSachThanhVien : []
+      );
+
+      if (danhSachTVHopLe.length === 0) {
         return res.status(400).json({
           thanhCong: false,
           thongBao: 'Hợp đồng phải có ít nhất 1 khách thuê',
@@ -238,14 +257,15 @@ const HopDongController = {
       }
 
       if (KieuHopDong !== 'TachHopDongRieng') {
-        const coDaiDien = DanhSachThanhVien.some((tv) => tv.VaiTro === 'DaiDien');
+        const coDaiDien = danhSachTVHopLe.some((tv) => tv.VaiTro === 'DaiDien');
         if (!coDaiDien) {
-          DanhSachThanhVien[0].VaiTro = 'DaiDien';
+          danhSachTVHopLe[0].VaiTro = 'DaiDien';
         }
       }
 
       const payload = {
         ...req.body,
+        DanhSachThanhVien: danhSachTVHopLe,
         DanhSachMaPDV:
           req.body.DanhSachMaPDV ||
           req.body.DanhSachMaDV ||
@@ -308,7 +328,11 @@ const HopDongController = {
         });
       }
 
-      if (!Array.isArray(DanhSachThanhVien) || DanhSachThanhVien.length === 0) {
+      const danhSachTVHopLe = ChiTietHopDongModel.filterUniqueMembers(
+        Array.isArray(DanhSachThanhVien) ? DanhSachThanhVien : []
+      );
+
+      if (danhSachTVHopLe.length === 0) {
         return res.status(400).json({
           thanhCong: false,
           thongBao: 'Phải có ít nhất 1 thành viên trong hợp đồng',
@@ -334,13 +358,15 @@ const HopDongController = {
         if (!ownsHopDong || !ownsPhong) {
           return res.status(403).json({
             thanhCong: false,
-            thongBao: 'Bạn chỉ được phép chỉnh sửa hợp đồng thuộc khu trọ mình quản lý.',
+            thongBao:
+              'Bạn chỉ được phép chỉnh sửa hợp đồng thuộc khu trọ mình quản lý.',
           });
         }
       }
 
       const payload = {
         ...req.body,
+        DanhSachThanhVien: danhSachTVHopLe,
         DanhSachMaPDV:
           req.body.DanhSachMaPDV ||
           req.body.DanhSachMaDV ||
