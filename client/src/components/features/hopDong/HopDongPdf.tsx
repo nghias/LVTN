@@ -264,14 +264,15 @@ export default function HopDongPdfModal({
       tienDichVuKhac;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-[#F1F5F9]">
+    <div className="fixed inset-0 z-50 flex h-screen w-screen flex-col overflow-hidden bg-[#F0FDF4]">
       {/* Thanh công cụ phía trên toàn màn hình */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0B1D33] px-5 py-3 text-white shadow-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#BBF7D0] bg-white px-5 py-3 text-[#0F172A] shadow-sm">
         <div>
-          <h2 className="text-base font-bold md:text-lg">
-            Hợp Đồng Thuê Phòng #{hopDong.MaHDT} - {hopDong.TenPhong} ({hopDong.TenKhu})
+          <h2 className="text-base font-bold text-[#0F172A] md:text-lg">
+            Hợp Đồng Thuê Phòng #{hopDong.MaHDT} -{' '}
+            <span className="text-[#059669]">{hopDong.TenPhong}</span> ({hopDong.TenKhu})
           </h2>
-          <p className="text-xs text-slate-300">
+          <p className="text-xs text-[#64748B]">
             Chuẩn mẫu Hợp đồng & Phụ lục khổ giấy A4 — Tự động điền thông tin hai bên
           </p>
         </div>
@@ -279,12 +280,12 @@ export default function HopDongPdfModal({
         <div className="flex flex-wrap items-center gap-2">
           {/* Bộ chọn người đứng tên bản hợp đồng nếu phòng có từ 2 người trở lên */}
           {tatCaThanhVien.length > 1 && (
-            <div className="flex items-center gap-2 rounded bg-slate-800 px-3 py-1.5 text-xs">
-              <span className="text-slate-300">Bản HĐ đứng tên:</span>
+            <div className="flex items-center gap-2 rounded-lg border border-[#BBF7D0] bg-[#F0FDF4] px-3 py-1.5 text-xs">
+              <span className="font-medium text-[#065F46]">Bản HĐ đứng tên:</span>
               <select
                 value={maNDDungTen || ''}
                 onChange={(e) => setMaNDDungTen(Number(e.target.value))}
-                className="rounded bg-white px-2 py-1 font-semibold text-[#0B1D33]"
+                className="rounded border border-[#86EFAC] bg-white px-2 py-1 font-semibold text-[#0F172A] outline-none focus:border-[#059669]"
               >
                 {tatCaThanhVien.map((tv) => (
                   <option key={tv.MaND} value={tv.MaND}>
@@ -296,23 +297,23 @@ export default function HopDongPdfModal({
           )}
 
           {/* Chuyển đổi mẫu Hợp đồng / Mẫu Hóa đơn */}
-          <div className="flex rounded bg-slate-800 p-1 text-xs">
+          <div className="flex rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] p-1 text-xs">
             <button
               onClick={() => setTabHienThi('HOP_DONG')}
-              className={`rounded px-3 py-1.5 font-medium transition ${
+              className={`rounded-md px-3 py-1.5 font-semibold transition ${
                 tabHienThi === 'HOP_DONG'
-                  ? 'bg-[#00A896] text-white'
-                  : 'text-slate-300 hover:text-white'
+                  ? 'bg-[#059669] text-white shadow-xs'
+                  : 'text-[#475569] hover:text-[#0F172A]'
               }`}
             >
               Mẫu Hợp Đồng & Phụ Lục
             </button>
             <button
               onClick={() => setTabHienThi('HOA_DON')}
-              className={`rounded px-3 py-1.5 font-medium transition ${
+              className={`rounded-md px-3 py-1.5 font-semibold transition ${
                 tabHienThi === 'HOA_DON'
-                  ? 'bg-[#00A896] text-white'
-                  : 'text-slate-300 hover:text-white'
+                  ? 'bg-[#059669] text-white shadow-xs'
+                  : 'text-[#475569] hover:text-[#0F172A]'
               }`}
             >
               Mẫu Hóa Đơn Kèm Theo
@@ -324,7 +325,7 @@ export default function HopDongPdfModal({
             onClick={() =>
               setCheDoXem(cheDoXem === 'PDF_EMBED' ? 'TRUC_TIEP' : 'PDF_EMBED')
             }
-            className="rounded border border-slate-500 px-3 py-1.5 text-xs font-medium hover:bg-slate-800"
+            className="rounded-lg border border-[#86EFAC] bg-[#DCFCE7] px-3 py-1.5 text-xs font-semibold text-[#065F46] transition hover:bg-[#BBF7D0]"
           >
             {cheDoXem === 'PDF_EMBED' ? 'Xem trang A4 trực tiếp' : 'Xem bằng PDF Viewer'}
           </button>
@@ -333,14 +334,14 @@ export default function HopDongPdfModal({
           <button
             onClick={xuLyTaiFilePdf}
             disabled={dangTaiVe}
-            className="rounded bg-[#00A896] px-4 py-1.5 text-xs font-semibold text-white hover:bg-teal-600 disabled:opacity-60"
+            className="rounded-lg bg-[#00E699] px-4 py-1.5 text-xs font-bold text-[#0F172A] transition hover:bg-[#00D18B] disabled:opacity-60"
           >
             {dangTaiVe ? 'Đang tải hợp đồng...' : 'Tải hợp đồng về máy (PDF A4)'}
           </button>
 
           <button
             onClick={onClose}
-            className="rounded bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+            className="rounded-lg border border-[#E2E8F0] bg-[#F1F5F9] px-3 py-1.5 text-xs font-semibold text-[#475569] transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
           >
             Đóng
           </button>
@@ -348,12 +349,12 @@ export default function HopDongPdfModal({
       </div>
 
       {/* Khu vực hiển thị nội dung PDF mở rộng toàn màn hình */}
-      <div className="relative flex-1 overflow-y-auto bg-slate-200">
+      <div className="relative flex-1 overflow-y-auto bg-[#F0FDF4]">
         {cheDoXem === 'PDF_EMBED' && (
           <div className="h-full w-full overflow-hidden bg-white">
             {dangTaoPdf ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-700">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00A896] border-t-transparent" />
+              <div className="flex h-full flex-col items-center justify-center gap-2 bg-[#F0FDF4] text-[#065F46]">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#059669] border-t-transparent" />
                 <p className="text-sm font-medium">
                   Đang kết xuất bản xem trước PDF chuẩn khổ giấy A4...
                 </p>
@@ -372,7 +373,7 @@ export default function HopDongPdfModal({
         <div
           className={
             cheDoXem === 'TRUC_TIEP'
-              ? 'mx-auto my-6 w-[210mm] bg-white px-[15mm] py-[15mm] pl-[18mm] text-black shadow-2xl'
+              ? 'mx-auto my-6 w-[210mm] border border-[#BBF7D0] bg-white px-[15mm] py-[15mm] pl-[18mm] text-black shadow-xl'
               : 'fixed -left-[9999px] top-0 w-[177mm] bg-white text-black'
           }
         >
@@ -426,7 +427,7 @@ export default function HopDongPdfModal({
               }
               .a4-contract-root table.contract-table th {
                 border: 1px solid #000000;
-                background-color: #f8fafc;
+                background-color: transparent;
                 font-weight: bold;
                 text-align: center;
                 vertical-align: middle;
@@ -1402,7 +1403,7 @@ export default function HopDongPdfModal({
               </div>
             ) : (
               /* MẪU HÓA ĐƠN KÈM THEO */
-              <div style={{ padding: '14px', border: '1px dashed #334155' }}>
+              <div style={{ padding: '14px', border: '1px dashed #059669' }}>
                 <div style={{ fontWeight: 'bold', fontSize: '14pt', marginBottom: '12px' }}>
                   HÓA ĐƠN TIỀN THÁNG {String(thangHoaDon).padStart(2, '0')}/{namHoaDon} - Phòng:{' '}
                   {hopDong.TenPhong}

@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-const PhongTroController = require("../app/controllers/phongTro.controller");
+const PhongTroController = require("../app/controllers/phongTro.Controller");
 const {
   verifyToken,
   authorizeRoles,

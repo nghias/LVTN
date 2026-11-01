@@ -232,7 +232,7 @@ export default function QuanLyHopDongPage() {
       <QuanLyHeader user={user} />
 
       {/* Mở rộng max-w-[1440px] để bảng 8 cột hiển thị trọn vẹn không cần kéo ngang */}
-      <main className="mx-auto max-w-[1440px] px-3 py-6 sm:px-5 lg:px-6">
+      <main className="mx-auto max-w-360 px-3 py-6 sm:px-5 lg:px-6">
         {/* 1. Tiêu đề trang & Nút Thêm Hợp Đồng */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <div>

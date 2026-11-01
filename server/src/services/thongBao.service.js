@@ -1,78 +1,79 @@
 // server/src/services/thongBao.service.js
 const ThongBaoModel = require("../app/models/thongBao.model");
 
+const createError = (message, statusCode = 400) => {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+};
+
 const ThongBaoService = {
-  // Hàm trích xuất thông tin User an toàn (tương thích cả maND/MaND)
-  extractUser(user) {
-    const maND = Number(user?.maND ?? user?.MaND);
-    const quyen = user?.quyen ?? user?.Quyen;
-    if (isNaN(maND) || !maND) {
-      const err = new Error("Không xác định được danh tính người dùng từ Token.");
-      err.statusCode = 401;
-      throw err;
-    }
-    return { maND, quyen };
-  },
-
-  // Xác định phạm vi quyền hạn cho trang Quản lý (Chủ trọ / Quản lý khu)
+  // Xác định quyền hạn & khu trọ được phép thao tác của người dùng
   async resolveUserPermission(user) {
-    const { maND, quyen } = ThongBaoService.extractUser(user);
+    const maND = Number(user?.maND ?? user?.MaND);
+    const quyen = user?.quyen ?? user?.Quyen ?? "";
 
-    if (quyen === "KhachThue") {
-      const error = new Error("Khách thuê không có quyền truy cập trang quản lý thông báo.");
-      error.statusCode = 403;
-      throw error;
+    if (!maND) {
+      throw createError("Không xác định được người dùng đăng nhập.", 401);
     }
 
-    const allKhuTro = await ThongBaoModel.getAllKhuTro();
-    const myKhuTro = await ThongBaoModel.getKhuTroByManager(maND);
+    const isSupremeLandlord = quyen === "ChuTro" || quyen === "Admin";
 
-    const isSupremeLandlord =
-      quyen === "Admin" ||
-      (quyen === "ChuTro" && (myKhuTro.length === 0 || myKhuTro.length === allKhuTro.length));
+    const khuTroList = isSupremeLandlord
+      ? await ThongBaoModel.getAllKhuTro()
+      : await ThongBaoModel.getKhuTroByManager(maND);
 
-    const allowedKhuTro = isSupremeLandlord ? allKhuTro : myKhuTro;
-    const allowedKhuIds = allowedKhuTro.map((k) => k.MaKhu);
-
-    if (!isSupremeLandlord && allowedKhuIds.length === 0) {
-      const error = new Error("Tài khoản quản lý của bạn chưa được phân công Khu trọ nào.");
-      error.statusCode = 403;
-      throw error;
-    }
+    const allowedKhuIds = khuTroList.map((k) => Number(k.MaKhu));
 
     return {
       maND,
       quyen,
       isSupremeLandlord,
-      allowedKhuTro,
+      vaiTroHienThi: isSupremeLandlord ? "CHU_TRO_TONG" : "QUAN_LY_KHU",
+      khuTroList,
       allowedKhuIds,
     };
   },
 
+  // 1. Lấy dữ liệu khởi tạo cho trang Quản lý thông báo & Modal Soạn thông báo
   async getMetadata(user) {
-    const perm = await ThongBaoService.resolveUserPermission(user);
-    const [loaiThongBao, danhSachPhong] = await Promise.all([
+    const perm = await this.resolveUserPermission(user);
+
+    const [loaiThongBaoList, phongList, nguoiNhanList] = await Promise.all([
       ThongBaoModel.getLoaiThongBao(),
       ThongBaoModel.getPhongByKhuIds(perm.allowedKhuIds),
+      ThongBaoModel.getSelectableRecipients({
+        isSupremeLandlord: perm.isSupremeLandlord,
+        allowedKhuIds: perm.allowedKhuIds,
+        excludeMaND: perm.maND,
+      }),
     ]);
 
     return {
-      vaiTroHienThi: perm.isSupremeLandlord ? "CHU_TRO_TONG" : "QUAN_LY_KHU",
+      vaiTroHienThi: perm.vaiTroHienThi,
       isSupremeLandlord: perm.isSupremeLandlord,
-      khuTroList: perm.allowedKhuTro,
-      phongList: danhSachPhong,
-      loaiThongBaoList: loaiThongBao,
+      khuTroList: perm.khuTroList,
+      phongList,
+      loaiThongBaoList,
+      nguoiNhanList,
     };
   },
 
-  async createThongBao(user, body) {
-    const perm = await ThongBaoService.resolveUserPermission(user);
-    const { maLTB, tieuDe, noiDung, phamVi, maKhu, maPhong } = body;
+  // 2. Tạo và phát thông báo (Tất cả mọi người / Theo khu / Theo phòng / 1 người / Nhiều người)
+  async createThongBao(user, payload) {
+    const perm = await this.resolveUserPermission(user);
+    const {
+      maLTB,
+      tieuDe,
+      noiDung,
+      phamVi,
+      maKhu,
+      maPhong,
+      nguoiNhanIds,
+    } = payload || {};
 
     if (!maLTB || !tieuDe?.trim() || !noiDung?.trim()) {
-      const err = new Error("Vui lòng nhập đầy đủ loại thông báo, tiêu đề và nội dung.");
-      err.statusCode = 400;
-      throw err;
+      throw createError("Vui lòng nhập đầy đủ loại thông báo, tiêu đề và nội dung.");
     }
 
     let dsNguoiNhan = [];
@@ -80,9 +81,10 @@ const ThongBaoService = {
     switch (phamVi) {
       case "TOAN_HE_THONG": {
         if (!perm.isSupremeLandlord) {
-          const err = new Error("Chỉ Chủ trọ mới có quyền gửi thông báo cho toàn bộ hệ thống!");
-          err.statusCode = 403;
-          throw err;
+          throw createError(
+            "Chỉ Chủ trọ mới có quyền phát thông báo toàn hệ thống.",
+            403
+          );
         }
         dsNguoiNhan = await ThongBaoModel.getAllSystemRecipientIds(perm.maND);
         break;
@@ -90,67 +92,79 @@ const ThongBaoService = {
 
       case "TAT_CA_QUAN_LY": {
         if (!perm.isSupremeLandlord) {
-          const err = new Error("Chỉ Chủ trọ mới có quyền gửi thông báo cho các Quản lý khu trọ!");
-          err.statusCode = 403;
-          throw err;
+          throw createError(
+            "Chỉ Chủ trọ mới có quyền gửi thông báo cho tất cả Quản lý.",
+            403
+          );
         }
         dsNguoiNhan = await ThongBaoModel.getAllManagerIds(perm.maND);
         break;
       }
 
       case "THEO_KHU": {
-        const targetKhuId = Number(maKhu);
-        if (!targetKhuId) {
-          if (!perm.isSupremeLandlord) {
-            dsNguoiNhan = await ThongBaoModel.getTenantIdsByKhu(perm.allowedKhuIds, perm.maND);
-            break;
-          }
-          const err = new Error("Vui lòng chọn Khu trọ cần gửi thông báo.");
-          err.statusCode = 400;
-          throw err;
+        const targetKhuIds = maKhu
+          ? [Number(maKhu)]
+          : perm.allowedKhuIds;
+
+        const isAllowed = targetKhuIds.every((id) =>
+          perm.allowedKhuIds.includes(id)
+        );
+        if (!isAllowed || targetKhuIds.length === 0) {
+          throw createError(
+            "Bạn không có quyền gửi thông báo cho khu trọ này.",
+            403
+          );
         }
 
-        if (!perm.allowedKhuIds.includes(targetKhuId)) {
-          const err = new Error("Bạn không có quyền gửi thông báo cho Khu trọ này!");
-          err.statusCode = 403;
-          throw err;
-        }
-
-        dsNguoiNhan = await ThongBaoModel.getTenantIdsByKhu([targetKhuId], perm.maND);
+        dsNguoiNhan = await ThongBaoModel.getTenantIdsByKhu(
+          targetKhuIds,
+          perm.maND
+        );
         break;
       }
 
       case "THEO_PHONG": {
-        const targetPhongId = Number(maPhong);
-        if (!targetPhongId) {
-          const err = new Error("Vui lòng chọn Phòng cần gửi thông báo.");
-          err.statusCode = 400;
-          throw err;
+        if (!maPhong) {
+          throw createError("Vui lòng chọn phòng nhận thông báo.");
         }
         dsNguoiNhan = await ThongBaoModel.getTenantIdsByPhong(
-          targetPhongId,
+          Number(maPhong),
           perm.allowedKhuIds,
           perm.maND
         );
         break;
       }
 
-      default: {
-        const err = new Error("Phạm vi gửi thông báo không hợp lệ.");
-        err.statusCode = 400;
-        throw err;
+      case "MOT_NGUOI":
+      case "NHIEU_NGUOI": {
+        const rawIds = Array.isArray(nguoiNhanIds) ? nguoiNhanIds : [];
+        if (phamVi === "MOT_NGUOI" && rawIds.length !== 1) {
+          throw createError("Vui lòng chọn đúng 1 người nhận thông báo.");
+        }
+        if (rawIds.length === 0) {
+          throw createError("Vui lòng chọn ít nhất 1 người nhận thông báo.");
+        }
+
+        dsNguoiNhan = await ThongBaoModel.filterValidRecipientIds({
+          targetIds: rawIds,
+          isSupremeLandlord: perm.isSupremeLandlord,
+          allowedKhuIds: perm.allowedKhuIds,
+          excludeMaND: perm.maND,
+        });
+        break;
       }
+
+      default:
+        throw createError("Phạm vi nhận thông báo không hợp lệ.");
     }
 
-    if (dsNguoiNhan.length === 0) {
-      const err = new Error(
-        "Không tìm thấy người nhận hợp lệ (hoặc khu/phòng hiện chưa có khách thuê đang ở)."
+    if (!dsNguoiNhan || dsNguoiNhan.length === 0) {
+      throw createError(
+        "Không tìm thấy người nhận hợp lệ trong phạm vi đã chọn."
       );
-      err.statusCode = 400;
-      throw err;
     }
 
-    const thongBaoMoi = await ThongBaoModel.createThongBao({
+    const thongBao = await ThongBaoModel.createThongBao({
       ndGui: perm.maND,
       maLTB: Number(maLTB),
       tieuDe: tieuDe.trim(),
@@ -159,15 +173,13 @@ const ThongBaoService = {
       dsNguoiNhan,
     });
 
-    return {
-      thongBao: thongBaoMoi,
-      dsNguoiNhan,
-    };
+    return { thongBao, dsNguoiNhan };
   },
 
-  async searchThongBao(user, query) {
-    const perm = await ThongBaoService.resolveUserPermission(user);
-    return await ThongBaoModel.searchThongBao({
+  // 3. Tìm kiếm danh sách thông báo ở trang Quản lý
+  async searchThongBao(user, query = {}) {
+    const perm = await this.resolveUserPermission(user);
+    return ThongBaoModel.searchThongBao({
       maND: perm.maND,
       isSupremeLandlord: perm.isSupremeLandlord,
       keyword: query.keyword || "",
@@ -176,66 +188,61 @@ const ThongBaoService = {
     });
   },
 
-  // --- CÁC TÍNH NĂNG DÀNH CHO NGƯỜI DÙNG & NOTIFICATION BELL ---
-
-  // 1. Lấy danh sách thông báo cho NotificationBell & Trang Thông báo Người thuê
+  // 4. Lấy danh sách thông báo cá nhân (NotificationBell & Trang khách thuê)
   async getThongBaoCuaToi(user, query = {}) {
-    const { maND } = ThongBaoService.extractUser(user);
-    const options =
-      typeof query === "number"
-        ? { limit: query }
-        : {
-            limit: Number(query.limit) || 50,
-            keyword: query.keyword || "",
-            maLTB: query.maLTB || "",
-            trangThai: query.trangThai || "",
-            tab: query.tab || "da_nhan",
-          };
+    const maND = Number(user?.maND ?? user?.MaND);
+    if (!maND) {
+      throw createError("Chưa đăng nhập.", 401);
+    }
 
-    const [notiData, loaiThongBaoList, roomData] = await Promise.all([
-      ThongBaoModel.getThongBaoCuaToi(maND, options),
-      ThongBaoModel.getLoaiThongBao(),
-      ThongBaoModel.getThongTinPhongVaNguoiNhanCuaKhach(maND),
-    ]);
+    const data = await ThongBaoModel.getThongBaoCuaToi(maND, {
+      limit: query.limit,
+      keyword: query.keyword,
+      maLTB: query.maLTB,
+      trangThai: query.trangThai,
+      tab: query.tab,
+    });
+
+    const { thongTinPhong } =
+      await ThongBaoModel.getThongTinPhongVaNguoiNhanCuaKhach(maND);
 
     return {
-      ...notiData,
-      loaiThongBaoList,
-      thongTinPhong: roomData?.thongTinPhong || null,
+      ...data,
+      thongTinPhong,
     };
   },
 
-  // 1b. Khách thuê gửi phản ánh / báo cáo sự cố lên Quản lý khu & Chủ trọ
-  async createPhanAnhKhachThue(user, body) {
-    const { maND } = ThongBaoService.extractUser(user);
-    const { maLTB, tieuDe, noiDung } = body;
+  // 5. Khách thuê gửi phản ánh / báo cáo sự cố
+  async createPhanAnhKhachThue(user, body = {}) {
+    const maND = Number(user?.maND ?? user?.MaND);
+    if (!maND) {
+      throw createError("Chưa đăng nhập.", 401);
+    }
 
-    if (!maLTB || !tieuDe?.trim() || !noiDung?.trim()) {
-      const err = new Error("Vui lòng chọn loại thông báo, nhập tiêu đề và nội dung chi tiết.");
-      err.statusCode = 400;
-      throw err;
+    const { maLTB, tieuDe, noiDung } = body;
+    if (!tieuDe?.trim() || !noiDung?.trim()) {
+      throw createError("Vui lòng nhập đầy đủ tiêu đề và nội dung phản ánh.");
     }
 
     const { thongTinPhong, recipients } =
       await ThongBaoModel.getThongTinPhongVaNguoiNhanCuaKhach(maND);
 
-    if (recipients.length === 0) {
-      const err = new Error("Không tìm thấy Ban quản lý để nhận phản ánh.");
-      err.statusCode = 400;
-      throw err;
+    if (!recipients || recipients.length === 0) {
+      throw createError(
+        "Không tìm thấy Ban quản lý để nhận phản ánh lúc này."
+      );
     }
 
-    // Tự động gắn nhãn Phòng - Khu vào tiêu đề để Quản lý biết ngay sự cố ở phòng nào
-    const prefix = thongTinPhong
+    const prefixRoom = thongTinPhong?.TenPhong
       ? `[${thongTinPhong.TenPhong} - ${thongTinPhong.TenKhu}] `
       : "";
     const finalTitle = tieuDe.trim().startsWith("[")
       ? tieuDe.trim()
-      : `${prefix}${tieuDe.trim()}`;
+      : `${prefixRoom}${tieuDe.trim()}`;
 
-    const thongBaoMoi = await ThongBaoModel.createThongBao({
+    const thongBao = await ThongBaoModel.createThongBao({
       ndGui: maND,
-      maLTB: Number(maLTB),
+      maLTB: Number(maLTB) || 1,
       tieuDe: finalTitle,
       noiDung: noiDung.trim(),
       maTBGoc: null,
@@ -243,116 +250,110 @@ const ThongBaoService = {
     });
 
     return {
-      thongBao: thongBaoMoi,
+      thongBao,
       dsNguoiNhan: recipients,
     };
   },
 
-  // 2. Xem chi tiết thông báo + Tự động đánh dấu đã đọc
+  // 6. Xem chi tiết thông báo & tự động đánh dấu đã đọc
   async getChiTietThongBao(user, maTB) {
-    const { maND } = ThongBaoService.extractUser(user);
-    if (!maTB || isNaN(maTB)) {
-      const err = new Error("Mã thông báo không hợp lệ.");
-      err.statusCode = 400;
-      throw err;
+    const maND = Number(user?.maND ?? user?.MaND);
+    if (!maND || !maTB) {
+      throw createError("Thông tin truy vấn không hợp lệ.");
     }
 
-    // Tự động đánh dấu đã đọc khi mở xem chi tiết
     await ThongBaoModel.markAsRead(maTB, maND);
-
     const detail = await ThongBaoModel.getChiTietThongBao(maTB, maND);
     if (!detail) {
-      const err = new Error("Không tìm thấy thông báo này.");
-      err.statusCode = 404;
-      throw err;
+      throw createError("Không tìm thấy thông báo.", 404);
     }
 
     return detail;
   },
 
-  // 3. Trả lời thông báo
-  async replyThongBao(user, maTB, body) {
-    const { maND } = ThongBaoService.extractUser(user);
+  // 7. Trả lời thông báo
+  async replyThongBao(user, maTB, body = {}) {
+    const maND = Number(user?.maND ?? user?.MaND);
     const { noiDung } = body;
 
+    if (!maND) {
+      throw createError("Chưa đăng nhập.", 401);
+    }
     if (!noiDung || !noiDung.trim()) {
-      const err = new Error("Vui lòng nhập nội dung phản hồi.");
-      err.statusCode = 400;
-      throw err;
+      throw createError("Vui lòng nhập nội dung phản hồi.");
     }
 
     const target = await ThongBaoModel.getThongBaoById(maTB);
     if (!target) {
-      const err = new Error("Thông báo cần trả lời không tồn tại.");
-      err.statusCode = 404;
-      throw err;
+      throw createError("Thông báo không tồn tại hoặc đã bị xóa.", 404);
     }
 
     const rootMaTB = target.MaTBGoc || target.MaTB;
     const { root, recipients } = await ThongBaoModel.getReplyRecipients(
       rootMaTB,
-      target.MaTB,
+      maTB,
       maND
     );
 
     if (!root) {
-      const err = new Error("Không tìm thấy thông báo gốc.");
-      err.statusCode = 404;
-      throw err;
+      throw createError("Không tìm thấy thông báo gốc.", 404);
     }
 
-    const tieuDePhanHoi = root.TieuDe.startsWith("Phản hồi:")
+    const replyTitle = root.TieuDe.startsWith("Re:")
       ? root.TieuDe
-      : `Phản hồi: ${root.TieuDe}`;
+      : `Re: ${root.TieuDe}`;
 
-    const phanHoiMoi = await ThongBaoModel.createThongBao({
+    const phanHoi = await ThongBaoModel.createThongBao({
       ndGui: maND,
       maLTB: root.MaLTB,
-      tieuDe: tieuDePhanHoi,
+      tieuDe: replyTitle,
       noiDung: noiDung.trim(),
       maTBGoc: rootMaTB,
       dsNguoiNhan: recipients,
     });
 
     return {
-      phanHoi: phanHoiMoi,
+      phanHoi,
       rootMaTB,
       dsNguoiNhan: recipients,
     };
   },
 
-  // 4. Đánh dấu đã đọc 1 thông báo
+  // 8. Đánh dấu đã đọc 1 thông báo
   async markAsRead(user, maTB) {
-    const { maND } = ThongBaoService.extractUser(user);
+    const maND = Number(user?.maND ?? user?.MaND);
+    if (!maND || !maTB) {
+      throw createError("Dữ liệu không hợp lệ.");
+    }
     await ThongBaoModel.markAsRead(maTB, maND);
     return { MaTB: maTB, TrangThai: "DaDoc" };
   },
 
-  // 5. Đánh dấu đã đọc tất cả
+  // 9. Đánh dấu đã đọc tất cả
   async markAllAsRead(user) {
-    const { maND } = ThongBaoService.extractUser(user);
+    const maND = Number(user?.maND ?? user?.MaND);
+    if (!maND) {
+      throw createError("Chưa đăng nhập.", 401);
+    }
     const updatedCount = await ThongBaoModel.markAllAsRead(maND);
     return { updatedCount };
   },
 
+  // 10. Xóa thông báo
   async deleteThongBao(user, maTB) {
-    const perm = await ThongBaoService.resolveUserPermission(user);
-    const existing = await ThongBaoModel.getThongBaoById(maTB);
+    const perm = await this.resolveUserPermission(user);
+    const target = await ThongBaoModel.getThongBaoById(maTB);
 
-    if (!existing) {
-      const err = new Error("Thông báo không tồn tại hoặc đã bị xóa.");
-      err.statusCode = 404;
-      throw err;
+    if (!target) {
+      throw createError("Thông báo không tồn tại.", 404);
     }
 
-    if (!perm.isSupremeLandlord && Number(existing.NDGui) !== perm.maND) {
-      const err = new Error("Bạn chỉ có quyền xóa những thông báo do chính mình tạo!");
-      err.statusCode = 403;
-      throw err;
+    if (!perm.isSupremeLandlord && Number(target.NDGui) !== perm.maND) {
+      throw createError("Bạn chỉ có quyền xóa thông báo do chính mình gửi.", 403);
     }
 
     await ThongBaoModel.deleteThongBao(maTB);
-    return { MaTB: Number(maTB) };
+    return { MaTB: maTB };
   },
 };
 

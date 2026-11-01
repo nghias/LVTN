@@ -126,6 +126,124 @@ const ThongBaoModel = {
     return rows.map((r) => r.MaND);
   },
 
+  // 8b. Lấy danh sách người nhận kèm thông tin Phòng/Khu để chọn 1 người hoặc nhiều người
+  async getSelectableRecipients({
+    isSupremeLandlord,
+    allowedKhuIds,
+    excludeMaND,
+  }) {
+    if (!isSupremeLandlord && (!allowedKhuIds || allowedKhuIds.length === 0)) {
+      return [];
+    }
+
+    const baseSelect = `
+      SELECT
+        nd.MaND,
+        COALESCE(tt.HoTen, nd.TenTK) AS HoTen,
+        nd.TenTK,
+        nd.Quyen,
+        COALESCE(tenant_info.MaKhu, mgr_info.MaKhu) AS MaKhu,
+        COALESCE(tenant_info.TenKhu, mgr_info.TenKhu) AS TenKhu,
+        tenant_info.MaPhong,
+        tenant_info.TenPhong
+      FROM NguoiDung nd
+      ${JOIN_THONG_TIN_CA_NHAN}
+      LEFT JOIN (
+        SELECT cthdt.MaND,
+               MAX(p.MaPhong) AS MaPhong,
+               MAX(p.TenPhong) AS TenPhong,
+               MAX(kt.MaKhu) AS MaKhu,
+               MAX(kt.TenKhu) AS TenKhu
+        FROM ChiTietHopDongThue cthdt
+        INNER JOIN HopDongThue hdt ON cthdt.MaHDT = hdt.MaHDT
+        INNER JOIN Phong p ON hdt.MaPhong = p.MaPhong
+        INNER JOIN KhuTro kt ON p.MaKhu = kt.MaKhu
+        WHERE hdt.TrangThai = 'ConHieuLuc'
+          AND (cthdt.NgayDi IS NULL OR cthdt.NgayDi >= CURDATE())
+        GROUP BY cthdt.MaND
+      ) tenant_info ON nd.MaND = tenant_info.MaND
+      LEFT JOIN (
+        SELECT kt.MaND,
+               MAX(kt.MaKhu) AS MaKhu,
+               GROUP_CONCAT(kt.TenKhu ORDER BY kt.MaKhu SEPARATOR ', ') AS TenKhu
+        FROM KhuTro kt
+        GROUP BY kt.MaND
+      ) mgr_info ON nd.MaND = mgr_info.MaND
+    `;
+
+    if (isSupremeLandlord) {
+      const [rows] = await db.query(
+        `${baseSelect}
+         WHERE nd.MaND != ?
+           AND (
+             tenant_info.MaND IS NOT NULL
+             OR mgr_info.MaND IS NOT NULL
+             OR nd.Quyen IN ('KhachThue', 'QuanLy')
+           )
+         ORDER BY
+           CASE WHEN nd.Quyen = 'QuanLy' THEN 0 ELSE 1 END ASC,
+           COALESCE(tenant_info.MaKhu, mgr_info.MaKhu, 9999) ASC,
+           COALESCE(tenant_info.TenPhong, '') ASC,
+           HoTen ASC`,
+        [excludeMaND]
+      );
+      return rows;
+    }
+
+    const [rows] = await db.query(
+      `${baseSelect}
+       WHERE nd.MaND != ?
+         AND tenant_info.MaKhu IN (?)
+       ORDER BY
+         tenant_info.MaKhu ASC,
+         tenant_info.TenPhong ASC,
+         HoTen ASC`,
+      [excludeMaND, allowedKhuIds]
+    );
+    return rows;
+  },
+
+  // 8c. Kiểm tra danh sách MaND hợp lệ khi gửi cho 1 người hoặc nhiều người
+  async filterValidRecipientIds({
+    targetIds,
+    isSupremeLandlord,
+    allowedKhuIds,
+    excludeMaND,
+  }) {
+    const cleanIds = [
+      ...new Set(
+        (targetIds || [])
+          .map(Number)
+          .filter((id) => id > 0 && id !== Number(excludeMaND))
+      ),
+    ];
+    if (cleanIds.length === 0) return [];
+
+    if (isSupremeLandlord) {
+      const [rows] = await db.query(
+        `SELECT MaND FROM NguoiDung WHERE MaND IN (?) AND MaND != ?`,
+        [cleanIds, excludeMaND]
+      );
+      return rows.map((r) => Number(r.MaND));
+    }
+
+    if (!allowedKhuIds || allowedKhuIds.length === 0) return [];
+
+    const [rows] = await db.query(
+      `SELECT DISTINCT cthdt.MaND
+       FROM ChiTietHopDongThue cthdt
+       INNER JOIN HopDongThue hdt ON cthdt.MaHDT = hdt.MaHDT
+       INNER JOIN Phong p ON hdt.MaPhong = p.MaPhong
+       WHERE cthdt.MaND IN (?)
+         AND p.MaKhu IN (?)
+         AND hdt.TrangThai = 'ConHieuLuc'
+         AND (cthdt.NgayDi IS NULL OR cthdt.NgayDi >= CURDATE())
+         AND cthdt.MaND != ?`,
+      [cleanIds, allowedKhuIds, excludeMaND]
+    );
+    return rows.map((r) => Number(r.MaND));
+  },
+
   // 9. Tạo thông báo mới hoặc trả lời thông báo (Transaction)
   async createThongBao({
     ndGui,
@@ -148,8 +266,14 @@ const ThongBaoModel = {
       const maTB = result.insertId;
 
       if (dsNguoiNhan && dsNguoiNhan.length > 0) {
-        const uniqueRecipients = [...new Set(dsNguoiNhan.map(Number).filter(Boolean))];
-        const values = uniqueRecipients.map((ndNhan) => [maTB, ndNhan, "ChuaDoc"]);
+        const uniqueRecipients = [
+          ...new Set(dsNguoiNhan.map(Number).filter(Boolean)),
+        ];
+        const values = uniqueRecipients.map((ndNhan) => [
+          maTB,
+          ndNhan,
+          "ChuaDoc",
+        ]);
         await conn.query(
           `INSERT INTO NhanThongBao (MaTB, NDNhan, TrangThai) VALUES ?`,
           [values]
@@ -258,7 +382,6 @@ const ThongBaoModel = {
     let sql = "";
 
     if (tab === "da_gui") {
-      // Các phản ánh / báo cáo sự cố do chính người dùng gửi đi
       sql = `
         SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
                COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
@@ -275,7 +398,6 @@ const ThongBaoModel = {
       `;
       params.push(maND);
     } else {
-      // Hộp thư đến của người dùng
       sql = `
         SELECT tb.MaTB, tb.MaTBGoc, tb.NDGui,
                COALESCE(tt.HoTen, nd.TenTK) AS TenNguoiGui,
@@ -349,19 +471,19 @@ const ThongBaoModel = {
     const thongTinPhong = roomRows[0] || null;
     const recipientSet = new Set();
 
-    // Nếu khách đang ở phòng cụ thể -> Gửi cho Quản lý khu trọ đó
-    if (thongTinPhong?.MaQuanLy && Number(thongTinPhong.MaQuanLy) !== Number(maND)) {
+    if (
+      thongTinPhong?.MaQuanLy &&
+      Number(thongTinPhong.MaQuanLy) !== Number(maND)
+    ) {
       recipientSet.add(Number(thongTinPhong.MaQuanLy));
     }
 
-    // Luôn gửi đồng thời cho Chủ trọ tổng (ChuTro / Admin)
     const [landlords] = await db.query(
       `SELECT MaND FROM NguoiDung WHERE Quyen IN ('ChuTro', 'Admin') AND MaND != ?`,
       [maND]
     );
     landlords.forEach((r) => recipientSet.add(Number(r.MaND)));
 
-    // Dự phòng nếu chưa tìm thấy ai thì gửi cho tất cả Quản lý
     if (recipientSet.size === 0) {
       const [managers] = await db.query(
         `SELECT DISTINCT MaND FROM KhuTro WHERE MaND != ?`,

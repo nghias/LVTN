@@ -2,7 +2,7 @@
 const db = require("../../database/db");
 
 const PhongTroModel = {
-  // Lấy danh sách phòng theo danh sách MaKhu (dùng cho quản lý - vẫn giữ lọc cơ bản)
+  // Lấy danh sách phòng theo danh sách MaKhu (dùng cho quản lý)
   getListByFilters: async ({ maKhuIds = [], trangThai, keyword }) => {
     if (!maKhuIds || maKhuIds.length === 0) return [];
     const placeholders = maKhuIds.map(() => "?").join(",");
@@ -63,7 +63,8 @@ const PhongTroModel = {
   },
 
   // ========== API RIÊNG CHO TRANG HOME ==========
-  // Chỉ lấy tin đăng có TrangThai = 'DangHienThi' VÀ Phòng có TrangThai = 'Trong'
+  // KHÔNG gọi nd.hoten để tránh lỗi Unknown column 'nd.hoten'
+  // Lấy trực tiếp AnhDaiDienDB từ bảng AnhPhong
   getPublicTinDangForHome: async ({ maKhu, mucGia, dienTich } = {}) => {
     let sql = `
       SELECT 
@@ -83,7 +84,14 @@ const PhongTroModel = {
         k.TenKhu,
         k.DiaChi,
         k.MoTa AS MoTaKhu,
-        k.MaND AS MaQuanLyKhu
+        k.MaND AS MaQuanLyKhu,
+        (
+          SELECT ap.DuongDan
+          FROM AnhPhong ap
+          WHERE ap.MaPhong = p.MaPhong
+          ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
+          LIMIT 1
+        ) AS AnhDaiDienDB
       FROM TinDang td
       INNER JOIN Phong p ON td.MaPhong = p.MaPhong
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
@@ -118,7 +126,6 @@ const PhongTroModel = {
     return rows;
   },
 
-  // Giữ lại hàm cũ nếu nơi khác còn gọi nhưng đồng bộ điều kiện phòng trống
   getActiveTinDang: async () => {
     const sql = `
       SELECT td.MaTin, td.MaPhong, td.MaND, td.TieuDe, td.MoTa, td.NgayDang, td.NgayHetHan, td.TrangThai

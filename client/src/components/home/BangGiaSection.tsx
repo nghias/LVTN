@@ -5,14 +5,22 @@ import { GiaDienNuocHome, PhiDichVuItem } from "@/services/home.service";
 import { formatVND } from "./home.data";
 
 interface BangGiaSectionProps {
-  giaDienNuoc: GiaDienNuocHome;
-  phiDichVuList?: PhiDichVuItem[]; // Thêm dấu ? để phòng trường hợp undefined
+  giaDienNuoc?: GiaDienNuocHome | null;
+  phiDichVuList?: PhiDichVuItem[];
 }
 
 export default function BangGiaSection({
   giaDienNuoc,
-  phiDichVuList = [], // Gán giá trị mặc định là mảng rỗng nếu không được truyền vào
+  phiDichVuList = [],
 }: BangGiaSectionProps) {
+  const safePhiDichVuList = Array.isArray(phiDichVuList) ? phiDichVuList : [];
+
+  const formattedNgayApDung =
+    giaDienNuoc?.NgayApDung &&
+    !isNaN(new Date(giaDienNuoc.NgayApDung).getTime())
+      ? new Date(giaDienNuoc.NgayApDung).toLocaleDateString("vi-VN")
+      : "Mới nhất";
+
   return (
     <section
       id="bang-gia"
@@ -27,8 +35,7 @@ export default function BangGiaSection({
         </h2>
         <p className="text-xs text-slate-500 mt-1.5">
           Áp dụng thống nhất khi tính Hóa đơn tự động hàng tháng trên hệ thống
-          (Cập nhật ngày:{" "}
-          {giaDienNuoc?.NgayApDung ? new Date(giaDienNuoc.NgayApDung).toLocaleDateString("vi-VN") : ""})
+          (Cập nhật ngày: {formattedNgayApDung})
         </p>
       </div>
 
@@ -38,7 +45,7 @@ export default function BangGiaSection({
             Đơn giá Điện (Đồng hồ IoT)
           </span>
           <p className="text-2xl font-bold text-slate-900 my-2">
-            {formatVND(giaDienNuoc?.GiaDien || 0)}{" "}
+            {formatVND(Number(giaDienNuoc?.GiaDien || 3500))}{" "}
             <span className="text-xs font-normal text-slate-500">/ kWh</span>
           </p>
           <span className="text-[11px] text-slate-500">
@@ -51,7 +58,7 @@ export default function BangGiaSection({
             Đơn giá Nước (Đồng hồ IoT)
           </span>
           <p className="text-2xl font-bold text-slate-900 my-2">
-            {formatVND(giaDienNuoc?.GiaNuoc || 0)}{" "}
+            {formatVND(Number(giaDienNuoc?.GiaNuoc || 15000))}{" "}
             <span className="text-xs font-normal text-slate-500">/ m³</span>
           </p>
           <span className="text-[11px] text-slate-500">
@@ -59,25 +66,22 @@ export default function BangGiaSection({
           </span>
         </div>
 
-        {/* Dùng optional chaining ?. để tránh lỗi khi mảng chưa sẵn sàng */}
-        {phiDichVuList?.slice(0, 2).map((dv) => {
-            return (
-                <div
-                    key={dv.MaDV}
-                    className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between"
-                >
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Phí dịch vụ cố định
-                    </span>
-                    <p className="text-xl font-bold text-slate-900 my-2">
-                        {Number(dv.DonGia) === 0
-                            ? "Miễn phí"
-                            : `${formatVND(dv.DonGia)} / tháng`}
-                    </p>
-                    <span className="text-xs font-bold text-slate-700">{dv.TenDV}</span>
-                </div>
-            );
-        })}
+        {safePhiDichVuList.slice(0, 2).map((dv) => (
+          <div
+            key={dv.MaDV}
+            className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Phí dịch vụ cố định
+            </span>
+            <p className="text-xl font-bold text-slate-900 my-2">
+              {Number(dv.DonGia) === 0
+                ? "Miễn phí"
+                : `${formatVND(Number(dv.DonGia))} / tháng`}
+            </p>
+            <span className="text-xs font-bold text-slate-700">{dv.TenDV}</span>
+          </div>
+        ))}
       </div>
     </section>
   );

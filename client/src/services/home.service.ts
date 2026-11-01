@@ -73,25 +73,125 @@ export interface HomeTinDangFilterParams {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const SERVER_ORIGIN = API_URL.replace(/\/api\/?$/, "");
+
+const DEFAULT_GIA_DIEN_NUOC: GiaDienNuocHome = {
+  MaGia: 1,
+  GiaDien: 3500,
+  GiaNuoc: 15000,
+  NgayApDung: new Date().toISOString().split("T")[0],
+};
+
+// Hàm chuẩn hóa đường dẫn ảnh từ DB (hỗ trợ cả URL Cloudinary lẫn đường dẫn uploads/...)
+export function resolveHomeRoomImageUrl(rawInput?: any): string | null {
+  if (!rawInput) return null;
+
+  const rawPath =
+    typeof rawInput === "string"
+      ? rawInput.trim()
+      : typeof rawInput === "object" && rawInput.DuongDan
+        ? String(rawInput.DuongDan).trim()
+        : "";
+
+  if (!rawPath) return null;
+
+  if (/^https?:\/\//i.test(rawPath)) {
+    return rawPath;
+  }
+
+  const normalizedPath = rawPath.replace(/\\/g, "/").replace(/^\/+/, "");
+  return `${SERVER_ORIGIN}/${normalizedPath}`;
+}
+
+function normalizeTinDangItem(item: any): TinDangHome {
+  const rawList: any[] = Array.isArray(item?.DanhSachAnh)
+    ? item.DanhSachAnh
+    : [];
+
+  const normalizedImages = rawList
+    .map((img) => resolveHomeRoomImageUrl(img))
+    .filter((url): url is string => Boolean(url));
+
+  const mainImage =
+    resolveHomeRoomImageUrl(item?.AnhDaiDien) || normalizedImages[0] || null;
+
+  return {
+    ...item,
+    MaTin: Number(item.MaTin),
+    MaPhong: Number(item.MaPhong),
+    MaKhu: Number(item.MaKhu),
+    DienTich: Number(item.DienTich || 0),
+    Gia: Number(item.Gia || 0),
+    TrangThaiTin: item.TrangThaiTin || item.TrangThai || "DangHienThi",
+    TrangThai: item.TrangThai || item.TrangThaiTin || "DangHienThi",
+    TrangThaiPhong: item.TrangThaiPhong || "Trong",
+    AnhDaiDien: mainImage,
+    DanhSachAnh:
+      normalizedImages.length > 0
+        ? normalizedImages
+        : mainImage
+          ? [mainImage]
+          : [],
+    DanhSachTienIch: Array.isArray(item.DanhSachTienIch)
+      ? item.DanhSachTienIch
+      : Array.isArray(item.TienIch)
+        ? item.TienIch
+        : [],
+  };
+}
 
 export class HomeService {
-  // 1. Lấy toàn bộ dữ liệu khởi tạo trang Home (đã bao gồm tin đăng Phòng trống + Đang hiển thị)
+  // 1. Lấy toàn bộ dữ liệu khởi tạo trang Home từ phongTro.Controller
   static async getHomeData(): Promise<HomeDataPayload> {
     try {
       const res = await fetch(`${API_URL}/phong-tro/public/home-data`, {
         method: "GET",
         cache: "no-store",
       });
-      if (!res.ok) throw new Error("Không thể tải dữ liệu trang chủ");
-      const json = await res.json();
-      return json.data;
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json || json.success === false) {
+        console.error(
+          "Cảnh báo API home-data:",
+          json?.message || res.statusText,
+        );
+        // Fallback tự động lấy tin đăng qua API /phong-tro/public/tin-dang
+        const fallbackTinDang = await HomeService.getPublicTinDang().catch(
+          () => [],
+        );
+        return {
+          tinDang: fallbackTinDang,
+          tienIch: [],
+          phiDichVu: [],
+          khuTro: [],
+          giaDienNuoc: DEFAULT_GIA_DIEN_NUOC,
+        };
+      }
+
+      const rawData = json.data || {};
+      return {
+        tinDang: Array.isArray(rawData.tinDang)
+          ? rawData.tinDang.map(normalizeTinDangItem)
+          : [],
+        tienIch: Array.isArray(rawData.tienIch) ? rawData.tienIch : [],
+        phiDichVu: Array.isArray(rawData.phiDichVu) ? rawData.phiDichVu : [],
+        khuTro: Array.isArray(rawData.khuTro) ? rawData.khuTro : [],
+        giaDienNuoc: rawData.giaDienNuoc || DEFAULT_GIA_DIEN_NUOC,
+      };
     } catch (error) {
       console.error("Lỗi khi tải dữ liệu trang chủ:", error);
-      throw error;
+      return {
+        tinDang: [],
+        tienIch: [],
+        phiDichVu: [],
+        khuTro: [],
+        giaDienNuoc: DEFAULT_GIA_DIEN_NUOC,
+      };
     }
   }
 
-  // 2. API riêng chỉ lấy danh sách tin đăng cho trang Home (Phòng trống + Đang hiển thị)
+  // 2. API riêng chỉ lấy danh sách tin đăng cho trang Home từ phongTro.Controller
   static async getPublicTinDang(
     params?: HomeTinDangFilterParams,
   ): Promise<TinDangHome[]> {
@@ -118,19 +218,25 @@ export class HomeService {
         cache: "no-store",
       });
 
-      if (!res.ok) {
-        throw new Error("Không thể tải danh sách tin đăng trang chủ");
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok || !json || json.success === false) {
+        console.error(
+          "Lỗi API /phong-tro/public/tin-dang:",
+          json?.message || res.statusText,
+        );
+        return [];
       }
 
-      const json = await res.json();
-      return Array.isArray(json.data) ? json.data : [];
+      return Array.isArray(json.data)
+        ? json.data.map(normalizeTinDangItem)
+        : [];
     } catch (error) {
       console.error("Lỗi khi tải danh sách tin đăng trang chủ:", error);
-      throw error;
+      return [];
     }
   }
 }
 
-// Export thêm hàm rời để tiện import trực tiếp nếu cần
 export const getPublicHomeTinDang = (params?: HomeTinDangFilterParams) =>
   HomeService.getPublicTinDang(params);

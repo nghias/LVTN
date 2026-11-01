@@ -1,8 +1,16 @@
+// client/src/components/features/thongBao/ThongBaoList.tsx
 "use client";
 
-import { useState } from "react";
-
-import { ThongBaoItem } from "../../../types/thongBao.type";
+import { useEffect, useState, useCallback } from "react";
+import {
+  ThongBaoItem,
+  ThongBaoReplyItem,
+} from "@/types/thongBao.type";
+import ThongBaoDetailModal, {
+  formatTimeAgo,
+  getRoleBadge,
+  getSharedSocket,
+} from "./ThongBaoDetailModal";
 
 interface ThongBaoListProps {
   items: ThongBaoItem[];
@@ -15,18 +23,75 @@ interface ThongBaoListProps {
 export default function ThongBaoList({
   items,
   loading,
+  currentUserId,
   onDelete,
 }: ThongBaoListProps) {
+  // State quản lý xóa thông báo
   const [deleteTarget, setDeleteTarget] = useState<ThongBaoItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  // Mã thông báo đang mở trong Modal Xem chi tiết & Trả lời dùng chung
+  const [selectedMaTB, setSelectedMaTB] = useState<number | null>(null);
+
+  // State lưu số lượng phản hồi & trạng thái đã đọc cục bộ khi có cập nhật Real-time
+  const [replyCountMap, setReplyCountMap] = useState<Record<number, number>>(
+    {},
+  );
+  const [readMap, setReadMap] = useState<Record<number, boolean>>({});
+
+  // Cập nhật số lượng phản hồi từ Modal dùng chung
+  const handleReplyCountChange = useCallback((maTB: number, count: number) => {
+    setReplyCountMap((prev) => ({
+      ...prev,
+      [maTB]: count,
+    }));
+  }, []);
+
+  // Lắng nghe phản hồi mới qua Shared Socket để tăng bộ đếm ngoài thẻ danh sách
+  useEffect(() => {
+    const socket = getSharedSocket(currentUserId);
+
+    const handleNewReply = (payload: {
+      rootMaTB: number;
+      phanHoi: ThongBaoReplyItem;
+    }) => {
+      const rootId = Number(payload.rootMaTB);
+      setReplyCountMap((prev) => {
+        const baseItem = items.find((i) => i.MaTB === rootId);
+        const currentCount = prev[rootId] ?? baseItem?.SoPhanHoi ?? 0;
+        return {
+          ...prev,
+          [rootId]: currentCount + 1,
+        };
+      });
+    };
+
+    socket.on("phan_hoi_thong_bao", handleNewReply);
+
+    return () => {
+      socket.off("phan_hoi_thong_bao", handleNewReply);
+    };
+  }, [currentUserId, items]);
+
+  // Mở Modal xem chi tiết & luồng trả lời
+  const handleSelectNotification = (item: ThongBaoItem) => {
+    if (item.TrangThai === "ChuaDoc") {
+      setReadMap((prev) => ({ ...prev, [item.MaTB]: true }));
+    }
+    setSelectedMaTB(item.MaTB);
+  };
+
+  // Xác nhận xóa thông báo
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
       setDeleting(true);
       setDeleteError("");
       await onDelete(deleteTarget.MaTB, deleteTarget.TieuDe);
+      if (selectedMaTB === deleteTarget.MaTB) {
+        setSelectedMaTB(null);
+      }
       setDeleteTarget(null);
     } catch (err: unknown) {
       const msg =
@@ -63,66 +128,120 @@ export default function ThongBaoList({
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {items.map((tb) => {
+          const isUnread =
+            tb.TrangThai === "ChuaDoc" && !readMap[tb.MaTB];
+          const replyCount =
+            replyCountMap[tb.MaTB] ?? tb.SoPhanHoi ?? 0;
+
           return (
             <div
               key={tb.MaTB}
-              className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-4 hover:border-teal-300 transition"
+              onClick={() => handleSelectNotification(tb)}
+              className={`bg-white border rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-4 hover:border-teal-400 hover:shadow-md transition cursor-pointer ${
+                isUnread
+                  ? "border-teal-300 bg-[#00FFCC]/5"
+                  : "border-slate-200"
+              }`}
             >
               <div className="space-y-3">
+                {/* Hàng Badge: Loại thông báo, Số người nhận, Số phản hồi */}
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/40 text-slate-900">
-                    {tb.TenLTB}
-                  </span>
-
-                  {tb.SoNguoiNhan !== undefined && (
-                    <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
-                      Đã gửi tới {tb.SoNguoiNhan} người
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/40 text-slate-900">
+                      {tb.TenLTB}
                     </span>
-                  )}
+
+                    {tb.SoNguoiNhan !== undefined && (
+                      <span className="text-[11px] font-semibold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200">
+                        Đã gửi tới {tb.SoNguoiNhan} người
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${
+                        replyCount > 0
+                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                          : "bg-slate-50 text-slate-500 border-slate-200"
+                      }`}
+                    >
+                      💬 {replyCount} phản hồi
+                    </span>
+
+                    {isUnread && (
+                      <span
+                        title="Chưa đọc"
+                        className="w-2.5 h-2.5 rounded-full bg-teal-500 shrink-0"
+                      />
+                    )}
+                  </div>
                 </div>
 
+                {/* Tiêu đề & Nội dung */}
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 line-clamp-1">
                     {tb.TieuDe}
                   </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed mt-1.5 whitespace-pre-line">
+                  <p className="text-xs text-slate-600 leading-relaxed mt-1.5 whitespace-pre-line line-clamp-3">
                     {tb.NoiDung}
                   </p>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+              {/* Footer thẻ: Thông tin người gửi + Nút Trả lời & Xóa */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
                 <div className="text-[11px] text-slate-500 space-y-0.5">
-                  <p className="font-semibold text-slate-700">
-                    Người gửi: {tb.TenNguoiGui}
-                  </p>
-                  <p>
-                    {new Date(tb.NgayGui).toLocaleString("vi-VN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-slate-700">
+                      Người gửi: {tb.TenNguoiGui}
+                    </span>
+                    {tb.QuyenNguoiGui && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-600">
+                        {getRoleBadge(tb.QuyenNguoiGui)}
+                      </span>
+                    )}
+                  </div>
+                  <p>{formatTimeAgo(tb.NgayGui)}</p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteError("");
-                    setDeleteTarget(tb);
-                  }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer flex items-center gap-1.5 shrink-0"
-                >
-                  <span>Xóa thông báo</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectNotification(tb);
+                    }}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-teal-800 bg-[#00FFCC]/40 hover:bg-[#00FFCC] border border-teal-300 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Xem & Trả lời</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteError("");
+                      setDeleteTarget(tb);
+                    }}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Xóa thông báo</span>
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Modal Xem Chi Tiết & Trả Lời Thông Báo Dùng Chung */}
+      <ThongBaoDetailModal
+        maTB={selectedMaTB}
+        userId={currentUserId}
+        onClose={() => setSelectedMaTB(null)}
+        onReplyCountChange={handleReplyCountChange}
+      />
 
       {/* Modal xác nhận xóa thông báo */}
       {deleteTarget && (
