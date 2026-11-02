@@ -23,7 +23,7 @@ export default function QuanLyHoaDonPage() {
 
   const [selectedMaKhu, setSelectedMaKhu] = useState<number>(0);
   const [selectedMaPhong, setSelectedMaPhong] = useState<number>(0);
-  const [thangNam, setThangNam] = useState<string>(() => getCurrentMonth());
+  const [thangNam, setThangNam] = useState<string>('');
   const [trangThaiTT, setTrangThaiTT] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -93,7 +93,13 @@ export default function QuanLyHoaDonPage() {
   );
 
   useEffect(() => {
-    fetchDanhSach();
+    fetchDanhSach({
+      maKhu: 0,
+      maPhong: 0,
+      thangNam: '',
+      trangThaiTT: '',
+      search: '',
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -261,8 +267,7 @@ export default function QuanLyHoaDonPage() {
                     value={thangNam}
                     onChange={(e) => {
                       const val = e.target.value;
-                      const safeMonth = val || getCurrentMonth();
-                      setThangNam(safeMonth);
+                      setThangNam(val);
                       fetchDanhSach({ thangNam: val });
                     }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
@@ -335,8 +340,7 @@ export default function QuanLyHoaDonPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const currentMonth = getCurrentMonth();
-                    setThangNam(currentMonth);
+                    setThangNam('');
                     setSelectedMaPhong(0);
                     setTrangThaiTT('');
                     setSearch('');

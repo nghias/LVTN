@@ -30,6 +30,14 @@ export default function QuanLyThanhToanPage() {
   const [keyword, setKeyword] = useState<string>('');
   const [processingId, setProcessingId] = useState<number | null>(null);
 
+  // Rút gọn tên cơ sở để không bị tràn và gãy dòng
+  const formatShortKhu = (tenKhu?: string) => {
+    if (!tenKhu) return 'Cơ sở';
+    const match = tenKhu.match(/Cơ sở\s*\d+/i);
+    if (match) return match[0];
+    return tenKhu.split('-')[0].replace(/Xóm Trọ/i, '').trim() || tenKhu;
+  };
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -141,13 +149,13 @@ export default function QuanLyThanhToanPage() {
       if (!matchKhu || !matchKw) return false;
 
       if (filterMode === 'CHUA_TRA') {
-        return hd.TrangThaiThanhToan !== 'DaThanhToan';
+        return Number(hd.ConNo) > 0 && hd.TrangThaiThanhToan !== 'DaThanhToan';
       }
       if (filterMode === 'DA_TRA') {
-        return hd.TrangThaiThanhToan === 'DaThanhToan';
+        return Number(hd.ConNo) <= 0 || hd.TrangThaiThanhToan === 'DaThanhToan';
       }
       if (filterMode === 'CHO_XAC_NHAN') {
-        return hd.CoGiaoDichChoXacNhan;
+        return Boolean(hd.CoGiaoDichChoXacNhan);
       }
       return true;
     });
@@ -172,20 +180,20 @@ export default function QuanLyThanhToanPage() {
   const renderPaymentBadge = (trangThai: string) => {
     if (trangThai === 'DaThanhToan') {
       return (
-        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-emerald-100 text-emerald-800 border border-emerald-300">
           Đã trả đủ
         </span>
       );
     }
     if (trangThai === 'MotPhan') {
       return (
-        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-amber-100 text-amber-800 border border-amber-300">
           Trả một phần
         </span>
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-300">
+      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-red-100 text-red-700 border border-red-300">
         Chưa thanh toán
       </span>
     );
@@ -194,17 +202,25 @@ export default function QuanLyThanhToanPage() {
   return (
     <ProtectedRoute allowedRoles={['ChuTro', 'QuanLy']}>
       {(user) => (
-        <div className="flex-1 flex flex-col bg-white text-slate-900">
+        <div
+          className="flex-1 flex flex-col bg-white text-slate-900"
+          style={{ fontFamily: "'Montserrat', sans-serif" }}
+        >
+          {/* Đồng bộ phông chữ Montserrat */}
+          <style jsx global>{`
+            @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+          `}</style>
+
           <QuanLyHeader user={user} />
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-            {/* 1. Tiêu đề trang & Nút Thiết lập ngân hàng (Đồng bộ QuanLyKhuTroVaPhongPage) */}
+            {/* 1. Tiêu đề trang & Nút Thiết lập ngân hàng */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Quản Lý Thanh Toán & Đối Soát Tự Động
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs sm:text-sm font-medium text-slate-500 mt-1">
                   {user.Quyen === 'ChuTro'
                     ? 'Chủ trọ thiết lập tài khoản ngân hàng, đối soát QR PayOS tự động và xác nhận thu tiền mặt'
                     : 'Quản lý cơ sở theo dõi lịch sử thanh toán và xác nhận thu tiền mặt của các phòng phụ trách'}
@@ -215,7 +231,7 @@ export default function QuanLyThanhToanPage() {
                 {user.Quyen === 'ChuTro' && canEditPaymentInfo && (
                   <Link
                     href="/chuTro/thanhToan/thietLap"
-                    className="flex-1 sm:flex-initial text-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition no-underline"
+                    className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold whitespace-nowrap shadow-xs transition no-underline"
                   >
                     + Thiết Lập Ngân Hàng
                   </Link>
@@ -225,7 +241,7 @@ export default function QuanLyThanhToanPage() {
 
             {/* 2. Thanh chọn Khu trọ & Khung thông tin Ngân hàng thụ hưởng */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 {khuTroList.length > 1 && (
                   <button
                     type="button"
@@ -233,7 +249,7 @@ export default function QuanLyThanhToanPage() {
                     className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                       selectedKhu === 'ALL'
                         ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     Tất cả cơ sở ({hoaDonList.length})
@@ -260,7 +276,7 @@ export default function QuanLyThanhToanPage() {
                       className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                         isSelected
                           ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
                       {khu.TenKhu} ({count})
@@ -269,24 +285,27 @@ export default function QuanLyThanhToanPage() {
                 })}
               </div>
 
-              {/* Khung thông tin Ngân hàng thụ hưởng (Giống hệt khung activeKhu của Phòng trọ) */}
+              {/* Khung thông tin Ngân hàng thụ hưởng */}
               <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-base font-bold text-slate-900">
                       Ngân hàng thụ hưởng: {thongTinNH?.TenNganHang || 'MB Bank'}
                     </h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#00FFCC]/40 text-slate-900">
+                    <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-[#00FFCC]/40 text-slate-900">
                       Chủ TK: {thongTinNH?.ChuTaiKhoan || 'TRAN TUAN NGHIA'}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white text-teal-800 border border-teal-200">
+                    <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-white text-teal-800 border border-teal-200">
                       STK: {thongTinNH?.STK || '0931493785'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600">
-                    <strong>Trạng thái kênh thanh toán:</strong> Đã kích hoạt xác thực tự động qua cổng PayOS VietQR
+                  <p className="text-xs font-medium text-slate-600">
+                    <strong className="font-bold text-slate-800">
+                      Trạng thái kênh thanh toán:
+                    </strong>{' '}
+                    Đã kích hoạt xác thực tự động qua cổng PayOS VietQR
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs font-medium text-slate-500">
                     Hệ thống tự động sinh mã QR theo từng hợp đồng/hóa đơn và gạch nợ ngay khi người thuê chuyển khoản thành công
                   </p>
                 </div>
@@ -295,12 +314,12 @@ export default function QuanLyThanhToanPage() {
                   {user.Quyen === 'ChuTro' && canEditPaymentInfo ? (
                     <Link
                       href="/chuTro/thanhToan/thietLap"
-                      className="px-4 py-2 rounded-full bg-white hover:bg-[#00FFCC] text-slate-800 border border-slate-300 text-xs font-bold transition no-underline"
+                      className="inline-flex items-center px-4 py-2 rounded-full bg-white hover:bg-[#00FFCC] text-slate-900 border border-slate-300 text-xs font-bold whitespace-nowrap transition no-underline"
                     >
                       Sửa thông tin TT
                     </Link>
                   ) : (
-                    <span className="px-4 py-2 rounded-full bg-white text-slate-500 border border-slate-200 text-xs font-bold">
+                    <span className="inline-flex items-center px-4 py-2 rounded-full bg-white text-slate-500 border border-slate-200 text-xs font-bold whitespace-nowrap">
                       Chỉ Chủ trọ được quyền thay đổi
                     </span>
                   )}
@@ -308,19 +327,19 @@ export default function QuanLyThanhToanPage() {
               </div>
             </div>
 
-            {/* 3. Bộ lọc & Tìm kiếm hóa đơn thanh toán (Giống hệt Bộ lọc Phòng trọ) */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="sm:col-span-5">
+            {/* 3. Bộ lọc & Tìm kiếm dàn đều ngang khung */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="flex-1 min-w-[240px]">
                 <input
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="Tìm kiếm theo tên phòng (VD: P.101, P.102), tên khách..."
-                  className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-full text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 />
               </div>
 
-              <div className="sm:col-span-7 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {[
                   {
                     value: 'ALL',
@@ -328,7 +347,13 @@ export default function QuanLyThanhToanPage() {
                   },
                   {
                     value: 'CHUA_TRA',
-                    label: `Còn nợ (${hoaDonList.filter((h) => h.ConNo > 0).length})`,
+                    label: `Còn nợ (${
+                      hoaDonList.filter(
+                        (h) =>
+                          Number(h.ConNo) > 0 &&
+                          h.TrangThaiThanhToan !== 'DaThanhToan'
+                      ).length
+                    })`,
                   },
                   {
                     value: 'CHO_XAC_NHAN',
@@ -336,7 +361,13 @@ export default function QuanLyThanhToanPage() {
                   },
                   {
                     value: 'DA_TRA',
-                    label: `Đã trả đủ (${hoaDonList.filter((h) => h.ConNo <= 0).length})`,
+                    label: `Đã trả đủ (${
+                      hoaDonList.filter(
+                        (h) =>
+                          Number(h.ConNo) <= 0 ||
+                          h.TrangThaiThanhToan === 'DaThanhToan'
+                      ).length
+                    })`,
                   },
                   {
                     value: 'LICH_SU',
@@ -347,10 +378,10 @@ export default function QuanLyThanhToanPage() {
                     key={st.value}
                     type="button"
                     onClick={() => setFilterMode(st.value as any)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                       filterMode === st.value
-                        ? 'bg-[#00FFCC] text-slate-900'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-[#00FFCC] text-slate-900 shadow-2xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-[#00FFCC]/25 hover:text-slate-900'
                     }`}
                   >
                     {st.label}
@@ -377,20 +408,22 @@ export default function QuanLyThanhToanPage() {
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-bold text-slate-900">
-                            {gd.TenPhong} ({gd.TenKhu})
+                            {gd.TenPhong} ({formatShortKhu(gd.TenKhu)})
                           </span>
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
+                          <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-[#00FFCC]/30 text-slate-900 border border-teal-200">
                             {gd.PhuongThuc === 'TienMat'
                               ? 'Tiền mặt'
                               : 'Chuyển khoản QR'}
                           </span>
-                          <span className="text-sm font-extrabold text-teal-700">
+                          <span className="text-sm font-bold text-teal-700 whitespace-nowrap">
                             {Number(gd.SoTien).toLocaleString('vi-VN')} đ
                           </span>
                         </div>
-                        <p className="text-xs text-slate-600">
-                          <strong>Khách thuê:</strong> {gd.TenKhachThue} •{' '}
-                          {gd.NgayTT}
+                        <p className="text-xs font-medium text-slate-600">
+                          <strong className="font-bold text-slate-800">
+                            Khách thuê:
+                          </strong>{' '}
+                          {gd.TenKhachThue} • {gd.NgayTT}
                           {gd.GhiChu ? ` • ${gd.GhiChu}` : ''}
                         </p>
                       </div>
@@ -400,7 +433,7 @@ export default function QuanLyThanhToanPage() {
                           type="button"
                           disabled={processingId === gd.MaTT}
                           onClick={() => handleDuyetNhanh(gd, 'ThanhCong')}
-                          className="px-4 py-2 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                          className="px-4 py-2 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold whitespace-nowrap transition cursor-pointer disabled:opacity-50"
                         >
                           Xác nhận trả
                         </button>
@@ -408,7 +441,7 @@ export default function QuanLyThanhToanPage() {
                           type="button"
                           disabled={processingId === gd.MaTT}
                           onClick={() => handleDuyetNhanh(gd, 'TuChoi')}
-                          className="px-3.5 py-2 rounded-xl border border-red-200 bg-white hover:bg-red-50 text-red-600 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                          className="px-4 py-2 rounded-full border border-red-200 bg-white hover:bg-red-50 text-red-600 text-xs font-bold whitespace-nowrap transition cursor-pointer disabled:opacity-50"
                         >
                           Từ chối
                         </button>
@@ -421,7 +454,7 @@ export default function QuanLyThanhToanPage() {
 
             {/* 5. Lưới Thẻ Hóa Đơn hoặc Bảng Lịch Sử Giao Dịch */}
             {loading ? (
-              <div className="py-16 text-center text-sm text-slate-500">
+              <div className="py-16 text-center text-sm font-medium text-slate-500">
                 Đang tải danh sách thanh toán...
               </div>
             ) : filterMode === 'LICH_SU' ? (
@@ -436,26 +469,28 @@ export default function QuanLyThanhToanPage() {
                   <table className="w-full text-left border-collapse text-sm">
                     <thead>
                       <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
-                        <th className="py-3.5 px-4 text-xs font-bold">Mã GD</th>
-                        <th className="py-3.5 px-4 text-xs font-bold">
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
+                          Mã GD
+                        </th>
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
                           Phòng / Cơ sở
                         </th>
-                        <th className="py-3.5 px-4 text-xs font-bold">
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
                           Khách đại diện
                         </th>
-                        <th className="py-3.5 px-4 text-xs font-bold">
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
                           Số tiền
                         </th>
-                        <th className="py-3.5 px-4 text-xs font-bold">
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
                           Phương thức
                         </th>
-                        <th className="py-3.5 px-4 text-xs font-bold">
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
                           Thời gian
                         </th>
-                        <th className="py-3.5 px-4 text-xs font-bold">
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
                           Trạng thái
                         </th>
-                        <th className="py-3.5 px-4 text-xs font-bold">
+                        <th className="py-3.5 px-4 text-xs font-bold whitespace-nowrap">
                           Ghi chú
                         </th>
                       </tr>
@@ -463,49 +498,52 @@ export default function QuanLyThanhToanPage() {
                     <tbody className="divide-y divide-slate-100">
                       {filteredHistory.map((item) => (
                         <tr key={item.MaTT} className="hover:bg-slate-50">
-                          <td className="py-3.5 px-4 text-xs font-bold text-slate-700">
+                          <td className="py-3.5 px-4 text-xs font-bold text-slate-700 whitespace-nowrap">
                             #{item.MaTT}
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             <span className="text-sm font-bold text-slate-900 block">
                               Phòng {item.TenPhong}
                             </span>
-                            <span className="text-xs text-slate-500">
-                              {item.TenKhu} • HĐ #{item.MaHD}
+                            <span className="text-xs font-medium text-slate-500">
+                              {formatShortKhu(item.TenKhu)} • HĐ #{item.MaHD}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-xs font-semibold text-slate-700">
+                          <td className="py-3.5 px-4 text-xs font-bold text-slate-800 whitespace-nowrap">
                             {item.TenKhachThue}
                           </td>
-                          <td className="py-3.5 px-4 text-sm font-extrabold text-teal-700">
+                          <td className="py-3.5 px-4 text-sm font-bold text-teal-700 whitespace-nowrap">
                             {Number(item.SoTien).toLocaleString('vi-VN')} đ
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-[#00FFCC]/30 text-slate-900 border border-teal-200">
                               {item.PhuongThuc === 'TienMat'
                                 ? 'Tiền mặt'
                                 : 'Chuyển khoản QR'}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-xs text-slate-500">
+                          <td className="py-3.5 px-4 text-xs font-medium text-slate-500 whitespace-nowrap">
                             {item.NgayTT}
                           </td>
-                          <td className="py-3.5 px-4">
+                          <td className="py-3.5 px-4 whitespace-nowrap">
                             {item.TrangThai === 'ThanhCong' ? (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-emerald-100 text-emerald-800 border border-emerald-300">
                                 Đã xác nhận
                               </span>
                             ) : item.TrangThai === 'TuChoi' ? (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-300">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-red-100 text-red-700 border border-red-300">
                                 Đã từ chối
                               </span>
                             ) : (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-amber-100 text-amber-800 border border-amber-300">
                                 Chờ xác nhận
                               </span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-xs text-slate-500 max-w-xs truncate">
+                          <td
+                            className="py-3.5 px-4 text-xs font-medium text-slate-500 max-w-xs truncate"
+                            title={item.GhiChu || ''}
+                          >
                             {item.GhiChu}
                           </td>
                         </tr>
@@ -519,7 +557,7 @@ export default function QuanLyThanhToanPage() {
                 <p className="text-base font-bold text-slate-700">
                   Không tìm thấy hóa đơn nào phù hợp!
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs font-medium text-slate-500 mt-1">
                   Hãy thử thay đổi bộ lọc trạng thái hoặc từ khóa tìm kiếm.
                 </p>
               </div>
@@ -534,37 +572,40 @@ export default function QuanLyThanhToanPage() {
                       <div>
                         {/* Hàng nhãn Cơ sở & Trạng thái */}
                         <div className="flex items-center justify-between gap-2 mb-3">
-                          <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/80 text-[#00FFCC]">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-900 text-[#00FFCC] truncate max-w-[60%]">
                             {hd.TenKhu || 'Cơ sở Xóm Trọ'}
                           </span>
                           {renderPaymentBadge(hd.TrangThaiThanhToan)}
                         </div>
 
-                        {/* Tên phòng & Kỳ hóa đơn (Giống hệt thẻ Phòng trọ) */}
+                        {/* Tên phòng & Kỳ hóa đơn */}
                         <div className="flex items-baseline justify-between gap-2">
-                          <h3 className="text-lg font-bold text-slate-900">
+                          <h3 className="text-lg font-bold text-slate-900 whitespace-nowrap">
                             Phòng {hd.TenPhong}
                           </h3>
-                          <span className="text-xs font-semibold text-slate-500">
+                          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">
                             HĐ #{hd.MaHD} • Kỳ {hd.NgayTinh}
                           </span>
                         </div>
 
                         {/* Tổng tiền kỳ này */}
-                        <p className="mt-1 text-base font-extrabold text-teal-700">
-                          {Number(hd.TongTien).toLocaleString('vi-VN')} đ / kỳ này
+                        <p className="mt-1 text-base font-bold text-teal-700">
+                          {Number(hd.TongTien).toLocaleString('vi-VN')} đ{' '}
+                          <span className="text-xs font-semibold text-slate-500">
+                            / kỳ này
+                          </span>
                         </p>
 
                         {/* Các tag thông tin */}
                         <div className="mt-3 flex flex-wrap gap-1.5">
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
                             Khách: {hd.TenKhachThue}
                           </span>
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
                             Đã trả: {Number(hd.TienDaTra).toLocaleString('vi-VN')} đ
                           </span>
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${
                               hd.ConNo > 0
                                 ? 'bg-red-50 text-red-600 border-red-200'
                                 : 'bg-[#00FFCC]/25 text-slate-900 border-teal-200'
@@ -575,19 +616,19 @@ export default function QuanLyThanhToanPage() {
                         </div>
                       </div>
 
-                      {/* Cụm nút điều hướng (Giống hệt Chi tiết / Sửa của thẻ Phòng trọ) */}
+                      {/* Cụm nút điều hướng */}
                       <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
                         <Link
                           href={`/chuTro/thanhToan/xacNhan/${hd.MaHD}`}
-                          className="flex-1 py-2 text-center rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold transition no-underline"
+                          className="flex-1 py-2.5 px-3 text-center rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold whitespace-nowrap transition no-underline"
                         >
                           {hd.ConNo > 0
                             ? 'Mã QR & Xác nhận trả'
                             : 'Chi tiết thanh toán'}
                         </Link>
                         <Link
-                          href="/chuTro/hoaDon"
-                          className="px-4 py-2 text-center rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold transition no-underline"
+                          href={`/chuTro/hoaDon/chiTiet/${hd.MaHD}`}
+                          className="px-4 py-2.5 text-center rounded-full border border-slate-300 bg-white hover:bg-[#00FFCC]/25 text-slate-900 text-xs font-bold whitespace-nowrap transition no-underline"
                         >
                           Hóa đơn
                         </Link>
