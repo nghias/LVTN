@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
-import NguoiThueHeader from '@/components/layout/NguoiThueHeader';
+
 import { useAlertModal } from '@/components/common/AlertModalProvider';
 import { thanhToanService, PayOSQrData } from '@/services/thanhToan.service';
 
@@ -141,7 +141,6 @@ export default function NguoiThueThanhToanHoaDonPage() {
     <ProtectedRoute allowedRoles={['KhachThue']}>
       {(user) => (
         <div className="flex-1 flex flex-col bg-white text-slate-900">
-          <NguoiThueHeader user={user} />
 
           <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
             <div>

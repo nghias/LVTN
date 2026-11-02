@@ -20,21 +20,33 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
 
   const roleLabel = 'Khách thuê phòng';
 
-  const primaryNavItems = [
-    { label: 'Tổng quan', href: '/nguoiThue/thongKe' },
-    { label: 'Hợp đồng & Tạm trú', href: '/nguoiThue/hopDong' },
-    { label: 'Chỉ số Điện nước', href: '/nguoiThue/dienNuoc' },
+  // Danh sách các trang khớp với cấu trúc thư mục trong /nguoiThue
+  const navItems = [
+    {
+      label: 'Tổng quan',
+      href: '/nguoiThue/thongKe',
+      matchPaths: ['/nguoiThue/thongKe'],
+    },
+    {
+      label: 'Hợp đồng & Tạm trú',
+      href: '/nguoiThue/hopDong',
+      matchPaths: ['/nguoiThue/hopDong'],
+    },
+    {
+      label: 'Hóa đơn & Thanh toán',
+      href: '/nguoiThue/hoaDon',
+      // Sáng menu khi ở trang danh sách hóa đơn hoặc trang chi tiết thanh toán [maHD]
+      matchPaths: ['/nguoiThue/hoaDon', '/nguoiThue/thanhToan'],
+    },
+    {
+      label: 'Thông báo & Sự cố',
+      href: '/nguoiThue/thongBao',
+      matchPaths: ['/nguoiThue/thongBao'],
+    },
   ];
 
-  const moreNavItems = [
-    { label: 'Hóa đơn & Thanh toán', href: '/nguoiThue/hoaDon' },
-    { label: 'Thông báo & Sự cố', href: '/nguoiThue/thongBao' },
-  ];
-
-  const allNavItems = [...primaryNavItems, ...moreNavItems];
-  const activeMoreItem = moreNavItems.find((item) =>
-    pathname.startsWith(item.href)
-  );
+  const checkIsActive = (matchPaths: string[]) =>
+    matchPaths.some((path) => pathname.startsWith(path));
 
   const handleMobileLogout = () => {
     setMobileMenuOpen(false);
@@ -59,6 +71,7 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
   return (
     <header className="w-full bg-white text-slate-900 border-b-2 border-[#00FFCC] shadow-xs sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+        {/* Logo */}
         <Link
           href="/nguoiThue/thongKe"
           className="flex items-center gap-2.5 no-underline text-slate-900 shrink-0 whitespace-nowrap"
@@ -80,9 +93,10 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
           </div>
         </Link>
 
+        {/* Thanh điều hướng Desktop */}
         <nav className="hidden lg:flex items-center gap-1.5 shrink-0">
-          {primaryNavItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+          {navItems.map((item) => {
+            const isActive = checkIsActive(item.matchPaths);
             return (
               <Link
                 key={item.href}
@@ -97,58 +111,9 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
               </Link>
             );
           })}
-
-          <div className="relative group">
-            <button
-              type="button"
-              className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
-                activeMoreItem
-                  ? 'bg-[#00FFCC] text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-[#00FFCC]/20'
-              }`}
-            >
-              <span>{activeMoreItem ? activeMoreItem.label : 'Khác'}</span>
-              <svg
-                width="14"
-                height="14"
-                className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-200"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            <div className="absolute left-0 top-full pt-2 w-52 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 z-50">
-              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden py-1.5">
-                {moreNavItems.map((item) => {
-                  const isActive = pathname.startsWith(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`w-full px-4 py-2.5 text-left text-xs font-bold whitespace-nowrap flex items-center justify-between transition no-underline ${
-                        isActive
-                          ? 'bg-[#00FFCC]/40 text-slate-900'
-                          : 'text-slate-700 hover:bg-[#00FFCC]/20 hover:text-slate-900'
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      {isActive && <span>•</span>}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
         </nav>
 
+        {/* Hành động người dùng & Nút mở menu Mobile */}
         <UserHeaderActions
           user={user}
           roleLabel={roleLabel}
@@ -158,6 +123,7 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
         />
       </div>
 
+      {/* Menu Mobile */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-white border-t border-slate-200 px-4 pt-3 pb-5 shadow-xl space-y-4">
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
@@ -179,8 +145,8 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
               Danh mục cư dân
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {allNavItems.map((item) => {
-                const isActive = pathname.startsWith(item.href);
+              {navItems.map((item) => {
+                const isActive = checkIsActive(item.matchPaths);
                 return (
                   <Link
                     key={item.href}

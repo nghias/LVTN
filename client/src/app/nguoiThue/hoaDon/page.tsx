@@ -8,6 +8,7 @@ import {
   HoaDonItem,
   HoaDonChiTiet,
 } from '@/services/hoaDon.service';
+import NguoiThueHeader from '@/components/layout/NguoiThueHeader';
 
 export default function KhachThueHoaDonPage() {
   const { showError } = useAlertModal();
@@ -81,8 +82,9 @@ export default function KhachThueHoaDonPage() {
 
   return (
     <ProtectedRoute allowedRoles={['KhachThue']}>
-      {() => (
+      {(user) => (
         <div className="min-h-screen flex flex-col bg-white text-slate-900">
+          <NguoiThueHeader user={user} />
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>

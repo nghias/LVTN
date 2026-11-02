@@ -613,6 +613,154 @@ const HopDongModel = {
       conn.release();
     }
   },
+
+  // 7. [BẢO MẬT] Kiểm tra hợp đồng có thuộc về Khách thuê đang đăng nhập hay không
+  checkHopDongThuocKhachThue: async (maHDT, maND) => {
+    const [rows] = await db.execute(
+      `SELECT ct.MaHDT, ct.MaND, ct.VaiTro, ct.NgayVao, ct.NgayDi, ct.TamTru,
+              hdt.TrangThai AS TrangThaiHopDong, hdt.MaPhong,
+              p.TenPhong, kt.MaKhu, kt.TenKhu, kt.MaND AS MaQuanLyKhu
+       FROM chitiethopdongthue ct
+       INNER JOIN hopdongthue hdt ON ct.MaHDT = hdt.MaHDT
+       INNER JOIN phong p ON hdt.MaPhong = p.MaPhong
+       INNER JOIN khutro kt ON p.MaKhu = kt.MaKhu
+       WHERE ct.MaHDT = ? AND ct.MaND = ?
+       LIMIT 1`,
+      [Number(maHDT), Number(maND)]
+    );
+    return rows[0] || null;
+  },
+
+  // 8. Lấy danh sách hợp đồng CỦA RIÊNG khách thuê đang đăng nhập
+  getDanhSachHopDongCuaToi: async (maND, { trangThai = '', tuKhoa = '' } = {}) => {
+    let sql = `
+      SELECT 
+        hdt.MaHDT, hdt.MaPhong, hdt.MaHDTCu, hdt.NgayBD, hdt.NgayKT, hdt.NgayKy, 
+        hdt.TienCoc, hdt.TrangThai,
+        p.TenPhong, p.DienTich, p.Gia AS GiaPhong, p.TrangThai AS TrangThaiPhong,
+        kt.MaKhu, kt.TenKhu, kt.DiaChi AS DiaChiKhu,
+        ctCuaToi.VaiTro AS VaiTroCuaToi,
+        ctCuaToi.TamTru AS TamTruCuaToi,
+        ctCuaToi.NgayVao AS NgayVaoCuaToi,
+        ctCuaToi.NgayDi AS NgayDiCuaToi,
+        quanLy.MaND AS MaQuanLy,
+        COALESCE(ttcnQL.HoTen, quanLy.TenTK) AS TenQuanLy,
+        ttcnQL.SDT AS SDTQuanLy,
+        (
+          SELECT COUNT(*) 
+          FROM chitiethopdongthue ct 
+          WHERE ct.MaHDT = hdt.MaHDT AND ct.NgayDi IS NULL
+        ) AS SoThanhVien,
+        EXISTS (
+          SELECT 1 FROM thongbao tb
+          WHERE tb.NDGui = ?
+            AND tb.MaTBGoc IS NULL
+            AND tb.TieuDe LIKE CONCAT('%[Yêu cầu hủy HĐ #', hdt.MaHDT, ']%')
+        ) AS DaGuiYeuCauHuy
+      FROM chitiethopdongthue ctCuaToi
+      INNER JOIN hopdongthue hdt ON ctCuaToi.MaHDT = hdt.MaHDT
+      INNER JOIN phong p ON hdt.MaPhong = p.MaPhong
+      INNER JOIN khutro kt ON p.MaKhu = kt.MaKhu
+      INNER JOIN nguoidung quanLy ON kt.MaND = quanLy.MaND
+      LEFT JOIN thongtincanhan ttcnQL ON quanLy.MaND = ttcnQL.MaND
+      WHERE ctCuaToi.MaND = ?
+    `;
+    const params = [Number(maND), Number(maND)];
+
+    if (trangThai && trangThai.trim() !== '') {
+      sql += ` AND hdt.TrangThai = ?`;
+      params.push(trangThai.trim());
+    }
+
+    if (tuKhoa && tuKhoa.trim() !== '') {
+      const kw = `%${tuKhoa.trim()}%`;
+      sql += ` AND (CAST(hdt.MaHDT AS CHAR) LIKE ? OR p.TenPhong LIKE ? OR kt.TenKhu LIKE ?)`;
+      params.push(kw, kw, kw);
+    }
+
+    sql += `
+      ORDER BY 
+        CASE WHEN hdt.TrangThai = 'ConHieuLuc' THEN 0 ELSE 1 END ASC,
+        hdt.MaHDT DESC
+    `;
+
+    const [rows] = await db.execute(sql, params);
+    return rows.map((row) => ({
+      ...row,
+      DaGuiYeuCauHuy: Boolean(row.DaGuiYeuCauHuy),
+    }));
+  },
+
+  // 9. Lấy danh sách Quản lý trực tiếp của Khu trọ + Chủ trọ để nhận thông báo hủy HĐ
+  getNguoiNhanYeuCauHuyHopDong: async (maHDT, excludeMaND) => {
+    // Lấy thông tin người quản lý trực tiếp khu trọ của hợp đồng này
+    const [khuRows] = await db.execute(
+      `SELECT kt.MaND AS MaQuanLy, p.TenPhong, kt.TenKhu
+       FROM hopdongthue hdt
+       INNER JOIN phong p ON hdt.MaPhong = p.MaPhong
+       INNER JOIN khutro kt ON p.MaKhu = kt.MaKhu
+       WHERE hdt.MaHDT = ?
+       LIMIT 1`,
+      [Number(maHDT)]
+    );
+
+    const recipientSet = new Set();
+    if (khuRows[0]?.MaQuanLy && Number(khuRows[0].MaQuanLy) !== Number(excludeMaND)) {
+      recipientSet.add(Number(khuRows[0].MaQuanLy));
+    }
+
+    // Lấy thêm tài khoản Chủ trọ tổng (Quyen = 'ChuTro') để cùng nắm thông tin
+    const [chuTroRows] = await db.execute(
+      `SELECT MaND FROM nguoidung WHERE Quyen = 'ChuTro' AND MaND != ?`,
+      [Number(excludeMaND)]
+    );
+    chuTroRows.forEach((r) => recipientSet.add(Number(r.MaND)));
+
+    // Tìm MaLTB phù hợp trong bảng LoaiThongBao (ưu tiên loại Hợp đồng / Phản ánh / Sự cố)
+    const [ltbRows] = await db.execute(
+      `SELECT MaLTB FROM loaithongbao
+       ORDER BY
+         CASE
+           WHEN TenLTB LIKE '%hợp đồng%' OR TenLTB LIKE '%Hợp đồng%' THEN 0
+           WHEN TenLTB LIKE '%phản ánh%' OR TenLTB LIKE '%sự cố%' OR TenLTB LIKE '%yêu cầu%' THEN 1
+           ELSE 2
+         END ASC,
+         MaLTB ASC
+       LIMIT 1`
+    );
+
+    const [senderRows] = await db.execute(
+      `SELECT COALESCE(tt.HoTen, nd.TenTK) AS HoTen, tt.SDT
+       FROM nguoidung nd
+       LEFT JOIN thongtincanhan tt ON nd.MaND = tt.MaND
+       WHERE nd.MaND = ?
+       LIMIT 1`,
+      [Number(excludeMaND)]
+    );
+
+    return {
+      dsNguoiNhan: Array.from(recipientSet),
+      maLTB: ltbRows[0]?.MaLTB || 1,
+      tenPhong: khuRows[0]?.TenPhong || '',
+      tenKhu: khuRows[0]?.TenKhu || '',
+      tenNguoiGui: senderRows[0]?.HoTen || 'Khách thuê',
+      sdtNguoiGui: senderRows[0]?.SDT || '',
+    };
+  },
+
+  // 10. Kiểm tra chống spam gửi yêu cầu hủy trùng lặp cho cùng 1 hợp đồng
+  checkDaGuiYeuCauHuy: async (maHDT, maND) => {
+    const [rows] = await db.execute(
+      `SELECT MaTB, NgayGui FROM thongbao
+       WHERE NDGui = ?
+         AND MaTBGoc IS NULL
+         AND TieuDe LIKE ?
+       ORDER BY NgayGui DESC
+       LIMIT 1`,
+      [Number(maND), `%[Yêu cầu hủy HĐ #${Number(maHDT)}]%`]
+    );
+    return rows[0] || null;
+  },
 };
 
 module.exports = HopDongModel;

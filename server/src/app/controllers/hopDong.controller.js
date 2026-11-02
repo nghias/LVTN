@@ -13,6 +13,21 @@ function extractCurrentMaND(req) {
   );
 }
 
+// [BẢO MẬT]: Chỉ lấy MaND từ JWT đã xác thực (req.user) cho các tác vụ nhạy cảm
+function extractVerifiedMaND(req) {
+  const rawId = req.user?.maND ?? req.user?.MaND ?? req.user?.id ?? null;
+  const parsed = Number(rawId);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+// Hàm làm sạch chuỗi đầu vào (chống XSS trong nội dung thông báo)
+function sanitizeText(str = '', maxLength = 1000) {
+  return String(str)
+    .replace(/[<>]/g, '')
+    .trim()
+    .slice(0, maxLength);
+}
+
 const HopDongController = {
   // GET /api/hop-dong/danh-sach & /api/hop-dong/tim-kiem
   layDanhSachHopDong: async (req, res) => {
@@ -112,19 +127,27 @@ const HopDongController = {
   },
 
   // GET /api/hop-dong/chi-tiet/:maHDT
+  // 1. Cập nhật lại hàm: GET /api/hop-dong/chi-tiet/:maHDT (Cho phép Khách thuê xem HĐ của chính mình)
   xemChiTietHopDong: async (req, res) => {
     try {
-      const { maHDT } = req.params;
-      const currentMaND = extractCurrentMaND(req);
+      const maHDT = Number(req.params.maHDT);
+      const currentMaND = extractVerifiedMaND(req);
+
+      if (!Number.isInteger(maHDT) || maHDT <= 0) {
+        return res.status(400).json({
+          thanhCong: false,
+          thongBao: 'Mã hợp đồng không hợp lệ.',
+        });
+      }
 
       if (!currentMaND) {
         return res.status(401).json({
           thanhCong: false,
-          thongBao: 'Không xác định được tài khoản đang đăng nhập.',
+          thongBao: 'Vui lòng đăng nhập để xem hợp đồng.',
         });
       }
 
-      const nguoiDung = await HopDongModel.getNguoiDungById(Number(currentMaND));
+      const nguoiDung = await HopDongModel.getNguoiDungById(currentMaND);
       if (!nguoiDung) {
         return res.status(403).json({
           thanhCong: false,
@@ -132,25 +155,21 @@ const HopDongController = {
         });
       }
 
-      if (nguoiDung.Quyen !== 'ChuTro' && nguoiDung.Quyen !== 'QuanLy') {
-        return res.status(403).json({
-          thanhCong: false,
-          thongBao: 'Bạn không có quyền xem chi tiết hợp đồng.',
-        });
-      }
-
-      const chiTiet = await HopDongModel.getChiTietHopDongById(Number(maHDT));
-      if (!chiTiet) {
-        return res.status(404).json({
-          thanhCong: false,
-          thongBao: 'Không tìm thấy hợp đồng',
-        });
-      }
-
-      // Nếu là Quản lý thì chỉ được xem hợp đồng thuộc cơ sở mình quản lý
-      if (nguoiDung.Quyen !== 'ChuTro') {
+      // Kiểm tra phân quyền chặt chẽ theo từng vai trò (Chống IDOR)
+      if (nguoiDung.Quyen === 'KhachThue') {
+        const ownsContract = await HopDongModel.checkHopDongThuocKhachThue(
+          maHDT,
+          nguoiDung.MaND
+        );
+        if (!ownsContract) {
+          return res.status(403).json({
+            thanhCong: false,
+            thongBao: 'Bảo mật: Bạn chỉ được phép xem hợp đồng thuê phòng của riêng mình!',
+          });
+        }
+      } else if (nguoiDung.Quyen === 'QuanLy') {
         const ownsHopDong = await HopDongModel.checkHopDongThuocQuanLy(
-          Number(maHDT),
+          maHDT,
           nguoiDung.MaND
         );
         if (!ownsHopDong) {
@@ -159,18 +178,35 @@ const HopDongController = {
             thongBao: 'Bạn chỉ được phép xem hợp đồng thuộc khu trọ mình quản lý.',
           });
         }
+      } else if (nguoiDung.Quyen !== 'ChuTro') {
+        return res.status(403).json({
+          thanhCong: false,
+          thongBao: 'Bạn không có quyền xem chi tiết hợp đồng.',
+        });
       }
 
-      // Đảm bảo DanhSachThanhVien và ThanhVienCungPhong luôn được nạp từ ChiTietHopDongModel
+      const chiTiet = await HopDongModel.getChiTietHopDongById(maHDT);
+      if (!chiTiet) {
+        return res.status(404).json({
+          thanhCong: false,
+          thongBao: 'Không tìm thấy hợp đồng.',
+        });
+      }
+
       if (!chiTiet.DanhSachThanhVien) {
-        chiTiet.DanhSachThanhVien =
-          await ChiTietHopDongModel.getThanhVienByMaHDT(Number(maHDT));
+        chiTiet.DanhSachThanhVien = await ChiTietHopDongModel.getThanhVienByMaHDT(maHDT);
       }
       if (!chiTiet.ThanhVienCungPhong && chiTiet.MaPhong) {
-        chiTiet.ThanhVienCungPhong =
-          await ChiTietHopDongModel.getThanhVienCungPhong(
-            Number(chiTiet.MaPhong)
-          );
+        chiTiet.ThanhVienCungPhong = await ChiTietHopDongModel.getThanhVienCungPhong(
+          Number(chiTiet.MaPhong)
+        );
+      }
+
+      // Nếu là Khách thuê, đính kèm trạng thái đã gửi yêu cầu hủy hay chưa
+      if (nguoiDung.Quyen === 'KhachThue') {
+        const yeuCauHuy = await HopDongModel.checkDaGuiYeuCauHuy(maHDT, nguoiDung.MaND);
+        chiTiet.DaGuiYeuCauHuy = Boolean(yeuCauHuy);
+        chiTiet.ThoiGianGuiYeuCauHuy = yeuCauHuy?.NgayGui || null;
       }
 
       return res.status(200).json({
@@ -182,7 +218,181 @@ const HopDongController = {
       return res.status(500).json({
         thanhCong: false,
         thongBao: 'Lỗi máy chủ khi lấy chi tiết hợp đồng',
-        loi: error.message,
+      });
+    }
+  },
+
+  // 2. [MỚI] GET /api/hop-dong/cua-toi (Lấy danh sách hợp đồng của riêng người thuê)
+  layDanhSachHopDongCuaToi: async (req, res) => {
+    try {
+      const currentMaND = extractVerifiedMaND(req);
+      if (!currentMaND) {
+        return res.status(401).json({
+          thanhCong: false,
+          thongBao: 'Không xác định được phiên đăng nhập. Vui lòng đăng nhập lại.',
+        });
+      }
+
+      const nguoiDung = await HopDongModel.getNguoiDungById(currentMaND);
+      if (!nguoiDung) {
+        return res.status(403).json({
+          thanhCong: false,
+          thongBao: 'Tài khoản không tồn tại hoặc đã bị khóa.',
+        });
+      }
+
+      const { trangThai = '', tuKhoa = '' } = req.query;
+      const danhSach = await HopDongModel.getDanhSachHopDongCuaToi(nguoiDung.MaND, {
+        trangThai: sanitizeText(trangThai, 30),
+        tuKhoa: sanitizeText(tuKhoa, 100),
+      });
+
+      return res.status(200).json({
+        thanhCong: true,
+        thongBao: 'Tải danh sách hợp đồng cá nhân thành công.',
+        duLieu: danhSach,
+      });
+    } catch (error) {
+      console.error('Lỗi layDanhSachHopDongCuaToi:', error);
+      return res.status(500).json({
+        thanhCong: false,
+        thongBao: 'Lỗi máy chủ khi tải hợp đồng của bạn.',
+      });
+    }
+  },
+
+  // 3. [MỚI] POST /api/hop-dong/cua-toi/:maHDT/yeu-cau-huy (Gửi yêu cầu hủy HĐ qua Thông báo)
+  yeuCauHuyHopDong: async (req, res) => {
+    try {
+      const maHDT = Number(req.params.maHDT);
+      const currentMaND = extractVerifiedMaND(req);
+
+      if (!Number.isInteger(maHDT) || maHDT <= 0) {
+        return res.status(400).json({
+          thanhCong: false,
+          thongBao: 'Mã hợp đồng không hợp lệ.',
+        });
+      }
+
+      if (!currentMaND) {
+        return res.status(401).json({
+          thanhCong: false,
+          thongBao: 'Vui lòng đăng nhập để thực hiện thao tác này.',
+        });
+      }
+
+      // 1. Kiểm tra quyền sở hữu hợp đồng (Chống gửi yêu cầu hủy hợp đồng của phòng khác)
+      const hopDongCuaToi = await HopDongModel.checkHopDongThuocKhachThue(
+        maHDT,
+        currentMaND
+      );
+      if (!hopDongCuaToi) {
+        return res.status(403).json({
+          thanhCong: false,
+          thongBao: 'Bảo mật: Bạn không có tên trong hợp đồng này nên không thể yêu cầu hủy!',
+        });
+      }
+
+      // 2. Chỉ hợp đồng đang còn hiệu lực mới được yêu cầu hủy
+      if (hopDongCuaToi.TrangThaiHopDong !== 'ConHieuLuc') {
+        return res.status(400).json({
+          thanhCong: false,
+          thongBao: 'Chỉ có thể gửi yêu cầu hủy đối với hợp đồng đang còn hiệu lực.',
+        });
+      }
+
+      // 3. Kiểm tra xem đã gửi yêu cầu hủy trước đó chưa (Chống spam thông báo)
+      const daGui = await HopDongModel.checkDaGuiYeuCauHuy(maHDT, currentMaND);
+      if (daGui) {
+        return res.status(409).json({
+          thanhCong: false,
+          thongBao: 'Bạn đã gửi yêu cầu hủy cho hợp đồng này rồi. Vui lòng chờ Quản lý/Chủ trọ phản hồi trong mục Thông báo.',
+        });
+      }
+
+      // 4. Validate dữ liệu đầu vào
+      const lyDoHuy = sanitizeText(req.body?.lyDoHuy, 1000);
+      const ngayDuKienTraPhong = sanitizeText(req.body?.ngayDuKienTraPhong, 20);
+      const sdtLienHe = sanitizeText(req.body?.sdtLienHe, 15);
+      const ghiChuThem = sanitizeText(req.body?.ghiChuThem, 500);
+
+      if (!lyDoHuy || lyDoHuy.length < 10) {
+        return res.status(400).json({
+          thanhCong: false,
+          thongBao: 'Vui lòng nhập lý do hủy hợp đồng rõ ràng (tối thiểu 10 ký tự).',
+        });
+      }
+
+      if (!ngayDuKienTraPhong || Number.isNaN(Date.parse(ngayDuKienTraPhong))) {
+        return res.status(400).json({
+          thanhCong: false,
+          thongBao: 'Vui lòng chọn ngày dự kiến trả phòng hợp lệ.',
+        });
+      }
+
+      // 5. Tìm danh sách Quản lý khu trọ & Chủ trọ quản lý hợp đồng đó
+      const {
+        dsNguoiNhan,
+        maLTB,
+        tenPhong,
+        tenKhu,
+        tenNguoiGui,
+        sdtNguoiGui,
+      } = await HopDongModel.getNguoiNhanYeuCauHuyHopDong(maHDT, currentMaND);
+
+      if (!dsNguoiNhan || dsNguoiNhan.length === 0) {
+        return res.status(404).json({
+          thanhCong: false,
+          thongBao: 'Không tìm thấy Quản lý hoặc Chủ trọ phụ trách hợp đồng này.',
+        });
+      }
+
+      const vaiTroLabel =
+        hopDongCuaToi.VaiTro === 'DaiDien' ? 'Người đại diện hợp đồng' : 'Thành viên cùng phòng';
+      const ngayTraFormatted = new Date(ngayDuKienTraPhong).toLocaleDateString('vi-VN');
+      const soDienThoai = sdtLienHe || sdtNguoiGui || 'Chưa cập nhật';
+
+      const tieuDe = `[Yêu cầu hủy HĐ #${maHDT}] Phòng ${tenPhong} - ${tenKhu}`;
+      const noiDung = [
+        `Kính gửi Ban quản lý và Chủ trọ,`,
+        `Khách thuê ${tenNguoiGui} (${vaiTroLabel}) vừa gửi yêu cầu chấm dứt/hủy hợp đồng thuê phòng với thông tin chi tiết:`,
+        `• Mã hợp đồng: #${maHDT}`,
+        `• Phòng / Khu trọ: Phòng ${tenPhong} - ${tenKhu}`,
+        `• Ngày dự kiến bàn giao & trả phòng: ${ngayTraFormatted}`,
+        `• Số điện thoại liên hệ: ${soDienThoai}`,
+        `• Lý do xin hủy hợp đồng: ${lyDoHuy}`,
+        ghiChuThem ? `• Đề xuất / Ghi chú bàn giao: ${ghiChuThem}` : null,
+        `Vui lòng phản hồi trực tiếp tại luồng thông báo này để xác nhận lịch kiểm tra phòng và tất toán hợp đồng.`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      // 6. Tạo thông báo vào bảng ThongBao + NhanThongBao và bắn Socket Realtime
+      const thongBaoMoi = await ThongBaoModel.createThongBao({
+        ndGui: currentMaND,
+        maLTB,
+        tieuDe,
+        noiDung,
+        maTBGoc: null,
+        dsNguoiNhan,
+      });
+
+      emitThongBaoMoi(dsNguoiNhan, thongBaoMoi);
+
+      return res.status(201).json({
+        thanhCong: true,
+        thongBao: 'Đã gửi yêu cầu hủy hợp đồng tới Quản lý và Chủ trọ thành công!',
+        duLieu: {
+          maTB: thongBaoMoi?.MaTB,
+          soNguoiNhan: dsNguoiNhan.length,
+          thongBao: thongBaoMoi,
+        },
+      });
+    } catch (error) {
+      console.error('Lỗi yeuCauHuyHopDong:', error);
+      return res.status(500).json({
+        thanhCong: false,
+        thongBao: 'Lỗi máy chủ khi gửi yêu cầu hủy hợp đồng.',
       });
     }
   },
