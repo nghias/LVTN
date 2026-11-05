@@ -11,6 +11,13 @@ const {
 router.get('/gia/public', DienNuocController.getDanhSachGia);
 
 router.use(verifyToken);
+
+router.get(
+  '/nguoi-thue',
+  authorizeRoles('KhachThue'),
+  DienNuocController.getDanhSachChiSoNguoiThue
+);
+
 router.use(authorizeRoles('ChuTro', 'QuanLy'));
 
 // 1. Lấy dữ liệu khởi tạo (Khu trọ, Phòng kèm chỉ số cũ khóa cứng & trạng thái ghi tháng)

@@ -1,3 +1,4 @@
+// client/src/app/chuTro/dienNuoc/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -20,6 +21,7 @@ export default function QuanLyDienNuocPage() {
   const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
   const [danhSach, setDanhSach] = useState<ChiSoDienNuocItem[]>([]);
+  const [latestMonthFromDB, setLatestMonthFromDB] = useState<string>('');
   const [khuTroList, setKhuTroList] = useState<KhuTroOption[]>([]);
   const [phongList, setPhongList] = useState<PhongDienNuocOption[]>([]);
   const [giaHienTai, setGiaHienTai] = useState<GiaDienNuocItem>({
@@ -31,7 +33,6 @@ export default function QuanLyDienNuocPage() {
 
   const [selectedMaKhu, setSelectedMaKhu] = useState<string>('');
   const [selectedMaPhong, setSelectedMaPhong] = useState<string>('');
-  // Khởi tạo chuẩn YYYY-MM giống trang Hóa đơn để không bị lỗi hiển thị "---------- ----"
   const [thangNam, setThangNam] = useState<string>(() => getCurrentMonth());
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -48,6 +49,7 @@ export default function QuanLyDienNuocPage() {
     return dateStr;
   };
 
+  // Tải danh sách theo bộ lọc đang chọn
   const fetchDanhSach = async (filters?: {
     maKhu?: string;
     maPhong?: string;
@@ -78,8 +80,51 @@ export default function QuanLyDienNuocPage() {
     }
   };
 
+  // Khi mới vào trang: Tự động lấy tháng mới nhất có dữ liệu và lọc theo tháng đó
+  const initLatestMonthData = async (maKhuFilter = '') => {
+    try {
+      setLoading(true);
+      const res = await dienNuocService.getList({
+        maKhu: maKhuFilter,
+        maPhong: '',
+        thangNam: '',
+        search: '',
+      });
+
+      if (res.success) {
+        const allRows: ChiSoDienNuocItem[] = res.data || [];
+        if (res.khuTroList) setKhuTroList(res.khuTroList);
+        if (res.phongList) setPhongList(res.phongList);
+        if (res.giaHienTai) setGiaHienTai(res.giaHienTai);
+
+        if (allRows.length > 0) {
+          // Bản ghi đầu tiên là bản ghi mới nhất (do Backend đã ORDER BY NgayGhi DESC)
+          const newestMonth = allRows[0].NgayGhi
+            ? allRows[0].NgayGhi.slice(0, 7)
+            : getCurrentMonth();
+
+          setLatestMonthFromDB(newestMonth);
+          setThangNam(newestMonth);
+          setDanhSach(
+            allRows.filter(
+              (item) => item.NgayGhi && item.NgayGhi.startsWith(newestMonth)
+            )
+          );
+        } else {
+          setDanhSach([]);
+        }
+      } else {
+        showError('Không thể tải danh sách chỉ số điện nước.');
+      }
+    } catch {
+      showError('Lỗi kết nối máy chủ.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchDanhSach({ maKhu: '', maPhong: '', thangNam: '', search: '' });
+    initLatestMonthData('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -99,11 +144,18 @@ export default function QuanLyDienNuocPage() {
     });
   };
 
-  const handleResetFilters = () => {
-    const currentMonth = getCurrentMonth();
+  // Nút "Kỳ mới nhất": Đưa bộ lọc và dữ liệu về đúng kỳ tháng mới nhất
+  const handleResetToLatestMonth = () => {
     setSelectedMaKhu('');
     setSelectedMaPhong('');
-    setThangNam(currentMonth);
+    setSearch('');
+    initLatestMonthData('');
+  };
+
+  // Nút "Xem hết": Xem toàn bộ lịch sử tất cả các tháng
+  const handleViewAllHistory = () => {
+    setSelectedMaKhu('');
+    setSelectedMaPhong('');
     setSearch('');
     fetchDanhSach({ maKhu: '', maPhong: '', thangNam: '', search: '' });
   };
@@ -293,13 +345,14 @@ export default function QuanLyDienNuocPage() {
                     value={thangNam}
                     onChange={(e) => {
                       const val = e.target.value;
-                      const safeMonth = val || getCurrentMonth();
+                      const safeMonth =
+                        val || latestMonthFromDB || getCurrentMonth();
                       setThangNam(safeMonth);
                       try {
                         fetchDanhSach({
                           maKhu: selectedMaKhu,
                           maPhong: selectedMaPhong,
-                          thangNam: val,
+                          thangNam: safeMonth,
                           search,
                         });
                       } catch {
@@ -333,7 +386,14 @@ export default function QuanLyDienNuocPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleResetFilters}
+                  onClick={handleResetToLatestMonth}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-100 transition cursor-pointer whitespace-nowrap"
+                >
+                  Kỳ mới nhất
+                </button>
+                <button
+                  type="button"
+                  onClick={handleViewAllHistory}
                   className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-100 transition cursor-pointer whitespace-nowrap"
                 >
                   Xem hết
@@ -351,13 +411,22 @@ export default function QuanLyDienNuocPage() {
                 <p className="text-sm text-slate-600 font-medium">
                   Chưa có bản ghi chỉ số điện nước nào phù hợp với bộ lọc.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => router.push('/chuTro/dienNuoc/them')}
-                  className="mt-4 px-5 py-2.5 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold hover:bg-[#00e6b8] transition cursor-pointer"
-                >
-                  + Ghi chỉ số điện nước mới
-                </button>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleResetToLatestMonth}
+                    className="px-5 py-2.5 rounded-full border border-slate-300 bg-white text-slate-800 text-xs font-bold hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Xem kỳ mới nhất
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/chuTro/dienNuoc/them')}
+                    className="px-5 py-2.5 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold hover:bg-[#00e6b8] transition cursor-pointer"
+                  >
+                    + Ghi chỉ số điện nước mới
+                  </button>
+                </div>
               </div>
             ) : (
               <>

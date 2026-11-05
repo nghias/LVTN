@@ -33,6 +33,11 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
       matchPaths: ['/nguoiThue/hopDong'],
     },
     {
+      label: 'Chỉ số Điện nước',
+      href: '/nguoiThue/dienNuoc',
+      matchPaths: ['/nguoiThue/dienNuoc'],
+    },
+    {
       label: 'Hóa đơn & Thanh toán',
       href: '/nguoiThue/hoaDon',
       // Sáng menu khi ở trang danh sách hóa đơn hoặc trang chi tiết thanh toán [maHD]

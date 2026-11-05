@@ -3,11 +3,146 @@ const ChiSoDienNuocModel = require('../models/chiSoDienNuoc.model');
 const GiaDienNuocModel = require('../models/giaDienNuoc.model');
 const KhuTroModel = require('../models/khuTro.model');
 const PhongTroModel = require('../models/phongTro.model');
+const NguoiDungModel = require('../models/nguoiDung.model');
 
 const DienNuocController = {
-  // Hàm nội bộ: Lấy danh sách Khu trọ và Phòng trọ theo quyền của người dùng
+  // Hàm nội bộ: Lấy danh sách phòng của người thuê qua Model (Không dùng SQL trong Controller)
+  getRoomsByTenantMaND: async (maND) => {
+    // Cách 1: Gọi hàm getPhongCuaNguoiThue từ PhongTroModel
+    if (typeof PhongTroModel.getPhongCuaNguoiThue === 'function') {
+      const rooms = await PhongTroModel.getPhongCuaNguoiThue(maND);
+      if (rooms && rooms.length > 0) {
+        return rooms;
+      }
+    }
+
+    // Cách 2 (Dự phòng): Lấy từ NguoiDungModel.getAllKhachThueWithRoom đã có sẵn
+    if (typeof NguoiDungModel.getAllKhachThueWithRoom === 'function') {
+      const dsKhach = (await NguoiDungModel.getAllKhachThueWithRoom()) || [];
+      const myRecord = dsKhach.filter(
+        (k) => Number(k.MaND) === Number(maND) && k.MaPhong
+      );
+
+      if (myRecord.length > 0) {
+        return myRecord.map((r) => ({
+          MaPhong: r.MaPhong,
+          TenPhong: r.TenPhong,
+          MaKhu: r.MaKhu,
+          TrangThai: 'DangThue',
+          TenKhu: r.TenKhu || '',
+        }));
+      }
+    }
+
+    return [];
+  },
+
+  // [GET] /api/dien-nuoc/nguoi-thue (?maPhong=...&thangNam=...&search=...)
+  getDanhSachChiSoNguoiThue: async (req, res) => {
+    try {
+      const { maPhong = '', thangNam = '', search = '' } = req.query;
+      const maND = Number(req.user.maND || req.user.MaND);
+
+      // 1. Lấy danh sách phòng đang thuê của người dùng qua Model
+      const myRooms = await DienNuocController.getRoomsByTenantMaND(maND);
+      const allowedRoomIds = myRooms.map((r) => Number(r.MaPhong));
+
+      if (allowedRoomIds.length === 0) {
+        const giaHienTai = (await GiaDienNuocModel.getCurrentPrice()) || {
+          GiaDien: 3800,
+          GiaNuoc: 18000,
+          NgayApDung: '2026-08-01',
+        };
+        return res.status(200).json({
+          success: true,
+          data: [],
+          giaHienTai,
+          phongList: [],
+        });
+      }
+
+      // 2. Lấy chỉ số điện nước của các phòng đang thuê và bảng giá
+      const [dsChiSoAll, dsGia] = await Promise.all([
+        typeof ChiSoDienNuocModel.getByMaPhongList === 'function'
+          ? ChiSoDienNuocModel.getByMaPhongList(allowedRoomIds)
+          : ChiSoDienNuocModel.getAll().then((rows) =>
+              rows.filter((cs) => allowedRoomIds.includes(Number(cs.MaPhong)))
+            ),
+        GiaDienNuocModel.getAll(),
+      ]);
+
+      const giaHienTai = dsGia[0] || {
+        GiaDien: 3800,
+        GiaNuoc: 18000,
+        NgayApDung: '2026-08-01',
+      };
+
+      // 3. Tính toán sản lượng tiêu thụ & thành tiền tại Controller
+      let data = dsChiSoAll.map((cs) => {
+        const room = myRooms.find((r) => Number(r.MaPhong) === Number(cs.MaPhong));
+        const matchedPrice =
+          dsGia.find((g) => String(g.NgayApDung) <= String(cs.NgayGhi)) || giaHienTai;
+
+        const soDienTieuThu = Math.max(0, Number(cs.SoDienMoi) - Number(cs.SoDienCu));
+        const soNuocTieuThu = Math.max(0, Number(cs.SoNuocMoi) - Number(cs.SoNuocCu));
+        const tienDienTamTinh = soDienTieuThu * Number(matchedPrice.GiaDien);
+        const tienNuocTamTinh = soNuocTieuThu * Number(matchedPrice.GiaNuoc);
+
+        return {
+          ...cs,
+          TenPhong: room ? room.TenPhong : `Phòng #${cs.MaPhong}`,
+          MaKhu: room ? room.MaKhu : null,
+          TenKhu: room && room.TenKhu ? room.TenKhu : '',
+          SoDienTieuThu: soDienTieuThu,
+          SoNuocTieuThu: soNuocTieuThu,
+          DonGiaDienApDung: Number(matchedPrice.GiaDien),
+          DonGiaNuocApDung: Number(matchedPrice.GiaNuoc),
+          TienDienTamTinh: tienDienTamTinh,
+          TienNuocTamTinh: tienNuocTamTinh,
+          TongTienDienNuoc: tienDienTamTinh + tienNuocTamTinh,
+        };
+      });
+
+      if (maPhong) {
+        data = data.filter((item) => Number(item.MaPhong) === Number(maPhong));
+      }
+
+      if (thangNam && thangNam.trim() !== '') {
+        data = data.filter(
+          (item) => item.NgayGhi && String(item.NgayGhi).startsWith(thangNam.trim())
+        );
+      }
+
+      if (search && search.trim() !== '') {
+        const kw = search.trim().toLowerCase();
+        data = data.filter(
+          (item) =>
+            item.TenPhong.toLowerCase().includes(kw) ||
+            item.TenKhu.toLowerCase().includes(kw) ||
+            String(item.MaCS).includes(kw)
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        data,
+        giaHienTai,
+        phongList: myRooms,
+      });
+    } catch (error) {
+      console.error('Lỗi getDanhSachChiSoNguoiThue:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi máy chủ khi tải chỉ số điện nước của người thuê',
+      });
+    }
+  },
+
+  // Hàm nội bộ: Lấy danh sách Khu trọ và Phòng trọ theo quyền của Quản lý / Chủ trọ
   getAccessibleKhusAndRooms: async (user) => {
-    const { quyen, maND } = user;
+    const quyen = user.quyen || user.Quyen;
+    const maND = Number(user.maND || user.MaND);
+
     const allowedKhus =
       quyen === 'QuanLy'
         ? await KhuTroModel.getByMaND(maND)
@@ -25,7 +160,6 @@ const DienNuocController = {
   },
 
   // 1. [GET] /api/dien-nuoc/options (?thangNam=YYYY-MM)
-  // Lấy danh sách Cơ sở, Phòng (kèm chỉ số cũ khóa cứng & trạng thái đã ghi trong tháng)
   getOptions: async (req, res) => {
     try {
       const { thangNam = '' } = req.query;
@@ -37,9 +171,7 @@ const DienNuocController = {
           ChiSoDienNuocModel.getAll(),
         ]);
 
-      // Lấy bản ghi mới nhất của từng phòng làm chỉ số cũ khóa cứng
       const latestIndexByRoom = {};
-      // Kiểm tra phòng nào đã ghi trong tháng đang chọn (YYYY-MM)
       const recordedInMonthByRoom = {};
 
       for (const cs of dsChiSo) {
@@ -57,7 +189,7 @@ const DienNuocController = {
         if (
           thangNam &&
           cs.NgayGhi &&
-          cs.NgayGhi.startsWith(thangNam.trim()) &&
+          String(cs.NgayGhi).startsWith(thangNam.trim()) &&
           !recordedInMonthByRoom[roomId]
         ) {
           recordedInMonthByRoom[roomId] = {
@@ -108,8 +240,7 @@ const DienNuocController = {
     }
   },
 
-  // 2. [GET] /api/dien-nuoc (?maKhu=...&maPhong=...&thangNam=...&search=...)
-  // Xem danh sách & Lọc chỉ số điện nước
+  // 2. [GET] /api/dien-nuoc
   getDanhSachChiSo: async (req, res) => {
     try {
       const { maKhu = '', maPhong = '', thangNam = '', search = '' } = req.query;
@@ -123,7 +254,7 @@ const DienNuocController = {
 
       const giaHienTai = dsGia[0] || { GiaDien: 3800, GiaNuoc: 18000 };
 
-      let filtered = dsChiSoAll.filter((cs) =>
+      const filtered = dsChiSoAll.filter((cs) =>
         allowedRoomIds.includes(Number(cs.MaPhong))
       );
 
@@ -134,7 +265,7 @@ const DienNuocController = {
           : null;
 
         const matchedPrice =
-          dsGia.find((g) => g.NgayApDung <= cs.NgayGhi) || giaHienTai;
+          dsGia.find((g) => String(g.NgayApDung) <= String(cs.NgayGhi)) || giaHienTai;
 
         const soDienTieuThu = Math.max(0, Number(cs.SoDienMoi) - Number(cs.SoDienCu));
         const soNuocTieuThu = Math.max(0, Number(cs.SoNuocMoi) - Number(cs.SoNuocCu));
@@ -164,7 +295,7 @@ const DienNuocController = {
       }
       if (thangNam && thangNam.trim() !== '') {
         data = data.filter(
-          (item) => item.NgayGhi && item.NgayGhi.startsWith(thangNam.trim())
+          (item) => item.NgayGhi && String(item.NgayGhi).startsWith(thangNam.trim())
         );
       }
       if (search && search.trim() !== '') {
@@ -194,7 +325,6 @@ const DienNuocController = {
   },
 
   // 3. [GET] /api/dien-nuoc/chi-so/:maCS
-  // Lấy chi tiết 1 bản ghi chỉ số điện nước
   getChiTietChiSo: async (req, res) => {
     try {
       const maCS = Number(req.params.maCS);
@@ -247,7 +377,6 @@ const DienNuocController = {
   },
 
   // 4. [POST] /api/dien-nuoc/chi-so
-  // Thêm chỉ số điện nước cho 1 phòng (Tự động khóa cứng SoDienCu, SoNuocCu từ Database)
   themChiSo: async (req, res) => {
     try {
       const { MaPhong, SoDienMoi, SoNuocMoi, NgayGhi } = req.body;
@@ -270,7 +399,6 @@ const DienNuocController = {
         });
       }
 
-      // Kiểm tra trùng kỳ ghi trong tháng
       const existedMonth = await ChiSoDienNuocModel.checkExistsInMonth(MaPhong, NgayGhi);
       if (existedMonth) {
         return res.status(400).json({
@@ -279,7 +407,6 @@ const DienNuocController = {
         });
       }
 
-      // Khóa cứng SoDienCu và SoNuocCu từ kỳ gần nhất trong Database
       const latestRecord = await ChiSoDienNuocModel.getLatestByMaPhong(Number(MaPhong));
       const dienCu = latestRecord ? Number(latestRecord.SoDienMoi) || 0 : 0;
       const nuocCu = latestRecord ? Number(latestRecord.SoNuocMoi) || 0 : 0;
@@ -332,7 +459,6 @@ const DienNuocController = {
   },
 
   // 5. [POST] /api/dien-nuoc/chi-so/hang-loat
-  // Ghi chỉ số điện nước hàng loạt cho nhiều phòng cùng lúc (Khóa cứng SoDienCu, SoNuocCu từ CSDL)
   themNhieuChiSo: async (req, res) => {
     try {
       const { NgayGhi, DanhSachChiSo } = req.body;
@@ -347,7 +473,6 @@ const DienNuocController = {
       const { allowedRooms, allowedRoomIds } =
         await DienNuocController.getAccessibleKhusAndRooms(req.user);
 
-      // Kiểm tra toàn bộ danh sách trước khi lưu để đảm bảo không lỗi giữa chừng
       const validatedRecords = [];
 
       for (const item of DanhSachChiSo) {
@@ -373,7 +498,6 @@ const DienNuocController = {
           });
         }
 
-        // Lấy chỉ số cũ trực tiếp từ CSDL (không cho phép client tự sửa chỉ số cũ)
         const latest = await ChiSoDienNuocModel.getLatestByMaPhong(maPhong);
         const dienCu = latest ? Number(latest.SoDienMoi) || 0 : 0;
         const nuocCu = latest ? Number(latest.SoNuocMoi) || 0 : 0;
@@ -412,7 +536,6 @@ const DienNuocController = {
         });
       }
 
-      // Lưu từng bản ghi đã hợp lệ vào bảng ChiSoDienNuoc
       for (const rec of validatedRecords) {
         await ChiSoDienNuocModel.create(rec);
       }
@@ -432,7 +555,6 @@ const DienNuocController = {
   },
 
   // 6. [PUT] /api/dien-nuoc/chi-so/:maCS
-  // Sửa chỉ số điện nước (Khóa cứng MaPhong, SoDienCu và SoNuocCu gốc trong CSDL)
   suaChiSo: async (req, res) => {
     try {
       const maCS = Number(req.params.maCS);
@@ -464,7 +586,6 @@ const DienNuocController = {
         });
       }
 
-      // Khóa cứng MaPhong, SoDienCu, SoNuocCu theo đúng bản ghi gốc trong Database
       const maPhongGoc = Number(currentCS.MaPhong);
       const dienCuGoc = Number(currentCS.SoDienCu);
       const nuocCuGoc = Number(currentCS.SoNuocCu);
@@ -529,7 +650,6 @@ const DienNuocController = {
   },
 
   // 7. [DELETE] /api/dien-nuoc/chi-so/:maCS
-  // Xóa chỉ số điện nước
   xoaChiSo: async (req, res) => {
     try {
       const maCS = Number(req.params.maCS);

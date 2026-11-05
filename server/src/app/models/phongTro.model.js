@@ -192,6 +192,36 @@ const PhongTroModel = {
     return rows.length > 0;
   },
 
+  getPhongCuaNguoiThue: async (maND) => {
+    const sqlActive = `
+      SELECT DISTINCT p.MaPhong, p.TenPhong, p.MaKhu, p.TrangThai, k.TenKhu
+      FROM ChiTietHopDongThue ct
+      INNER JOIN HopDongThue hdt ON ct.MaHDT = hdt.MaHDT
+      INNER JOIN Phong p ON hdt.MaPhong = p.MaPhong
+      LEFT JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      WHERE ct.MaND = ?
+        AND ct.NgayDi IS NULL
+        AND hdt.TrangThai IN ('ConHieuLuc', 'DangThue', 'HieuLuc')
+      ORDER BY p.MaPhong ASC
+    `;
+    const [activeRows] = await db.execute(sqlActive, [Number(maND)]);
+    if (activeRows && activeRows.length > 0) {
+      return activeRows;
+    }
+
+    const sqlAll = `
+      SELECT DISTINCT p.MaPhong, p.TenPhong, p.MaKhu, p.TrangThai, k.TenKhu
+      FROM ChiTietHopDongThue ct
+      INNER JOIN HopDongThue hdt ON ct.MaHDT = hdt.MaHDT
+      INNER JOIN Phong p ON hdt.MaPhong = p.MaPhong
+      LEFT JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      WHERE ct.MaND = ?
+      ORDER BY p.MaPhong ASC
+    `;
+    const [allRows] = await db.execute(sqlAll, [Number(maND)]);
+    return allRows || [];
+  },
+
   // 11. Thêm phòng mới
   create: async ({ MaKhu, TenPhong, DienTich, Gia, TrangThai }) => {
     const sql = `

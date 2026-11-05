@@ -1,3 +1,4 @@
+// client/src/app/chuTro/hoaDon/page.tsx
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -18,12 +19,14 @@ export default function QuanLyHoaDonPage() {
   const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
 
   const [hoaDonList, setHoaDonList] = useState<HoaDonItem[]>([]);
+  const [latestMonthFromDB, setLatestMonthFromDB] = useState<string>('');
   const [khuTroList, setKhuTroList] = useState<KhuTroOption[]>([]);
   const [phongList, setPhongList] = useState<PhongOption[]>([]);
 
   const [selectedMaKhu, setSelectedMaKhu] = useState<number>(0);
   const [selectedMaPhong, setSelectedMaPhong] = useState<number>(0);
-  const [thangNam, setThangNam] = useState<string>('');
+  // Khởi tạo chuẩn YYYY-MM để không bao giờ bị lỗi hiển thị "---------- ----"
+  const [thangNam, setThangNam] = useState<string>(() => getCurrentMonth());
   const [trangThaiTT, setTrangThaiTT] = useState<string>('');
   const [search, setSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -53,6 +56,7 @@ export default function QuanLyHoaDonPage() {
       .trim();
   };
 
+  // Tải danh sách hóa đơn theo bộ lọc
   const fetchDanhSach = useCallback(
     async (filters?: {
       maKhu?: number;
@@ -92,16 +96,88 @@ export default function QuanLyHoaDonPage() {
     [selectedMaKhu, selectedMaPhong, thangNam, trangThaiTT, search, showError]
   );
 
+  // Khi mới vào trang: Tự động lấy tháng mới nhất có hóa đơn và lọc theo tháng đó
+  const initLatestMonthData = useCallback(
+    async (maKhuFilter = 0) => {
+      try {
+        setLoading(true);
+        const res = await hoaDonService.getAll({
+          maKhu: maKhuFilter,
+          maPhong: 0,
+          thangNam: '',
+          trangThaiTT: '',
+          search: '',
+        });
+
+        if (res.success && res.data) {
+          const allInvoices: HoaDonItem[] = res.data.hoaDonList || [];
+          const khus: KhuTroOption[] = res.data.khuTroList || [];
+          setKhuTroList(khus);
+          setPhongList(res.data.phongList || []);
+
+          if (khus.length === 1 && maKhuFilter === 0) {
+            setSelectedMaKhu(khus[0].MaKhu);
+          }
+
+          if (allInvoices.length > 0) {
+            const newestMonth = allInvoices[0].NgayTinh
+              ? allInvoices[0].NgayTinh.slice(0, 7)
+              : getCurrentMonth();
+
+            setLatestMonthFromDB(newestMonth);
+            setThangNam(newestMonth);
+            setHoaDonList(
+              allInvoices.filter(
+                (item) => item.NgayTinh && item.NgayTinh.startsWith(newestMonth)
+              )
+            );
+          } else {
+            setThangNam(getCurrentMonth());
+            setHoaDonList([]);
+          }
+        } else {
+          showError('Không thể tải danh sách hóa đơn.');
+        }
+      } catch {
+        showError('Không thể kết nối máy chủ để tải danh sách hóa đơn.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [showError]
+  );
+
   useEffect(() => {
+    initLatestMonthData(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Nút "Kỳ mới nhất": Đưa bộ lọc và dữ liệu về đúng kỳ hóa đơn mới nhất
+  const handleResetToLatestMonth = () => {
+    const defaultKhu = khuTroList.length === 1 ? khuTroList[0].MaKhu : 0;
+    setSelectedMaKhu(defaultKhu);
+    setSelectedMaPhong(0);
+    setTrangThaiTT('');
+    setSearch('');
+    initLatestMonthData(defaultKhu);
+  };
+
+  // Nút "Xem hết": Hiển thị toàn bộ lịch sử hóa đơn các tháng (nhưng giữ nguyên chuỗi YYYY-MM trên input để không bị lỗi vạch gạch ngang)
+  const handleViewAllHistory = () => {
+    const safeMonth = latestMonthFromDB || thangNam || getCurrentMonth();
+    const defaultKhu = khuTroList.length === 1 ? khuTroList[0].MaKhu : selectedMaKhu;
+    setThangNam(safeMonth);
+    setSelectedMaPhong(0);
+    setTrangThaiTT('');
+    setSearch('');
     fetchDanhSach({
-      maKhu: 0,
+      maKhu: defaultKhu,
       maPhong: 0,
       thangNam: '',
       trangThaiTT: '',
       search: '',
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
 
   const handleDelete = (item: HoaDonItem) => {
     if (Number(item.TienDaTra) > 0) {
@@ -172,7 +248,7 @@ export default function QuanLyHoaDonPage() {
               <div className="flex flex-wrap items-center gap-3 shrink-0">
                 <Link
                   href={`/chuTro/hoaDon/tao?thangNam=${thangNam || getCurrentMonth()}`}
-                  className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs sm:text-sm font-bold shadow-xs no-underline transition whitespace-nowrap"
+                  className="flex-1 sm:flex-initial text-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition no-underline"
                 >
                   + Tạo Hóa Đơn Hàng Tháng
                 </Link>
@@ -249,7 +325,7 @@ export default function QuanLyHoaDonPage() {
               </div>
             </div>
 
-            {/* Bộ lọc dàn đều 100% chiều ngang - Nút bấm không bao giờ bị nhảy dòng */}
+            {/* Bộ lọc dàn đều 100% chiều ngang */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -267,8 +343,10 @@ export default function QuanLyHoaDonPage() {
                     value={thangNam}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setThangNam(val);
-                      fetchDanhSach({ thangNam: val });
+                      const safeMonth =
+                        val || latestMonthFromDB || getCurrentMonth();
+                      setThangNam(safeMonth);
+                      fetchDanhSach({ thangNam: safeMonth });
                     }}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
@@ -339,18 +417,14 @@ export default function QuanLyHoaDonPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setThangNam('');
-                    setSelectedMaPhong(0);
-                    setTrangThaiTT('');
-                    setSearch('');
-                    fetchDanhSach({
-                      thangNam: '',
-                      maPhong: 0,
-                      trangThaiTT: '',
-                      search: '',
-                    });
-                  }}
+                  onClick={handleResetToLatestMonth}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer transition whitespace-nowrap"
+                >
+                  Kỳ mới nhất
+                </button>
+                <button
+                  type="button"
+                  onClick={handleViewAllHistory}
                   className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer transition whitespace-nowrap"
                 >
                   Xem hết
@@ -368,14 +442,23 @@ export default function QuanLyHoaDonPage() {
                 <p className="text-sm font-bold text-slate-700">
                   Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.
                 </p>
-                <Link
-                  href={`/chuTro/hoaDon/tao?thangNam=${
-                    thangNam || getCurrentMonth()
-                  }`}
-                  className="inline-block px-5 py-2.5 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold no-underline"
-                >
-                  + Tạo hóa đơn cho kỳ này ngay
-                </Link>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleResetToLatestMonth}
+                    className="px-5 py-2.5 rounded-full border border-slate-300 bg-white text-slate-800 text-xs font-bold hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    Xem kỳ mới nhất
+                  </button>
+                  <Link
+                    href={`/chuTro/hoaDon/tao?thangNam=${
+                      thangNam || getCurrentMonth()
+                    }`}
+                    className="inline-block px-5 py-2.5 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold no-underline"
+                  >
+                    + Tạo hóa đơn cho kỳ này ngay
+                  </Link>
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-3xl border border-slate-200 shadow-xs">

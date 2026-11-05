@@ -37,9 +37,9 @@ export interface PhongDienNuocOption {
   TenPhong: string;
   TrangThai: string;
   TenKhu: string;
-  SoDienGoiY: number;
-  SoNuocGoiY: number;
-  NgayGhiGanNhat: string | null;
+  SoDienGoiY?: number;
+  SoNuocGoiY?: number;
+  NgayGhiGanNhat?: string | null;
   DaGhiThangNay?: boolean;
   ChiSoThangNay?: {
     MaCS: number;
@@ -72,9 +72,21 @@ export interface GiaDienNuocPayload {
   NgayApDung: string;
 }
 
-const AUTH_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/auth';
-const API_ROOT = AUTH_URL.replace(/\/auth\/?$/, '');
-const DIEN_NUOC_API = `${API_ROOT}/dien-nuoc`;
+export interface DienNuocListResponse {
+  success: boolean;
+  message?: string;
+  data: ChiSoDienNuocItem[];
+  giaHienTai?: GiaDienNuocItem;
+  khuTroList?: KhuTroOption[];
+  phongList?: PhongDienNuocOption[];
+}
+
+const RAW_ENV_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_ROOT = RAW_ENV_URL.replace(/\/auth\/?$/, '').replace(/\/$/, '');
+const DIEN_NUOC_API = API_ROOT.endsWith('/api')
+  ? `${API_ROOT}/dien-nuoc`
+  : `${API_ROOT}/api/dien-nuoc`;
 
 export const dienNuocService = {
   // 1. Lấy danh sách Khu trọ, Phòng (kèm chỉ số cũ khóa cứng & trạng thái ghi theo tháng)
@@ -88,13 +100,13 @@ export const dienNuocService = {
     return res.json();
   },
 
-  // 2. Lấy danh sách & lọc chỉ số điện nước
+  // 2. Lấy danh sách & lọc chỉ số điện nước (Chủ trọ / Quản lý)
   getList: async (params?: {
     maKhu?: string | number;
     maPhong?: string | number;
     thangNam?: string;
     search?: string;
-  }) => {
+  }): Promise<DienNuocListResponse> => {
     const query = new URLSearchParams();
     if (params?.maKhu) query.set('maKhu', String(params.maKhu));
     if (params?.maPhong) query.set('maPhong', String(params.maPhong));
@@ -205,6 +217,26 @@ export const dienNuocService = {
   deleteGia: async (maGia: number | string) => {
     const res = await fetch(`${DIEN_NUOC_API}/gia/${maGia}`, {
       method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return res.json();
+  },
+
+  // 12. Lấy danh sách chỉ số điện nước dành riêng cho Người thuê (KhachThue)
+  getMyList: async (params?: {
+    maPhong?: string | number;
+    thangNam?: string;
+    search?: string;
+  }): Promise<DienNuocListResponse> => {
+    const query = new URLSearchParams();
+    if (params?.maPhong) query.set('maPhong', String(params.maPhong));
+    if (params?.thangNam) query.set('thangNam', params.thangNam);
+    if (params?.search?.trim()) query.set('search', params.search.trim());
+
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const res = await fetch(`${DIEN_NUOC_API}/nguoi-thue${qs}`, {
+      method: 'GET',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     });
