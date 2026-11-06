@@ -1,5 +1,5 @@
 // server/src/app/controllers/dichVu.controller.js
-const DichVuModel = require('../models/phiDichVu.model');
+const PhiDichVuModel = require('../models/phiDichVu.model');
 const ChiTietPhiDichVuModel = require('../models/chiTietPhiDichVu.model');
 
 const DichVuController = {
@@ -10,7 +10,7 @@ const DichVuController = {
       const { search = '' } = req.query;
 
       const [dsDichVu, dsChiTiet] = await Promise.all([
-        DichVuModel.getAll(search),
+        PhiDichVuModel.getAll(search),
         ChiTietPhiDichVuModel.getAll(),
       ]);
 
@@ -50,7 +50,7 @@ const DichVuController = {
         });
       }
 
-      const dichVu = await DichVuModel.getById(maDV);
+      const dichVu = await PhiDichVuModel.getById(maDV);
       if (!dichVu) {
         return res.status(404).json({
           success: false,
@@ -104,7 +104,7 @@ const DichVuController = {
       }
 
       // Kiểm tra trùng tên dịch vụ
-      const existed = await DichVuModel.getByName(TenDV);
+      const existed = await PhiDichVuModel.getByName(TenDV);
       if (existed) {
         return res.status(400).json({
           success: false,
@@ -112,7 +112,7 @@ const DichVuController = {
         });
       }
 
-      const maDVMoi = await DichVuModel.create({
+      const maDVMoi = await PhiDichVuModel.create({
         TenDV,
         DonGia,
         DonViTinh,
@@ -168,7 +168,7 @@ const DichVuController = {
         });
       }
 
-      const currentDV = await DichVuModel.getById(maDV);
+      const currentDV = await PhiDichVuModel.getById(maDV);
       if (!currentDV) {
         return res.status(404).json({
           success: false,
@@ -176,7 +176,7 @@ const DichVuController = {
         });
       }
 
-      const duplicate = await DichVuModel.getByName(TenDV, maDV);
+      const duplicate = await PhiDichVuModel.getByName(TenDV, maDV);
       if (duplicate) {
         return res.status(400).json({
           success: false,
@@ -184,7 +184,7 @@ const DichVuController = {
         });
       }
 
-      await DichVuModel.update(maDV, {
+      await PhiDichVuModel.update(maDV, {
         TenDV,
         DonGia,
         DonViTinh,
@@ -216,7 +216,7 @@ const DichVuController = {
         });
       }
 
-      const currentDV = await DichVuModel.getById(maDV);
+      const currentDV = await PhiDichVuModel.getById(maDV);
       if (!currentDV) {
         return res.status(404).json({
           success: false,
@@ -232,7 +232,7 @@ const DichVuController = {
         });
       }
 
-      await DichVuModel.delete(maDV);
+      await PhiDichVuModel.delete(maDV);
 
       return res.status(200).json({
         success: true,

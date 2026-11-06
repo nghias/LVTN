@@ -184,17 +184,17 @@ export default function ThemChiSoDienNuocPage() {
       const dienMoi = Number(entry.soDienMoi);
       const nuocMoi = Number(entry.soNuocMoi);
 
-      if (dienMoi < room.SoDienGoiY) {
+      const dienCu = room.SoDienGoiY ?? 0;
+      if (dienMoi < dienCu) {
         showError(
-          `${room.TenPhong}: Số điện mới (${dienMoi}) không được nhỏ hơn số điện cũ (${room.SoDienGoiY})!`
+          `${room.TenPhong}: Số điện mới (${dienMoi}) không được nhỏ hơn số điện cũ (${dienCu})!`
         );
-        return;
       }
-      if (nuocMoi < room.SoNuocGoiY) {
+      const nuocCu = room.SoNuocGoiY ?? 0;
+      if (nuocMoi < nuocCu) {
         showError(
-          `${room.TenPhong}: Số nước mới (${nuocMoi}) không được nhỏ hơn số nước cũ (${room.SoNuocGoiY})!`
+          `${room.TenPhong}: Số nước mới (${nuocMoi}) không được nhỏ hơn số nước cũ (${nuocCu})!`
         );
-        return;
       }
     }
 
@@ -429,8 +429,8 @@ export default function ThemChiSoDienNuocPage() {
                           soNuocMoi: '',
                         };
 
-                        const dienCu = room.SoDienGoiY;
-                        const nuocCu = room.SoNuocGoiY;
+                        const dienCu = room.SoDienGoiY ?? 0;
+                        const nuocCu = room.SoNuocGoiY ?? 0;
 
                         const hasDienMoi = entry.soDienMoi !== '';
                         const hasNuocMoi = entry.soNuocMoi !== '';
