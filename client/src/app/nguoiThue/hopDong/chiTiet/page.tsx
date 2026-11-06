@@ -19,6 +19,16 @@ export default function ChiTietThongTinHopDong({
   chiTiet,
   tomTat,
 }: ChiTietThongTinHopDongProps) {
+  // Thêm chốt chặn này để xử lý lỗi prerender khi dữ liệu chưa tải xong
+  if (!chiTiet) {
+    return (
+      <div className="p-5 text-sm text-slate-500 font-semibold animate-pulse">
+        Đang tải thông tin hợp đồng...
+      </div>
+    );
+  }
+
+  // Giữ nguyên toàn bộ code cũ của bạn ở bên dưới
   const giaDien = Number(chiTiet.GiaDienNuoc?.GiaDien ?? chiTiet.GiaDien ?? 0);
   const giaNuoc = Number(chiTiet.GiaDienNuoc?.GiaNuoc ?? chiTiet.GiaNuoc ?? 0);
   const soDienDau = Number(

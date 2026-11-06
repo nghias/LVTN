@@ -1,4 +1,3 @@
-// client/src/components/features/hopDongNguoiThue/danhSach/page.tsx
 'use client';
 
 import React from 'react';
@@ -18,7 +17,7 @@ interface DanhSachHopDongSidebarProps {
 }
 
 export default function DanhSachHopDongSidebar({
-  danhSach,
+  danhSach = [], // Thêm = [] để bảo vệ lỗi prerender
   selectedMaHDT,
   onSelect,
   onOpenPdf,

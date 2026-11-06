@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  Suspense,
 } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import ProtectedRoute from "../../../../components/common/ProtectedRoute";
@@ -70,7 +71,7 @@ function getCaretPositionByDigitIndex(
   return formatted.length;
 }
 
-export default function ThemTinDangPage() {
+function ThemTinDangContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -706,5 +707,19 @@ export default function ThemTinDangPage() {
         </div>
       )}
     </ProtectedRoute>
+  );
+}
+
+export default function ThemTinDangPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white text-slate-500 text-sm font-bold">
+          Đang tải trang đăng tin...
+        </div>
+      }
+    >
+      <ThemTinDangContent />
+    </Suspense>
   );
 }

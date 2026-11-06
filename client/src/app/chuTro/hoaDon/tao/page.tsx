@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
@@ -19,7 +19,7 @@ interface DraftPhatSinh {
   GhiChu: string;
 }
 
-export default function TaoHoaDonThangPage() {
+function TaoHoaDonThangContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showSuccess, showError } = useAlertModal();
@@ -593,5 +593,19 @@ export default function TaoHoaDonThangPage() {
         </div>
       )}
     </ProtectedRoute>
+  );
+}
+
+export default function TaoHoaDonThangPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white text-slate-500 text-sm font-bold">
+          Đang tải trang tạo hóa đơn...
+        </div>
+      }
+    >
+      <TaoHoaDonThangContent />
+    </Suspense>
   );
 }

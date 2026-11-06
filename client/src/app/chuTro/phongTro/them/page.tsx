@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, FormEvent, ChangeEvent } from 'react';
+import { useEffect, useState, FormEvent, ChangeEvent, Suspense, } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
@@ -10,7 +10,7 @@ import { PhongTroService } from '@/services/phongTro.service';
 import { KhuTroItem, RoomStatus, TienIchItem } from '@/types/phongTro.type';
 import CurrencyInput from '@/components/common/CurrencyInput';
 
-export default function ThemPhongTroPage() {
+function ThemPhongTroContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedKhu = Number(searchParams.get('maKhu') || 0);
@@ -322,5 +322,19 @@ export default function ThemPhongTroPage() {
         </div>
       )}
     </ProtectedRoute>
+  );
+}
+
+export default function ThemPhongTroPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white text-slate-500 text-sm font-bold">
+          Đang tải trang tạo phòng trọ...
+        </div>
+      }
+    >
+      <ThemPhongTroContent />
+    </Suspense>
   );
 }
