@@ -5,7 +5,7 @@ const ChiTietTienIchModel = require("../models/chiTietTienIch.model");
 const AnhPhongModel = require("../models/anhPhong.model");
 const TienIchModel = require("../models/tienIch.model");
 const NguoiDungModel = require("../models/nguoiDung.model");
-const PhiDichVuModel = require("../models/PhiDichVu.model");
+const PhiDichVuModel = require("../models/phiDichVu.model");
 
 const { deleteImageFromCloudinary } = require("../config/cloudinary.config");
 const { successResponse, errorResponse } = require("../../utils/response.util");
