@@ -22,33 +22,40 @@ const verifyRefreshToken = (token) => {
 };
 
 // Hàm gắn Token vào HttpOnly Cookie (Chống XSS tấn công đánh cắp Token)
-const setAuthCookies = (res, accessToken, refreshToken) => {
-  const isProd = env.nodeEnv === 'production';
+const isProduction =
+  process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
 
+const setAuthCookies = (res, accessToken, refreshToken) => {
   const cookieOptions = {
     httpOnly: true,
-    secure: isProd, // Tự động bật true khi chạy HTTPS trên Render/Vercel
-    sameSite: isProd ? 'none' : 'lax',
+    secure: isProduction, // Bắt buộc true trên Render (HTTPS)
+    sameSite: isProduction ? 'none' : 'lax', // Bắt buộc 'none' để gửi chéo giữa Vercel và Render
+    path: '/',
   };
 
-  res.cookie('accessToken', accessToken, {
-    ...cookieOptions,
-    maxAge: 24 * 60 * 60 * 1000, // 1 ngày
-  });
+  if (accessToken) {
+    res.cookie('accessToken', accessToken, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+    });
+  }
 
-  res.cookie('refreshToken', refreshToken, {
-    ...cookieOptions,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
-  });
+  if (refreshToken) {
+    res.cookie('refreshToken', refreshToken, {
+      ...cookieOptions,
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 ngày
+    });
+  }
 };
 
 const clearAuthCookies = (res) => {
-  const isProd = env.nodeEnv === 'production';
   const cookieOptions = {
     httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? 'none' : 'lax',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
   };
+
   res.clearCookie('accessToken', cookieOptions);
   res.clearCookie('refreshToken', cookieOptions);
 };
