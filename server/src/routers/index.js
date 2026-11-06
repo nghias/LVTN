@@ -23,5 +23,12 @@ router.use('/dien-nuoc', dienNuocRouter);
 router.use('/hoa-don', hoaDonRouter);
 router.use('/thanh-toan', thanhToanRouter);
 
+router.get('/ping', (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: 'I see you... Watch your back!',
+  });
+});
+
 
 module.exports = router;
