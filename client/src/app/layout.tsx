@@ -1,12 +1,9 @@
+// client/src/app/layout.tsx
+// @ts-ignore
 import './globals.css';
-import type { Metadata } from 'next';
-import { AlertModalProvider } from '../components/common/AlertModalProvider';
-import AppFooter from '../components/layout/AppFooter';
-
-export const metadata: Metadata = {
-  title: 'Hệ thống Quản lý Nhà trọ Xóm Trọ',
-  description: 'Nền tảng quản lý nhà trọ kết hợp thiết bị IoT tự động',
-};
+import React from 'react';
+import { AlertModalProvider } from '@/components/common/AlertModalProvider';
+import { GlobalLoadingProvider } from '@/components/common/GlobalLoadingProvider';
 
 export default function RootLayout({
   children,
@@ -14,12 +11,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <body className="min-h-screen flex flex-col antialiased bg-white text-slate-900">
-        <AlertModalProvider>
-          <div className="flex-1 flex flex-col bg-white">{children}</div>
-          <AppFooter />
-        </AlertModalProvider>
+        <GlobalLoadingProvider>
+          <AlertModalProvider>
+            {children}
+          </AlertModalProvider>
+        </GlobalLoadingProvider>
       </body>
     </html>
   );

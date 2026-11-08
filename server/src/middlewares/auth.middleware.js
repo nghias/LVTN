@@ -1,3 +1,4 @@
+// server/src/middlewares/auth.middleware.js
 const { verifyAccessToken } = require('../utils/jwt.util');
 const { errorResponse } = require('../utils/response.util');
 const { ROLES } = require('../utils/constants.util');
@@ -5,12 +6,17 @@ const { ROLES } = require('../utils/constants.util');
 // 1. Middleware kiểm tra đã đăng nhập hay chưa (Đọc từ HttpOnly Cookie hoặc Header Bearer)
 const verifyToken = (req, res, next) => {
   try {
-    let token = req.cookies?.accessToken;
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    const bearerToken =
+      authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.split(' ')[1]?.trim()
+        : null;
 
-    // Hỗ trợ thêm đọc từ Header Authorization (tiện khi test bằng Postman / Apidog)
-    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
-      token = req.headers.authorization.split(' ')[1];
-    }
+    // Ưu tiên lấy Bearer Token hợp lệ từ Header, nếu không có thì lấy từ Cookie
+    const token =
+      bearerToken && bearerToken !== 'undefined' && bearerToken !== 'null'
+        ? bearerToken
+        : req.cookies?.accessToken;
 
     if (!token) {
       return errorResponse(res, 'Vui lòng đăng nhập để tiếp tục!', 401);

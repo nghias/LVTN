@@ -112,14 +112,32 @@ const AuthController = {
   },
 
   // 2. [POST] /api/auth/logout
-  logout: async (req, res, next) => {
+  logout: async (req, res) => {
     try {
       if (typeof clearAuthCookies === 'function') {
-        clearAuthCookies(res);
+        try {
+          clearAuthCookies(res);
+        } catch {
+          // Bỏ qua nếu hàm clearAuthCookies gặp lỗi cấu hình
+        }
       }
+
+      const isProduction =
+        process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+      const clearOptions = {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
+        path: '/',
+      };
+
+      res.clearCookie('accessToken', clearOptions);
+      res.clearCookie('refreshToken', clearOptions);
+
       return successResponse(res, 'Đăng xuất thành công!', null);
     } catch (error) {
-      next(error);
+      // Luôn trả về thành công khi đăng xuất để Frontend thoát phiên an toàn
+      return successResponse(res, 'Đăng xuất thành công!', null);
     }
   },
 
