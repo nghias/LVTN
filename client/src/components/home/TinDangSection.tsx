@@ -26,6 +26,9 @@ interface TinDangSectionProps {
   onSelectContactRoom: (tin: TinDangItem) => void;
 }
 
+const DEFAULT_FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop&q=80";
+
 export default function TinDangSection({
   tinDangList,
   filteredTinDangList,
@@ -58,14 +61,77 @@ export default function TinDangSection({
     );
   }, [filteredTinDangList]);
 
+  // Tạo JSON-LD Structured Data giúp Google hiểu danh sách phòng cho thuê
+  const jsonLdSchema = useMemo(() => {
+    return {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      name: "Danh Sách Phòng Trọ Đang Mở Cho Thuê",
+      description:
+        "Danh sách phòng trọ đang trống, cập nhật giá thuê, diện tích và thông tin liên hệ quản lý trực tiếp.",
+      numberOfItems: validFilteredTinDangList.length,
+      itemListElement: validFilteredTinDangList.map((tin, index) => {
+        const rawImage =
+          tin.AnhDaiDien ||
+          (Array.isArray((tin as any).DanhSachAnh) &&
+          (tin as any).DanhSachAnh.length > 0
+            ? (tin as any).DanhSachAnh[0]
+            : null);
+        const imageUrl = rawImage
+          ? resolveRoomImageUrl(rawImage)
+          : DEFAULT_FALLBACK_IMAGE;
+
+        return {
+          "@type": "ListItem",
+          position: index + 1,
+          item: {
+            "@type": "Accommodation",
+            "@id": `#phong-tro-${tin.MaTin}`,
+            name: `${tin.TieuDe} - Phòng ${tin.TenPhong} (${tin.TenKhu})`,
+            description:
+              tin.MoTa ||
+              `Cho thuê phòng ${tin.TenPhong} tại ${tin.TenKhu}, diện tích ${Number(tin.DienTich)}m².`,
+            image: imageUrl,
+            floorSize: {
+              "@type": "QuantitativeValue",
+              value: Number(tin.DienTich),
+              unitCode: "MTK", // Mã chuẩn quốc tế cho m²
+            },
+            offers: {
+              "@type": "Offer",
+              price: Number(tin.Gia),
+              priceCurrency: "VND",
+              availability: "https://schema.org/InStock",
+            },
+          },
+        };
+      }),
+    };
+  }, [validFilteredTinDangList]);
+
   return (
-    <section id="tin-dang" className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <section
+      id="tin-dang"
+      aria-labelledby="tin-dang-heading"
+      className="space-y-6"
+    >
+      {/* Nhúng JSON-LD cho Googlebot */}
+      {!loading && validFilteredTinDangList.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdSchema) }}
+        />
+      )}
+
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-1.5">
             Tra cứu phòng trống trực tuyến
           </span>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+          <h2
+            id="tin-dang-heading"
+            className="text-xl sm:text-2xl font-bold text-slate-900"
+          >
             Danh Sách Phòng Đang Mở Cho Thuê ({validFilteredTinDangList.length}/
             {validTotalTinDangList.length})
           </h2>
@@ -74,16 +140,26 @@ export default function TinDangSection({
             nối trực tiếp Zalo / SĐT quản lý từng khu trọ
           </p>
         </div>
-      </div>
+      </header>
 
-      {/* Bộ lọc đa tiêu chí */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+      {/* Bộ lọc đa tiêu chí (gắn id & htmlFor chuẩn Accessibility/Lighthouse) */}
+      <form
+        role="search"
+        aria-label="Bộ lọc tìm kiếm phòng trọ"
+        onSubmit={(e) => e.preventDefault()}
+        className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4"
+      >
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <label
+              htmlFor="filter-khu-tro"
+              className="block text-[11px] font-bold uppercase tracking-wider text-slate-500"
+            >
               Cơ sở / Khu trọ
             </label>
             <select
+              id="filter-khu-tro"
+              name="khu"
               value={selectedKhu}
               onChange={(e) => onChangeKhu(e.target.value)}
               className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 text-slate-900"
@@ -98,10 +174,15 @@ export default function TinDangSection({
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <label
+              htmlFor="filter-muc-gia"
+              className="block text-[11px] font-bold uppercase tracking-wider text-slate-500"
+            >
               Mức giá thuê / tháng
             </label>
             <select
+              id="filter-muc-gia"
+              name="gia"
               value={selectedMucGia}
               onChange={(e) => onChangeMucGia(e.target.value)}
               className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 text-slate-900"
@@ -114,10 +195,15 @@ export default function TinDangSection({
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <label
+              htmlFor="filter-dien-tich"
+              className="block text-[11px] font-bold uppercase tracking-wider text-slate-500"
+            >
               Diện tích sử dụng
             </label>
             <select
+              id="filter-dien-tich"
+              name="dientich"
               value={selectedDienTich}
               onChange={(e) => onChangeDienTich(e.target.value)}
               className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-500 text-slate-900"
@@ -136,28 +222,30 @@ export default function TinDangSection({
             <span className="text-[11px] font-semibold text-slate-500 mr-1">
               Tiện ích tiêu chuẩn tại hệ thống:
             </span>
-            {tienIchList.length > 0 ? (
-              tienIchList.slice(0, 6).map((ti) => (
-                <span
-                  key={ti.MaTI}
-                  className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700"
-                >
-                  {ti.TenTI}
-                </span>
-              ))
-            ) : (
-              <>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
-                  Đồng hồ IoT riêng
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
-                  Wifi tốc độ cao
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
-                  Kiểm soát vân tay / RFID
-                </span>
-              </>
-            )}
+            <ul className="flex flex-wrap items-center gap-1.5 list-none m-0 p-0">
+              {tienIchList.length > 0 ? (
+                tienIchList.slice(0, 6).map((ti) => (
+                  <li
+                    key={ti.MaTI}
+                    className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700"
+                  >
+                    {ti.TenTI}
+                  </li>
+                ))
+              ) : (
+                <>
+                  <li className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+                    Đồng hồ IoT riêng
+                  </li>
+                  <li className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+                    Wifi tốc độ cao
+                  </li>
+                  <li className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700">
+                    Kiểm soát vân tay / RFID
+                  </li>
+                </>
+              )}
+            </ul>
           </div>
 
           {(selectedKhu !== "ALL" ||
@@ -172,11 +260,15 @@ export default function TinDangSection({
             </button>
           )}
         </div>
-      </div>
+      </form>
 
       {/* Lưới danh sách tin đăng */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          aria-busy="true"
+          aria-label="Đang tải danh sách phòng trọ"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
           {[1, 2, 3].map((item) => (
             <div
               key={item}
@@ -216,7 +308,7 @@ export default function TinDangSection({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {validFilteredTinDangList.map((tin) => {
+          {validFilteredTinDangList.map((tin, index) => {
             const contact = extractManagerContact(tin, khuTroList);
             const rawImage =
               tin.AnhDaiDien ||
@@ -225,25 +317,38 @@ export default function TinDangSection({
                 ? (tin as any).DanhSachAnh[0]
                 : null);
 
-            const formattedDate =
-              tin.NgayDang && !isNaN(new Date(tin.NgayDang).getTime())
-                ? new Date(tin.NgayDang).toLocaleDateString("vi-VN")
-                : "Mới cập nhật";
+            const imageUrl = rawImage
+              ? resolveRoomImageUrl(rawImage)
+              : DEFAULT_FALLBACK_IMAGE;
+
+            const isValidDate =
+              tin.NgayDang && !isNaN(new Date(tin.NgayDang).getTime());
+            const formattedDate = isValidDate
+              ? new Date(tin.NgayDang!).toLocaleDateString("vi-VN")
+              : "Mới cập nhật";
+            const isoDate = isValidDate
+              ? new Date(tin.NgayDang!).toISOString()
+              : undefined;
+
+            // Alt ảnh giàu từ khóa cho Google Image Search
+            const seoImageAlt = `${tin.TieuDe} - Cho thuê Phòng ${tin.TenPhong} tại ${tin.TenKhu}, diện tích ${Number(tin.DienTich)}m², giá ${Number(tin.Gia).toLocaleString("vi-VN")}đ/tháng`;
 
             return (
-              <div
+              <article
                 key={tin.MaTin}
+                id={`phong-tro-${tin.MaTin}`}
+                itemScope
+                itemType="https://schema.org/Accommodation"
                 className="group bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition overflow-hidden flex flex-col"
               >
                 {/* Hình ảnh phòng */}
-                <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
+                <figure className="relative h-48 w-full bg-slate-100 overflow-hidden m-0">
                   <img
-                    src={
-                      rawImage
-                        ? resolveRoomImageUrl(rawImage)
-                        : "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop&q=80"
-                    }
-                    alt={tin.TieuDe}
+                    src={imageUrl}
+                    alt={seoImageAlt}
+                    itemProp="image"
+                    loading={index < 3 ? "eager" : "lazy"}
+                    decoding="async"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute top-3 left-3">
@@ -256,7 +361,7 @@ export default function TinDangSection({
                       Đang trống
                     </span>
                   </div>
-                </div>
+                </figure>
 
                 {/* Phần đầu thẻ: Mã tin & Ngày đăng */}
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
@@ -264,7 +369,12 @@ export default function TinDangSection({
                     Mã tin #{tin.MaTin}
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
-                    Đăng ngày: {formattedDate}
+                    Đăng ngày:{" "}
+                    {isoDate ? (
+                      <time dateTime={isoDate}>{formattedDate}</time>
+                    ) : (
+                      formattedDate
+                    )}
                   </span>
                 </div>
 
@@ -276,28 +386,53 @@ export default function TinDangSection({
                         <h3 className="text-lg font-bold text-slate-900">
                           Phòng {tin.TenPhong}
                         </h3>
-                        <span className="text-xs font-semibold text-slate-500">
-                          Diện tích: {Number(tin.DienTich)} m²
+                        <span
+                          itemProp="floorSize"
+                          itemScope
+                          itemType="https://schema.org/QuantitativeValue"
+                          className="text-xs font-semibold text-slate-500"
+                        >
+                          Diện tích:{" "}
+                          <span itemProp="value">{Number(tin.DienTich)}</span>{" "}
+                          <meta itemProp="unitCode" content="MTK" />
+                          m²
                         </span>
                       </div>
 
-                      <p className="mt-1 text-base font-bold text-teal-700">
+                      <p
+                        itemProp="offers"
+                        itemScope
+                        itemType="https://schema.org/Offer"
+                        className="mt-1 text-base font-bold text-teal-700"
+                      >
+                        <meta itemProp="priceCurrency" content="VND" />
+                        <meta itemProp="price" content={String(Number(tin.Gia))} />
+                        <link
+                          itemProp="availability"
+                          href="https://schema.org/InStock"
+                        />
                         {Number(tin.Gia).toLocaleString("vi-VN")} đ / tháng
                       </p>
                     </div>
 
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                      <h4 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug">
+                      <h4
+                        itemProp="name"
+                        className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug"
+                      >
                         {tin.TieuDe}
                       </h4>
-                      <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <p
+                        itemProp="description"
+                        className="text-xs text-slate-600 line-clamp-3 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100"
+                      >
                         {tin.MoTa || "Chưa có mô tả chi tiết cho bài đăng này."}
                       </p>
                     </div>
                   </div>
 
                   {/* Chân thẻ: Thông tin Quản lý Khu trọ & Nút Liên hệ */}
-                  <div className="pt-3.5 border-t border-slate-100 space-y-3">
+                  <footer className="pt-3.5 border-t border-slate-100 space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -308,12 +443,19 @@ export default function TinDangSection({
                         </p>
                       </div>
 
-                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-800 shrink-0">
-                        📞{" "}
-                        {contact.hasPhoneFromDB
-                          ? contact.sdtHienThi
-                          : "Chưa cập nhật SĐT"}
-                      </span>
+                      {contact.hasPhoneFromDB ? (
+                        <a
+                          href={`tel:${contact.sdtHienThi.replace(/\s+/g, "")}`}
+                          title={`Gọi ngay cho ${contact.tenQuanLy}`}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 shrink-0 transition"
+                        >
+                          📞 {contact.sdtHienThi}
+                        </a>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-800 shrink-0">
+                          📞 Chưa cập nhật SĐT
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -332,14 +474,15 @@ export default function TinDangSection({
                       <button
                         type="button"
                         onClick={() => onSelectContactRoom(tin)}
+                        aria-label={`Liên hệ thuê Phòng ${tin.TenPhong} tại ${tin.TenKhu}`}
                         className="flex-1 px-4 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
                       >
                         Liên hệ thuê phòng
                       </button>
                     </div>
-                  </div>
+                  </footer>
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>

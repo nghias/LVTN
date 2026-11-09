@@ -121,9 +121,9 @@ export default function AiChatbotWidget({
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end">
+    <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40 flex flex-col items-end">
       {isOpen && (
-        <div className="mb-3 w-85 sm:w-95 bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="mb-3 w-[calc(100vw-2rem)] max-w-85 sm:max-w-none sm:w-95 bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
           <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-2xl bg-[#00FFCC] text-slate-900 font-bold text-xs flex items-center justify-center shrink-0">
@@ -145,7 +145,7 @@ export default function AiChatbotWidget({
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer"
+              className="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center cursor-pointer shrink-0"
               title="Thu gọn hộp thoại"
             >
               ✕
@@ -227,12 +227,13 @@ export default function AiChatbotWidget({
       <button
         type="button"
         onClick={onToggleOpen}
-        className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white border-2 border-[#00FFCC] shadow-xl transition cursor-pointer"
+        aria-label={isOpen ? "Đóng Trợ lý AI" : "Chat tư vấn AI 24/7"}
+        className="flex items-center justify-center sm:gap-2.5 p-1.5 sm:px-4 sm:py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white border-2 border-[#00FFCC] shadow-xl transition cursor-pointer"
       >
-        <span className="w-7 h-7 rounded-full bg-[#00FFCC] text-slate-900 font-bold text-xs flex items-center justify-center">
+        <span className="w-9 h-9 sm:w-7 sm:h-7 rounded-full bg-[#00FFCC] text-slate-900 font-bold text-xs flex items-center justify-center shrink-0">
           AI
         </span>
-        <span className="text-xs font-bold text-[#00FFCC] pr-1">
+        <span className="hidden sm:inline text-xs font-bold text-[#00FFCC] pr-1">
           {isOpen ? "Đóng Trợ lý AI" : "Chat tư vấn AI 24/7"}
         </span>
       </button>
