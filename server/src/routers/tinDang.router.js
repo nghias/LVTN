@@ -21,5 +21,7 @@ router.get('/', TinDangController.getList);
 router.post('/', TinDangController.create);
 router.put('/:maTin', TinDangController.update);
 router.delete('/:maTin', TinDangController.remove);
+router.get('/public', TinDangController.getPublicList);
+router.get('/public/:maTin', TinDangController.getPublicDetail);
 
 module.exports = router;

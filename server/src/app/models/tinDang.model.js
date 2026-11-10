@@ -1,18 +1,107 @@
+// src/models/tinDang.model.js
 const db = require("../../database/db");
+
+const DANH_SACH_TRANG_THAI_TRONG = ["Trong", "ConTrong", "Trống", "Còn trống"];
 
 // Chuẩn hóa chuỗi ngày về định dạng YYYY-MM-DD cho cột DATE của MySQL 8.4
 function normalizeDate(value) {
   if (!value || String(value).trim() === "") return null;
   const str = String(value).trim();
-  // Nếu FE gửi định dạng ISO (VD: 2026-11-20T00:00:00.000Z) thì cắt lấy YYYY-MM-DD
   if (str.includes("T")) {
     return str.split("T")[0];
   }
   return str;
 }
 
+// Gắn DanhSachAnh (bảng AnhPhong) và TienIch (bảng ChiTietTienIch + TienIch) vào từng tin đăng
+// Đồng bộ cấu trúc dữ liệu giống hệt trang ChiTietPhongTroPage
+async function attachImagesToTinDangRows(rows = []) {
+  if (!rows.length) return [];
+
+  const maPhongIds = [
+    ...new Set(rows.map((r) => Number(r.MaPhong)).filter(Boolean)),
+  ];
+
+  if (maPhongIds.length === 0) return rows;
+
+  // 1. Lấy toàn bộ ảnh của các phòng từ bảng AnhPhong (Ưu tiên AnhChinh = 1 lên đầu)
+  const [allImages] = await db.query(
+    `
+      SELECT MaAnh, MaPhong, DuongDan, AnhChinh
+      FROM AnhPhong
+      WHERE MaPhong IN (?)
+      ORDER BY MaPhong ASC, AnhChinh DESC, MaAnh ASC
+    `,
+    [maPhongIds]
+  );
+
+  // 2. Lấy toàn bộ tiện ích đi kèm của từng phòng từ ChiTietTienIch JOIN TienIch
+  const [allTienIch] = await db.query(
+    `
+      SELECT ctti.MaPhong, ti.MaTI, ti.TenTI, ti.MoTa
+      FROM ChiTietTienIch ctti
+      INNER JOIN TienIch ti ON ctti.MaTI = ti.MaTI
+      WHERE ctti.MaPhong IN (?)
+      ORDER BY ti.MaTI ASC
+    `,
+    [maPhongIds]
+  );
+
+  const imagesByPhong = {};
+  for (const img of allImages) {
+    const maPhong = Number(img.MaPhong);
+    if (!imagesByPhong[maPhong]) {
+      imagesByPhong[maPhong] = [];
+    }
+    if (img.DuongDan && String(img.DuongDan).trim()) {
+      imagesByPhong[maPhong].push({
+        MaAnh: Number(img.MaAnh),
+        MaPhong: maPhong,
+        DuongDan: String(img.DuongDan).trim(),
+        AnhChinh: Number(img.AnhChinh) === 1 ? 1 : 0,
+      });
+    }
+  }
+
+  const tienIchByPhong = {};
+  for (const ti of allTienIch) {
+    const maPhong = Number(ti.MaPhong);
+    if (!tienIchByPhong[maPhong]) {
+      tienIchByPhong[maPhong] = [];
+    }
+    tienIchByPhong[maPhong].push({
+      MaTI: Number(ti.MaTI),
+      TenTI: ti.TenTI,
+      MoTa: ti.MoTa || null,
+    });
+  }
+
+  return rows.map((row) => {
+    const maPhong = Number(row.MaPhong);
+    const anhPhongList = imagesByPhong[maPhong] || [];
+    const tienIchPhong = tienIchByPhong[maPhong] || [];
+
+    // Ưu tiên lấy ảnh có AnhChinh = 1, nếu không có thì lấy ảnh đầu tiên
+    const mainImgObj =
+      anhPhongList.find((item) => Number(item.AnhChinh) === 1) ||
+      anhPhongList[0] ||
+      null;
+
+    return {
+      ...row,
+      DienTich: Number(row.DienTich),
+      Gia: Number(row.Gia),
+      AnhDaiDien: mainImgObj ? mainImgObj.DuongDan : row.AnhDaiDien || null,
+      // Trả về cả mảng object (giống ChiTietPhongTroPage) để FE dùng đồng nhất
+      DanhSachAnh: anhPhongList,
+      AnhPhongList: anhPhongList,
+      TienIch: tienIchPhong,
+      DanhSachTienIch: tienIchPhong,
+    };
+  });
+}
+
 const TinDangModel = {
-  // Kiểm tra thông tin và quyền của người dùng (JOIN với ThongTinCaNhan)
   async getNguoiDungById(maND) {
     const sql = `
       SELECT 
@@ -31,14 +120,12 @@ const TinDangModel = {
     return rows[0] || null;
   },
 
-  // Lấy thông tin chi tiết 1 tin đăng theo MaTin
   async getTinDangById(maTin) {
     const sql = `SELECT * FROM TinDang WHERE MaTin = ? LIMIT 1`;
     const [rows] = await db.query(sql, [maTin]);
     return rows[0] || null;
   },
 
-  // Kiểm tra phòng có thuộc khu trọ do người dùng này quản lý hay không
   async checkPhongThuocQuanLy(maPhong, maND) {
     const sql = `
       SELECT p.MaPhong
@@ -51,7 +138,6 @@ const TinDangModel = {
     return rows.length > 0;
   },
 
-  // Kiểm tra tin đăng có thuộc khu trọ do người dùng này quản lý hay không
   async checkTinThuocQuanLy(maTin, maND) {
     const sql = `
       SELECT td.MaTin
@@ -65,12 +151,10 @@ const TinDangModel = {
     return rows.length > 0;
   },
 
-  // Kiểm tra phòng có đủ điều kiện đăng tin mới không (Phải còn trống VÀ chưa có trạng thái tin)
   async checkPhongCoTheDangTin(maPhong, excludeMaTin = null) {
     const params = [];
     let excludeClause = "";
 
-    // Lưu ý: excludeClause nằm trong LEFT JOIN (trước WHERE) nên phải push excludeMaTin trước
     if (excludeMaTin) {
       excludeClause = "AND td.MaTin <> ?";
       params.push(excludeMaTin);
@@ -100,9 +184,8 @@ const TinDangModel = {
     }
 
     const phong = rows[0];
-    const danhSachTrangThaiTrong = ["Trong", "ConTrong", "Trống", "Còn trống"];
 
-    if (!danhSachTrangThaiTrong.includes(phong.TrangThaiPhong)) {
+    if (!DANH_SACH_TRANG_THAI_TRONG.includes(phong.TrangThaiPhong)) {
       return { valid: false, reason: "NOT_EMPTY" };
     }
 
@@ -113,7 +196,7 @@ const TinDangModel = {
     return { valid: true };
   },
 
-  // 1. Lấy danh sách tin đăng cho trang Quản lý (Chỉ lấy những tin đang có trạng thái)
+  // 1. Lấy danh sách tin đăng cho trang Quản lý
   async getAllTinDang(maND, quyen) {
     const hasFullAccess = quyen === "ChuTro" || quyen === "Admin";
     const params = [];
@@ -169,15 +252,10 @@ const TinDangModel = {
     `;
 
     const [rows] = await db.query(sql, params);
-    return rows.map((row) => ({
-      ...row,
-      DienTich: Number(row.DienTich),
-      Gia: Number(row.Gia),
-    }));
+    return attachImagesToTinDangRows(rows);
   },
 
   // 2. Lấy danh sách Phòng gửi qua FE để chọn khi đăng tin mới
-  // Chỉ lấy phòng CÒN TRỐNG và KHÔNG CÓ TRẠNG THÁI TIN
   async getPhongListForSelect(maND, quyen) {
     const hasFullAccess = quyen === "ChuTro" || quyen === "Admin";
     const params = [];
@@ -227,7 +305,7 @@ const TinDangModel = {
     }));
   },
 
-  // 3. Lấy danh sách tin đăng công khai cho Trang chủ (Chỉ lấy tin DangHienThi và chưa hết hạn)
+  // 3. Lấy danh sách tin đăng công khai cho Trang chủ
   async getPublicTinDang() {
     const sql = `
       SELECT 
@@ -261,20 +339,62 @@ const TinDangModel = {
       LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
       LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
       WHERE td.TrangThai = 'DangHienThi'
+        AND p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống')
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
     const [rows] = await db.query(sql);
-    return rows.map((row) => ({
-      ...row,
-      DienTich: Number(row.DienTich),
-      Gia: Number(row.Gia),
-    }));
+    return attachImagesToTinDangRows(rows);
+  },
+
+  // 3.1. Lấy chi tiết 1 tin đăng công khai theo MaTin
+  async getPublicTinDangById(maTin) {
+    const sql = `
+      SELECT 
+        td.MaTin,
+        td.MaPhong,
+        td.MaND,
+        td.TieuDe,
+        td.MoTa,
+        td.NgayDang,
+        td.NgayHetHan,
+        td.TrangThai,
+        p.TenPhong,
+        p.DienTich,
+        p.Gia,
+        p.TrangThai AS TrangThaiPhong,
+        k.MaKhu,
+        k.TenKhu,
+        k.DiaChi,
+        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
+        ttcn.SDT AS SDTChuTro,
+        (
+          SELECT ap.DuongDan
+          FROM AnhPhong ap
+          WHERE ap.MaPhong = p.MaPhong
+          ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
+          LIMIT 1
+        ) AS AnhDaiDien
+      FROM TinDang td
+      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
+      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
+      WHERE td.MaTin = ?
+        AND td.TrangThai = 'DangHienThi'
+        AND p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống')
+        AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
+      LIMIT 1
+    `;
+    const [rows] = await db.query(sql, [maTin]);
+    if (!rows.length) return null;
+
+    const enrichedRows = await attachImagesToTinDangRows(rows);
+    return enrichedRows[0] || null;
   },
 
   // 4. Thêm mới tin đăng
   async createTinDang({ MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai }) {
-    // Dọn bản ghi rỗng (không có trạng thái) của phòng này nếu có trước khi thêm mới
     await db.query(
       `DELETE FROM TinDang WHERE MaPhong = ? AND (TrangThai IS NULL OR TRIM(TrangThai) = '')`,
       [MaPhong]
@@ -322,7 +442,7 @@ const TinDangModel = {
     return result.affectedRows > 0;
   },
 
-  // 6. Xóa tin đăng theo MaTin (Xóa luôn trạng thái tin của phòng để phòng xuất hiện lại ở phần thêm tin)
+  // 6. Xóa tin đăng theo MaTin
   async deleteTinDang(maTin) {
     const [rows] = await db.query(
       `SELECT MaPhong FROM TinDang WHERE MaTin = ? LIMIT 1`,
@@ -334,7 +454,6 @@ const TinDangModel = {
 
     const maPhong = rows[0].MaPhong;
 
-    // Xóa tin đăng và toàn bộ trạng thái tin gắn với phòng đó
     const [result] = await db.query(
       `DELETE FROM TinDang WHERE MaTin = ? OR MaPhong = ?`,
       [maTin, maPhong]

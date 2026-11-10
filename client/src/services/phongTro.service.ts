@@ -1,3 +1,4 @@
+// src/services/phongTro.service.ts
 import { ApiResponse } from '../types/auth.type';
 import {
   KhuTroItem,
@@ -6,11 +7,19 @@ import {
   TienIchItem,
 } from '../types/phongTro.type';
 
-const AUTH_URL = process.env.NEXT_PUBLIC_API_URL + '/auth';
-const API_ROOT = AUTH_URL.replace(/\/auth\/?$/, '');
-const PHONG_API = `${API_ROOT}/phong-tro`;
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+).replace(/\/+$/, '');
+const SERVER_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
+const PHONG_API = `${API_BASE_URL}/phong-tro`;
 
-async function requestJson<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export const DEFAULT_ROOM_FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop&q=80';
+
+async function requestJson<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
   const res = await fetch(`${PHONG_API}${endpoint}`, {
     ...options,
     credentials: 'include',
@@ -26,7 +35,11 @@ async function requestJson<T>(endpoint: string, options: RequestInit = {}): Prom
   return data;
 }
 
-async function requestFormData<T>(endpoint: string, method: string, formData: FormData): Promise<T> {
+async function requestFormData<T>(
+  endpoint: string,
+  method: string,
+  formData: FormData
+): Promise<T> {
   const res = await fetch(`${PHONG_API}${endpoint}`, {
     method,
     credentials: 'include',
@@ -39,24 +52,46 @@ async function requestFormData<T>(endpoint: string, method: string, formData: Fo
   return data;
 }
 
-// Hàm hiển thị URL ảnh (Tương thích cả ảnh Cloudinary lẫn ảnh mẫu trong DB)
-export function resolveRoomImageUrl(duongDan?: string | null): string {
-  if (!duongDan) {
-    return 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop&q=80';
+// Chuẩn hóa URL ảnh phòng (Hỗ trợ cả link http/https, Cloudinary, đường dẫn uploads/... và object AnhPhong)
+export function resolveRoomImageUrl(
+  rawInput?: string | { DuongDan?: string | null } | null
+): string {
+  if (!rawInput) {
+    return DEFAULT_ROOM_FALLBACK_IMAGE;
   }
-  if (duongDan.startsWith('http://') || duongDan.startsWith('https://')) {
-    return duongDan;
+
+  const rawPath =
+    typeof rawInput === 'string'
+      ? rawInput.trim()
+      : typeof rawInput === 'object' && rawInput.DuongDan
+        ? String(rawInput.DuongDan).trim()
+        : '';
+
+  if (!rawPath) {
+    return DEFAULT_ROOM_FALLBACK_IMAGE;
   }
-  // Nếu là đường dẫn tương đối (/uploads/phong/...) trong dữ liệu mẫu
-  return 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&auto=format&fit=crop&q=80';
+
+  if (/^https?:\/\//i.test(rawPath)) {
+    return rawPath;
+  }
+
+  const normalizedPath = rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+  return `${SERVER_ORIGIN}/${normalizedPath}`;
 }
 
 export const PhongTroService = {
   getKhuTroList: () => requestJson<ApiResponse<KhuTroItem[]>>('/khu-tro'),
-  getKhuTroDetail: (maKhu: number) => requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}`),
-  getDanhSachQuanLy: () => requestJson<ApiResponse<QuanLyUserItem[]>>('/quan-ly-list'),
+  getKhuTroDetail: (maKhu: number) =>
+    requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}`),
+  getDanhSachQuanLy: () =>
+    requestJson<ApiResponse<QuanLyUserItem[]>>('/quan-ly-list'),
 
-  createKhuTro: (payload: { MaND: number; TenKhu: string; DiaChi: string; MoTa: string }) =>
+  createKhuTro: (payload: {
+    MaND: number;
+    TenKhu: string;
+    DiaChi: string;
+    MoTa: string;
+  }) =>
     requestJson<ApiResponse<KhuTroItem>>('/khu-tro', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -76,7 +111,11 @@ export const PhongTroService = {
 
   getAllTienIch: () => requestJson<ApiResponse<TienIchItem[]>>('/tien-ich'),
 
-  getPhongList: (params?: { maKhu?: number; trangThai?: string; keyword?: string }) => {
+  getPhongList: (params?: {
+    maKhu?: number;
+    trangThai?: string;
+    keyword?: string;
+  }) => {
     const query = new URLSearchParams();
     if (params?.maKhu) query.set('maKhu', String(params.maKhu));
     if (params?.trangThai) query.set('trangThai', params.trangThai);
@@ -92,7 +131,11 @@ export const PhongTroService = {
     requestFormData<ApiResponse<PhongItem>>('/phong', 'POST', formData),
 
   updatePhong: (maPhong: number, formData: FormData) =>
-    requestFormData<ApiResponse<PhongItem>>(`/phong/${maPhong}`, 'PUT', formData),
+    requestFormData<ApiResponse<PhongItem>>(
+      `/phong/${maPhong}`,
+      'PUT',
+      formData
+    ),
 
   deletePhong: (maPhong: number) =>
     requestJson<ApiResponse<null>>(`/phong/${maPhong}`, { method: 'DELETE' }),

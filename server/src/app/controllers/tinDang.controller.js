@@ -1,3 +1,4 @@
+// src/controllers/tinDang.controller.js
 const TinDangModel = require('../models/tinDang.model');
 
 // Hàm phụ lấy MaND từ JWT Cookie (req.user.maND) hoặc từ query/body
@@ -12,7 +13,7 @@ function extractCurrentMaND(req) {
 }
 
 const TinDangController = {
-  // GET /tin-dang/public (Dùng cho khách xem ở trang chủ không cần đăng nhập)
+  // GET /tin-dang/public (Lấy danh sách phòng còn trống & tin đang hiển thị kèm toàn bộ ảnh)
   async getPublicList(req, res) {
     try {
       const tinDangList = await TinDangModel.getPublicTinDang();
@@ -25,6 +26,38 @@ const TinDangController = {
       return res.status(500).json({
         success: false,
         message: 'Không thể tải danh sách tin đăng công khai.',
+      });
+    }
+  },
+
+  // GET /tin-dang/public/:maTin (Xem chi tiết 1 phòng còn trống & tin đang hiển thị kèm tất cả ảnh)
+  async getPublicDetail(req, res) {
+    try {
+      const { maTin } = req.params;
+      if (!maTin || isNaN(Number(maTin))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã tin đăng không hợp lệ.',
+        });
+      }
+
+      const tinDang = await TinDangModel.getPublicTinDangById(Number(maTin));
+      if (!tinDang) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy phòng hoặc tin đăng đã ngừng hiển thị.',
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: { tinDang },
+      });
+    } catch (error) {
+      console.error('❌ Lỗi lấy chi tiết tin đăng công khai:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Không thể tải thông tin chi tiết phòng.',
       });
     }
   },
@@ -49,7 +82,6 @@ const TinDangController = {
         });
       }
 
-      // Chỉ cho phép ChuTro hoặc QuanLy truy cập danh sách quản lý
       if (nguoiDung.Quyen !== 'ChuTro' && nguoiDung.Quyen !== 'QuanLy') {
         return res.status(403).json({
           success: false,
@@ -57,7 +89,6 @@ const TinDangController = {
         });
       }
 
-      // phongList chỉ chứa các phòng còn trống và chưa có trạng thái tin
       const [tinDangList, phongList] = await Promise.all([
         TinDangModel.getAllTinDang(nguoiDung.MaND, nguoiDung.Quyen),
         TinDangModel.getPhongListForSelect(nguoiDung.MaND, nguoiDung.Quyen),
@@ -80,7 +111,7 @@ const TinDangController = {
     }
   },
 
-  // POST /tin-dang (Đăng tin mới + Gán trạng thái tin + Cập nhật giá niêm yết phòng nếu có)
+  // POST /tin-dang
   async create(req, res) {
     try {
       const { MaPhong, Gia, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
@@ -118,7 +149,6 @@ const TinDangController = {
         });
       }
 
-      // Chỉ tài khoản có quyền ChuTro mới được đăng tin ở tất cả cơ sở
       const isChuTro = nguoiDung.Quyen === 'ChuTro';
       if (!isChuTro) {
         const isAllowed = await TinDangModel.checkPhongThuocQuanLy(
@@ -133,7 +163,6 @@ const TinDangController = {
         }
       }
 
-      // Kiểm tra phòng phải đang còn trống và chưa có trạng thái tin đăng
       const checkPhong = await TinDangModel.checkPhongCoTheDangTin(Number(MaPhong));
       if (!checkPhong.valid) {
         const errorMessages = {
@@ -147,12 +176,10 @@ const TinDangController = {
         });
       }
 
-      // Nếu người dùng truyền Gia lên thì cập nhật giá niêm yết của phòng đó
       if (Gia !== undefined && Gia !== null && Gia !== '') {
         await TinDangModel.updateGiaPhong(Number(MaPhong), Number(Gia));
       }
 
-      // Khi tạo tin mới, trạng thái tin mới chính thức được thiết lập (mặc định: DangHienThi)
       const trangThaiMoi =
         TrangThai && String(TrangThai).trim() !== ''
           ? String(TrangThai).trim()
@@ -184,7 +211,7 @@ const TinDangController = {
     }
   },
 
-  // PUT /tin-dang/:maTin (Cập nhật tin đăng + Cập nhật giá niêm yết phòng nếu có)
+  // PUT /tin-dang/:maTin
   async update(req, res) {
     try {
       const { maTin } = req.params;
@@ -216,7 +243,6 @@ const TinDangController = {
         });
       }
 
-      // Giữ lại MaPhong cũ nếu FE không truyền MaPhong mới khi sửa
       const targetMaPhong = MaPhong ? Number(MaPhong) : Number(existingTin.MaPhong);
 
       const nguoiDung = await TinDangModel.getNguoiDungById(Number(currentMaND));
@@ -242,7 +268,6 @@ const TinDangController = {
         }
       }
 
-      // Nếu đổi sang phòng khác, kiểm tra phòng mới có trống và chưa có tin đăng không
       if (targetMaPhong !== Number(existingTin.MaPhong)) {
         const checkPhong = await TinDangModel.checkPhongCoTheDangTin(
           targetMaPhong,
@@ -271,7 +296,6 @@ const TinDangController = {
         });
       }
 
-      // Cập nhật giá niêm yết của phòng trong bảng Phong
       if (Gia !== undefined && Gia !== null && Gia !== '') {
         await TinDangModel.updateGiaPhong(targetMaPhong, Number(Gia));
       }
@@ -289,7 +313,7 @@ const TinDangController = {
     }
   },
 
-  // DELETE /tin-dang/:maTin (Xóa tin đăng + xóa luôn trạng thái tin để phòng xuất hiện lại ở danh sách thêm tin)
+  // DELETE /tin-dang/:maTin
   async remove(req, res) {
     try {
       const { maTin } = req.params;
