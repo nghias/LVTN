@@ -5,6 +5,12 @@ const ThanhToanController = require('../app/controllers/thanhToan.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
 
 // 1. PUBLIC ROUTE: Nhận tín hiệu xác thực chuyển khoản tự động từ PayOS Webhook
+router.get('/webhook', (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: 'PayOS Webhook endpoint đang hoạt động!',
+  });
+});
 router.post('/webhook', ThanhToanController.handlePayOSWebhook);
 
 // 2. PROTECTED ROUTES: Yêu cầu đăng nhập

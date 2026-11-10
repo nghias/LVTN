@@ -140,8 +140,16 @@ async function syncHoaDonTienDaTra(maHD) {
   return totalPaid;
 }
 
-// Trích xuất mã orderCode từ GhiChu "[PAYOS:123456]"
-function extractOrderCode(ghiChu, minhChung) {
+// Lấy mã OrderCode từ cột OrderCode (ưu tiên) hoặc trích xuất dự phòng từ GhiChu / MinhChung
+function extractOrderCode(orderCodeColumn, ghiChu, minhChung) {
+  if (
+    orderCodeColumn !== null &&
+    orderCodeColumn !== undefined &&
+    String(orderCodeColumn).trim() !== ''
+  ) {
+    const parsed = Number(orderCodeColumn);
+    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+  }
   if (ghiChu) {
     const match = String(ghiChu).match(/\[PAYOS:(\d+)\]/);
     if (match) return Number(match[1]);
@@ -338,6 +346,11 @@ const ThanhToanController = {
 
       const enrichedThanhToans = thanhToans.map((tt) => {
         const hdInfo = hoaDonMap.get(Number(tt.MaHD));
+        const resolvedOrderCode = extractOrderCode(
+          tt.OrderCode ?? tt.orderCode,
+          tt.GhiChu,
+          tt.MinhChung
+        );
         return {
           ...tt,
           SoTien: Number(tt.SoTien) || 0,
@@ -348,7 +361,8 @@ const ThanhToanController = {
           TenKhachThue: hdInfo?.TenKhachThue || '',
           NgayTinhHoaDon: hdInfo?.NgayTinh || '',
           TongTienHoaDon: hdInfo?.TongTien || 0,
-          OrderCode: extractOrderCode(tt.GhiChu, tt.MinhChung),
+          OrderCode: resolvedOrderCode,
+          orderCode: resolvedOrderCode,
         };
       });
 
@@ -371,7 +385,6 @@ const ThanhToanController = {
     }
   },
 
-  // 4. GET /api/thanh-toan/hoa-don/:maHD
   // 4. GET /api/thanh-toan/hoa-don/:maHD
   getChiTietThanhToanHoaDon: async (req, res) => {
     try {
@@ -449,11 +462,19 @@ const ThanhToanController = {
             SDTKhachThue: hopDongInfo?.SDT || '',
           },
           thongTinThanhToan: thongTinNH,
-          lichSuThanhToan: lichSu.map((tt) => ({
-            ...tt,
-            SoTien: Number(tt.SoTien) || 0,
-            OrderCode: extractOrderCode(tt.GhiChu, tt.MinhChung),
-          })),
+          lichSuThanhToan: lichSu.map((tt) => {
+            const resolvedOrderCode = extractOrderCode(
+              tt.OrderCode ?? tt.orderCode,
+              tt.GhiChu,
+              tt.MinhChung
+            );
+            return {
+              ...tt,
+              SoTien: Number(tt.SoTien) || 0,
+              OrderCode: resolvedOrderCode,
+              orderCode: resolvedOrderCode,
+            };
+          }),
         },
       });
     } catch (error) {
@@ -466,7 +487,6 @@ const ThanhToanController = {
   },
 
   // 5. POST /api/thanh-toan/tao-link-payos
-  // Tạo hoặc lấy lại mã QR PayOS gắn sẵn nội dung Hợp đồng (HDT) + Hóa đơn (HD) + Phòng
   taoLinkChuyenKhoanPayOS: async (req, res) => {
     try {
       const currentUser = await getCurrentUserFromDB(req);
@@ -543,11 +563,16 @@ const ThanhToanController = {
             item.PhuongThuc === 'ChuyenKhoan' &&
             item.TrangThai === 'ChoXacNhan' &&
             Number(item.SoTien) === soTienThanhToan &&
-            extractOrderCode(item.GhiChu, item.MinhChung)
+            extractOrderCode(
+              item.OrderCode ?? item.orderCode,
+              item.GhiChu,
+              item.MinhChung
+            )
         );
 
         if (pendingPayOS) {
           const existingOrderCode = extractOrderCode(
+            pendingPayOS.OrderCode ?? pendingPayOS.orderCode,
             pendingPayOS.GhiChu,
             pendingPayOS.MinhChung
           );
@@ -569,6 +594,7 @@ const ThanhToanController = {
               if (checkJson.data.status === 'PAID') {
                 await ThanhToanModel.updateStatus(pendingPayOS.MaTT, {
                   TrangThai: 'ThanhCong',
+                  OrderCode: existingOrderCode,
                   NgayTT: true,
                 });
                 await syncHoaDonTienDaTra(hoaDon.MaHD);
@@ -580,16 +606,21 @@ const ThanhToanController = {
                     MaTT: pendingPayOS.MaTT,
                     MaHD: hoaDon.MaHD,
                     MaHDT: maHDT,
+                    OrderCode: existingOrderCode,
                     orderCode: existingOrderCode,
                     amount: soTienThanhToan,
-                    description: description,
+                    description: checkJson.data.description || description,
                     checkoutUrl: `https://pay.payos.vn/web/${checkJson.data.id}`,
                     qrCode: checkJson.data.qrCode || null,
                     accountNumber:
-                      thongTinNH?.STK || '0931493785',
+                      checkJson.data.accountNumber ||
+                      thongTinNH?.STK ||
+                      '0931493785',
                     accountName:
-                      thongTinNH?.ChuTaiKhoan || 'TRAN TUAN NGHIA',
-                    bin: '970422',
+                      checkJson.data.accountName ||
+                      thongTinNH?.ChuTaiKhoan ||
+                      'TRAN TUAN NGHIA',
+                    bin: checkJson.data.bin || '970422',
                     thongTinNganHang: thongTinNH,
                   },
                 });
@@ -612,6 +643,7 @@ const ThanhToanController = {
         MaHD: hoaDon.MaHD,
         SoTien: soTienThanhToan,
         PhuongThuc: 'ChuyenKhoan',
+        OrderCode: orderCode,
         MinhChung: String(orderCode),
         GhiChu: `[PAYOS:${orderCode}] Tự động xác thực ${description}`,
         TrangThai: 'ChoXacNhan',
@@ -655,9 +687,9 @@ const ThanhToanController = {
             MaTT: maTT,
             MaHD: hoaDon.MaHD,
             MaHDT: maHDT,
+            OrderCode: orderCode,
             orderCode,
             amount: payosResult.data.amount || soTienThanhToan,
-            // Quan trọng: Lấy đúng chuỗi description do PayOS trả về để ngân hàng nhận diện tự động
             description: payosResult.data.description || description,
             checkoutUrl: payosResult.data.checkoutUrl,
             qrCode: payosResult.data.qrCode,
@@ -680,6 +712,7 @@ const ThanhToanController = {
           MaTT: maTT,
           MaHD: hoaDon.MaHD,
           MaHDT: maHDT,
+          OrderCode: orderCode,
           orderCode,
           amount: soTienThanhToan,
           description,
@@ -704,26 +737,63 @@ const ThanhToanController = {
   // 6. POST /api/thanh-toan/webhook
   handlePayOSWebhook: async (req, res) => {
     try {
-      const body = req.body;
-      if (!body || !body.data) {
-        return res.status(200).json({ success: true });
-      }
+      const body = req.body || {};
 
-      const isValid = verifyPayOSWebhookSignature(body);
-      if (!isValid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid signature',
+      // 1. Trả về 200 OK ngay lập tức cho gói tin kiểm tra Webhook của PayOS (orderCode = 123)
+      if (
+        !body.data ||
+        Number(body.data.orderCode) === 123 ||
+        body.data.description === 'VQRIO123'
+      ) {
+        return res.status(200).json({
+          error: 0,
+          success: true,
+          message: 'Webhook PayOS kết nối thành công!',
+          data: null,
         });
       }
 
-      if (body.code === '00' && body.data.orderCode) {
-        const { orderCode, reference } = body.data;
+      const { orderCode, reference } = body.data;
+      if (!orderCode) {
+        return res.status(200).json({ error: 0, success: true });
+      }
+
+      // 2. Kiểm tra chữ ký HMAC hoặc đối chiếu trực tiếp với PayOS API
+      let isVerified = verifyPayOSWebhookSignature(body) && body.code === '00';
+
+      if (!isVerified) {
+        try {
+          const checkRes = await fetch(
+            `https://api-merchant.payos.vn/v2/payment-requests/${orderCode}`,
+            {
+              method: 'GET',
+              headers: {
+                'x-client-id': PAYOS_CLIENT_ID,
+                'x-api-key': PAYOS_API_KEY,
+              },
+            }
+          );
+          const checkJson = await checkRes.json();
+          if (
+            checkJson &&
+            checkJson.code === '00' &&
+            checkJson.data?.status === 'PAID'
+          ) {
+            isVerified = true;
+          }
+        } catch (verifyErr) {
+          console.error('Lỗi đối chiếu PayOS API trong Webhook:', verifyErr.message);
+        }
+      }
+
+      // 3. Nếu đã xác thực thanh toán thành công -> Cập nhật bảng ThanhToan và HoaDon
+      if (isVerified) {
         const giaoDich = await ThanhToanModel.findByPayOSOrderCode(orderCode);
 
         if (giaoDich && giaoDich.TrangThai !== 'ThanhCong') {
           await ThanhToanModel.updateStatus(giaoDich.MaTT, {
             TrangThai: 'ThanhCong',
+            OrderCode: Number(orderCode),
             MinhChung: reference || String(orderCode),
             GhiChu: `${giaoDich.GhiChu || ''} | Đã xác thực tự động qua PayOS (Mã GD: ${reference || orderCode})`,
             NgayTT: true,
@@ -733,10 +803,18 @@ const ThanhToanController = {
         }
       }
 
-      return res.status(200).json({ success: true });
+      return res.status(200).json({
+        error: 0,
+        success: true,
+        message: 'Ok',
+        data: null,
+      });
     } catch (error) {
       console.error('Lỗi handlePayOSWebhook:', error);
-      return res.status(200).json({ success: true });
+      return res.status(200).json({
+        error: 0,
+        success: true,
+      });
     }
   },
 
@@ -758,12 +836,21 @@ const ThanhToanController = {
           success: true,
           paid: true,
           status: 'PAID',
+          orderCode: extractOrderCode(
+            giaoDich.OrderCode ?? giaoDich.orderCode,
+            giaoDich.GhiChu,
+            giaoDich.MinhChung
+          ),
           tienDaTra: totalPaid,
           message: 'Giao dịch đã được xác thực thành công!',
         });
       }
 
-      const orderCode = extractOrderCode(giaoDich.GhiChu, giaoDich.MinhChung);
+      const orderCode = extractOrderCode(
+        giaoDich.OrderCode ?? giaoDich.orderCode,
+        giaoDich.GhiChu,
+        giaoDich.MinhChung
+      );
       if (!orderCode) {
         return res.status(200).json({
           success: true,
@@ -795,6 +882,7 @@ const ThanhToanController = {
 
         await ThanhToanModel.updateStatus(giaoDich.MaTT, {
           TrangThai: 'ThanhCong',
+          OrderCode: Number(orderCode),
           MinhChung: ref,
           GhiChu: `[PAYOS:${orderCode}] Xác thực chuyển khoản tự động thành công`,
           NgayTT: true,
@@ -806,6 +894,7 @@ const ThanhToanController = {
           success: true,
           paid: true,
           status: 'PAID',
+          orderCode: Number(orderCode),
           tienDaTra: totalPaid,
           message: 'Xác thực chuyển khoản tự động thành công!',
         });
@@ -814,6 +903,7 @@ const ThanhToanController = {
       return res.status(200).json({
         success: true,
         paid: false,
+        orderCode: Number(orderCode),
         status: payosInfo?.data?.status || 'PENDING',
       });
     } catch (error) {
@@ -871,6 +961,7 @@ const ThanhToanController = {
         MaHD: hoaDon.MaHD,
         SoTien: soTienTra,
         PhuongThuc: 'TienMat',
+        OrderCode: null,
         MinhChung: MinhChung || null,
         GhiChu: GhiChu || 'Người thuê báo trả tiền mặt trực tiếp',
         TrangThai: 'ChoXacNhan',
@@ -903,7 +994,7 @@ const ThanhToanController = {
         });
       }
 
-      const { MaHD, SoTien, PhuongThuc = 'TienMat', GhiChu, MinhChung } = req.body;
+      const { MaHD, SoTien, PhuongThuc = 'TienMat', OrderCode = null, GhiChu, MinhChung } = req.body;
       const hoaDon = await HoaDonModel.getById(MaHD);
       if (!hoaDon) {
         return res.status(404).json({
@@ -938,6 +1029,7 @@ const ThanhToanController = {
         MaHD: hoaDon.MaHD,
         SoTien: soTienThu,
         PhuongThuc,
+        OrderCode: OrderCode ? Number(OrderCode) : null,
         MinhChung: MinhChung || null,
         GhiChu:
           GhiChu ||

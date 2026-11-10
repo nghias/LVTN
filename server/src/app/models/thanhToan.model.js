@@ -6,7 +6,7 @@ const ThanhToanModel = {
   getAll: async () => {
     const [rows] = await db.execute(
       `SELECT MaTT, MaHD, DATE_FORMAT(NgayTT, '%Y-%m-%d %H:%i:%s') AS NgayTT,
-              SoTien, PhuongThuc, MinhChung, GhiChu, TrangThai
+              SoTien, PhuongThuc, OrderCode, MinhChung, GhiChu, TrangThai
        FROM ThanhToan
        ORDER BY NgayTT DESC, MaTT DESC`
     );
@@ -17,7 +17,7 @@ const ThanhToanModel = {
   getById: async (maTT) => {
     const [rows] = await db.execute(
       `SELECT MaTT, MaHD, DATE_FORMAT(NgayTT, '%Y-%m-%d %H:%i:%s') AS NgayTT,
-              SoTien, PhuongThuc, MinhChung, GhiChu, TrangThai
+              SoTien, PhuongThuc, OrderCode, MinhChung, GhiChu, TrangThai
        FROM ThanhToan
        WHERE MaTT = ?
        LIMIT 1`,
@@ -30,7 +30,7 @@ const ThanhToanModel = {
   getByMaHD: async (maHD) => {
     const [rows] = await db.execute(
       `SELECT MaTT, MaHD, DATE_FORMAT(NgayTT, '%Y-%m-%d %H:%i:%s') AS NgayTT,
-              SoTien, PhuongThuc, MinhChung, GhiChu, TrangThai
+              SoTien, PhuongThuc, OrderCode, MinhChung, GhiChu, TrangThai
        FROM ThanhToan
        WHERE MaHD = ?
        ORDER BY NgayTT DESC, MaTT DESC`,
@@ -45,7 +45,7 @@ const ThanhToanModel = {
     const placeholders = maHDList.map(() => '?').join(',');
     const [rows] = await db.execute(
       `SELECT MaTT, MaHD, DATE_FORMAT(NgayTT, '%Y-%m-%d %H:%i:%s') AS NgayTT,
-              SoTien, PhuongThuc, MinhChung, GhiChu, TrangThai
+              SoTien, PhuongThuc, OrderCode, MinhChung, GhiChu, TrangThai
        FROM ThanhToan
        WHERE MaHD IN (${placeholders})
        ORDER BY NgayTT DESC, MaTT DESC`,
@@ -54,17 +54,22 @@ const ThanhToanModel = {
     return rows;
   },
 
-  // 5. Tìm giao dịch theo mã orderCode của PayOS (lưu trong GhiChu hoặc MinhChung)
+  // 5. Tìm giao dịch theo mã OrderCode của PayOS (Ưu tiên tìm theo cột OrderCode)
   findByPayOSOrderCode: async (orderCode) => {
+    const numericOrderCode = Number(orderCode);
     const token = `[PAYOS:${orderCode}]`;
     const [rows] = await db.execute(
       `SELECT MaTT, MaHD, DATE_FORMAT(NgayTT, '%Y-%m-%d %H:%i:%s') AS NgayTT,
-              SoTien, PhuongThuc, MinhChung, GhiChu, TrangThai
+              SoTien, PhuongThuc, OrderCode, MinhChung, GhiChu, TrangThai
        FROM ThanhToan
-       WHERE GhiChu LIKE ? OR MinhChung = ?
+       WHERE OrderCode = ? OR MinhChung = ? OR GhiChu LIKE ?
        ORDER BY MaTT DESC
        LIMIT 1`,
-      [`%${token}%`, String(orderCode)]
+      [
+        Number.isNaN(numericOrderCode) ? -1 : numericOrderCode,
+        String(orderCode),
+        `%${token}%`,
+      ]
     );
     return rows[0] || null;
   },
@@ -74,31 +79,40 @@ const ThanhToanModel = {
     const [rows] = await db.execute(
       `SELECT COALESCE(SUM(SoTien), 0) AS TongDaTra
        FROM ThanhToan
-       WHERE MaHD = ? AND TrangThai IN ('ThanhCong', 'DaThanhToan', '1', 1)`,
+       WHERE MaHD = ? AND TrangThai IN ('ThanhCong', 'DaThanhToan', 'DaXacNhan', '1', 1)`,
       [Number(maHD)]
     );
     return Number(rows[0]?.TongDaTra || 0);
   },
 
-  // 7. Tạo mới giao dịch thanh toán
+  // 7. Tạo mới giao dịch thanh toán (Có hỗ trợ lưu cột OrderCode)
   create: async ({
     MaHD,
     NgayTT = null,
     SoTien,
     PhuongThuc,
+    OrderCode = null,
+    orderCode = null,
     MinhChung = null,
     GhiChu = null,
     TrangThai = 'ChoXacNhan',
   }) => {
+    const rawOrderCode = OrderCode !== null && OrderCode !== undefined ? OrderCode : orderCode;
+    const finalOrderCode =
+      rawOrderCode !== null && rawOrderCode !== undefined && String(rawOrderCode).trim() !== ''
+        ? Number(rawOrderCode)
+        : null;
+
     if (NgayTT) {
       const [result] = await db.execute(
-        `INSERT INTO ThanhToan (MaHD, NgayTT, SoTien, PhuongThuc, MinhChung, GhiChu, TrangThai)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ThanhToan (MaHD, NgayTT, SoTien, PhuongThuc, OrderCode, MinhChung, GhiChu, TrangThai)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           Number(MaHD),
           NgayTT,
           Number(SoTien) || 0,
           String(PhuongThuc).trim(),
+          finalOrderCode,
           MinhChung || null,
           GhiChu || null,
           TrangThai,
@@ -107,12 +121,13 @@ const ThanhToanModel = {
       return result.insertId;
     } else {
       const [result] = await db.execute(
-        `INSERT INTO ThanhToan (MaHD, NgayTT, SoTien, PhuongThuc, MinhChung, GhiChu, TrangThai)
-         VALUES (?, NOW(), ?, ?, ?, ?, ?)`,
+        `INSERT INTO ThanhToan (MaHD, NgayTT, SoTien, PhuongThuc, OrderCode, MinhChung, GhiChu, TrangThai)
+         VALUES (?, NOW(), ?, ?, ?, ?, ?, ?)`,
         [
           Number(MaHD),
           Number(SoTien) || 0,
           String(PhuongThuc).trim(),
+          finalOrderCode,
           MinhChung || null,
           GhiChu || null,
           TrangThai,
@@ -122,11 +137,19 @@ const ThanhToanModel = {
     }
   },
 
-  // 8. Cập nhật trạng thái và ghi chú/minh chứng của giao dịch
-  updateStatus: async (maTT, { TrangThai, GhiChu, MinhChung, NgayTT = false }) => {
+  // 8. Cập nhật trạng thái, OrderCode và ghi chú/minh chứng của giao dịch
+  updateStatus: async (
+    maTT,
+    { TrangThai, OrderCode, orderCode, GhiChu, MinhChung, NgayTT = false }
+  ) => {
     const fields = ['TrangThai = ?'];
     const params = [TrangThai];
 
+    const resolvedOrderCode = OrderCode !== undefined ? OrderCode : orderCode;
+    if (resolvedOrderCode !== undefined) {
+      fields.push('OrderCode = ?');
+      params.push(resolvedOrderCode !== null ? Number(resolvedOrderCode) : null);
+    }
     if (GhiChu !== undefined) {
       fields.push('GhiChu = ?');
       params.push(GhiChu);
