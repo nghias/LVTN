@@ -1,7 +1,7 @@
 // client/src/app/nguoiThue/thanhToan/[maHD]/page.tsx
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
@@ -25,41 +25,50 @@ export default function NguoiThueThanhToanHoaDonPage() {
   const [cashNote, setCashNote] = useState<string>('');
   const [sendingCash, setSendingCash] = useState<boolean>(false);
 
-  const fetchDetail = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await thanhToanService.getChiTietHoaDon(maHD);
-      if (res.success && res.data) {
-        const hd = res.data.hoaDon;
-        setHoaDon(hd);
-        setThongTinNH(res.data.thongTinThanhToan);
+  const qrInitializedRef = useRef<boolean>(false);
 
-        if (hd.ConNo > 0) {
-          setCreatingQR(true);
-          const qrRes = await thanhToanService.taoLinkPayOS({
-            MaHD: maHD,
-            SoTien: hd.ConNo,
-          });
-          if (qrRes.success && qrRes.data) {
-            setQrData(qrRes.data);
+  const loadInvoiceData = useCallback(
+    async (showInitialSpinner = false) => {
+      try {
+        if (showInitialSpinner) setLoading(true);
+        const res = await thanhToanService.getChiTietHoaDon(maHD);
+        if (res.success && res.data) {
+          const hd = res.data.hoaDon;
+          setHoaDon(hd);
+          setThongTinNH(res.data.thongTinThanhToan);
+
+          if (hd.ConNo > 0 && !qrInitializedRef.current) {
+            qrInitializedRef.current = true;
+            setCreatingQR(true);
+            const qrRes = await thanhToanService.taoLinkPayOS({
+              MaHD: maHD,
+              SoTien: hd.ConNo,
+            });
+            if (qrRes.success && qrRes.data) {
+              setQrData(qrRes.data);
+            }
+            setCreatingQR(false);
           }
-          setCreatingQR(false);
+        } else if (res.message) {
+          showError(res.message);
         }
-      } else if (res.message) {
-        showError(res.message);
+      } catch {
+        showError('Không thể tải thông tin hóa đơn lúc này!');
+      } finally {
+        if (showInitialSpinner) setLoading(false);
       }
-    } catch {
-      showError('Không thể tải thông tin hóa đơn lúc này!');
-    } finally {
-      setLoading(false);
-    }
-  }, [maHD, showError]);
+    },
+    [maHD]
+  );
 
   useEffect(() => {
-    if (maHD) fetchDetail();
-  }, [maHD, fetchDetail]);
+    qrInitializedRef.current = false;
+    if (maHD) {
+      loadInvoiceData(true);
+    }
+  }, [maHD, loadInvoiceData]);
 
-  // Tự động kiểm tra xác thực chuyển khoản mỗi 3 giây
+  // Kiểm tra xác thực chuyển khoản ngầm mỗi 4 giây (Không bật màn hình Loading)
   useEffect(() => {
     if (!qrData?.MaTT || autoVerified || !hoaDon || hoaDon.ConNo <= 0) return;
 
@@ -70,15 +79,15 @@ export default function NguoiThueThanhToanHoaDonPage() {
           setAutoVerified(true);
           clearInterval(timer);
           showSuccess('Thanh toán chuyển khoản thành công! Hóa đơn đã được gạch nợ tự động.');
-          await fetchDetail();
+          await loadInvoiceData(false);
         }
       } catch {
         // Bỏ qua lỗi mạng tạm thời
       }
-    }, 3000);
+    }, 4000);
 
     return () => clearInterval(timer);
-  }, [qrData, autoVerified, hoaDon, fetchDetail, showSuccess]);
+  }, [qrData?.MaTT, autoVerified, hoaDon?.ConNo, loadInvoiceData]);
 
   const handleBaoTraTienMat = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +113,7 @@ export default function NguoiThueThanhToanHoaDonPage() {
                 'Đã gửi yêu cầu xác nhận trả tiền mặt thành công!'
             );
             setCashNote('');
-            await fetchDetail();
+            await loadInvoiceData(false);
           } else {
             showError(res.message || 'Lỗi khi gửi yêu cầu xác nhận tiền mặt');
           }
@@ -129,7 +138,10 @@ export default function NguoiThueThanhToanHoaDonPage() {
       ? `HDT${hoaDon.MaHDT} HD${hoaDon?.MaHD} ${hoaDon?.TenPhong}`
       : `HD${hoaDon?.MaHD} ${hoaDon?.TenPhong}`);
 
-  const vietQrImageUrl = hoaDon
+  // ƯU TIÊN HIỂN THỊ MÃ QR ĐỘNG CỦA PAYOS
+  const qrImageUrl = qrData?.qrCode
+    ? `https://quickchart.io/qr?text=${encodeURIComponent(qrData.qrCode)}&size=320&margin=1`
+    : hoaDon
     ? `https://img.vietqr.io/image/${bankBin}-${stk}-compact2.png?amount=${
         qrData?.amount || hoaDon.ConNo
       }&addInfo=${encodeURIComponent(noiDungCK)}&accountName=${encodeURIComponent(
@@ -141,7 +153,6 @@ export default function NguoiThueThanhToanHoaDonPage() {
     <ProtectedRoute allowedRoles={['KhachThue']}>
       {(user) => (
         <div className="flex-1 flex flex-col bg-white text-slate-900">
-
           <main className="flex-1 max-w-2xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
             <div>
               <Link
@@ -242,7 +253,7 @@ export default function NguoiThueThanhToanHoaDonPage() {
                           <>
                             <div className="inline-block p-3 bg-white border border-slate-200 rounded-2xl shadow-2xs">
                               <img
-                                src={vietQrImageUrl}
+                                src={qrImageUrl}
                                 alt="VietQR PayOS"
                                 className="w-60 h-auto mx-auto rounded-lg"
                               />

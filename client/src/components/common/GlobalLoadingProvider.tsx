@@ -11,7 +11,6 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 
-// Hàm tự đọc Access Token từ localStorage, sessionStorage hoặc Cookie
 function readClientAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
 
@@ -36,9 +35,9 @@ interface GlobalLoadingContextType {
   stopLoading: () => void;
 }
 
-const GlobalLoadingContext = createContext<GlobalLoadingContextType | undefined>(
-  undefined
-);
+const GlobalLoadingContext = createContext<
+  GlobalLoadingContextType | undefined
+>(undefined);
 
 export function GlobalLoadingProvider({
   children,
@@ -64,17 +63,19 @@ export function GlobalLoadingProvider({
     setMessage('Đang xử lý dữ liệu...');
   }, []);
 
-  const setIsLoading = useCallback((loading: boolean, customMessage?: string) => {
-    if (loading) {
-      if (customMessage) setMessage(customMessage);
-      setManualLoading(true);
-    } else {
-      setManualLoading(false);
-      setMessage('Đang xử lý dữ liệu...');
-    }
-  }, []);
+  const setIsLoading = useCallback(
+    (loading: boolean, customMessage?: string) => {
+      if (loading) {
+        if (customMessage) setMessage(customMessage);
+        setManualLoading(true);
+      } else {
+        setManualLoading(false);
+        setMessage('Đang xử lý dữ liệu...');
+      }
+    },
+    []
+  );
 
-  // 1. Tự động giải phóng trạng thái Loading khi chuyển sang trang mới
   useEffect(() => {
     activeCountRef.current = 0;
     setActiveRequests(0);
@@ -83,7 +84,6 @@ export function GlobalLoadingProvider({
     setMessage('Đang xử lý dữ liệu...');
   }, [pathname]);
 
-  // 2. Khóa cuộn trang khi đang mở màn hình Loading
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (isLoading) {
@@ -96,7 +96,7 @@ export function GlobalLoadingProvider({
     };
   }, [isLoading]);
 
-  // 3. Tự động đánh chặn các lệnh gọi API fetch để bật Loading & đính kèm Bearer Token
+  // Đánh chặn fetch: luôn đính kèm Bearer Token, nhưng KHÔNG bật Loading với các request kiểm tra ngầm
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -124,29 +124,36 @@ export function GlobalLoadingProvider({
           urlString.includes('onrender.com') ||
           urlString.includes('localhost:5000'));
 
+      // Kiểm tra xem có phải request chạy ngầm (polling PayOS, tạo QR ngầm) hay không
+      const reqHeaders = new Headers(init?.headers || {});
+      const isSilentRequest =
+        reqHeaders.get('x-silent-fetch') === '1' ||
+        urlString.includes('/kiem-tra-payos/') ||
+        urlString.includes('/tao-link-payos');
+
       let modifiedInit = init;
+      const shouldTrackLoading = isApiCall && !isSilentRequest;
 
       if (isApiCall) {
         const token = readClientAccessToken();
-        if (token) {
-          const headers = new Headers(init?.headers || {});
-          if (!headers.has('Authorization')) {
-            headers.set('Authorization', `Bearer ${token}`);
-          }
-          modifiedInit = {
-            ...init,
-            headers,
-          };
+        if (token && !reqHeaders.has('Authorization')) {
+          reqHeaders.set('Authorization', `Bearer ${token}`);
         }
+        modifiedInit = {
+          ...init,
+          headers: reqHeaders,
+        };
 
-        activeCountRef.current += 1;
-        setActiveRequests(activeCountRef.current);
+        if (shouldTrackLoading) {
+          activeCountRef.current += 1;
+          setActiveRequests(activeCountRef.current);
+        }
       }
 
       try {
         return await originalFetch(input, modifiedInit);
       } finally {
-        if (isApiCall) {
+        if (shouldTrackLoading) {
           activeCountRef.current = Math.max(0, activeCountRef.current - 1);
           setActiveRequests(activeCountRef.current);
         }
@@ -158,7 +165,6 @@ export function GlobalLoadingProvider({
     };
   }, []);
 
-  // 4. Hiện nút tắt khẩn cấp sau 8 giây (khi Render khởi động chậm) và tự tắt hẳn sau 30 giây
   useEffect(() => {
     if (!isLoading) {
       setShowForceClose(false);
