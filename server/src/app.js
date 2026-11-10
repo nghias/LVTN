@@ -8,7 +8,7 @@ const path = require("path");
 
 const env = require("./app/config/env.config");
 const apiRouters = require("./routers/index");
-const PhongTroController = require("./app/controllers/phongTro.Controller");
+const PhongTroController = require("./app/controllers/phongTro.controller");
 const errorHandler = require("./middlewares/error.middleware");
 
 const http = require("http");
