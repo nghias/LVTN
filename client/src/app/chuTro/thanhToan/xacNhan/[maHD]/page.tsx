@@ -1,7 +1,7 @@
 // client/src/app/chuTro/thanhToan/xacNhan/[maHD]/page.tsx
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
@@ -28,47 +28,57 @@ export default function XacNhanTraTienPage() {
   const [loadingQR, setLoadingQR] = useState<boolean>(false);
   const [autoVerified, setAutoVerified] = useState<boolean>(false);
 
-  const fetchDetail = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await thanhToanService.getChiTietHoaDon(maHD);
-      if (res.success && res.data) {
-        const hd = res.data.hoaDon;
-        setHoaDon(hd);
-        setThongTinNH(res.data.thongTinThanhToan);
-        setLichSu(res.data.lichSuThanhToan || []);
-        setSoTienThu(hd.ConNo || 0);
+  // Dùng ref để đảm bảo chỉ gọi tạo/lấy QR đúng 1 lần khi vào trang
+  const qrInitializedRef = useRef<boolean>(false);
 
-        if (hd.ConNo > 0) {
-          setLoadingQR(true);
-          const qrRes = await thanhToanService.taoLinkPayOS({
-            MaHD: maHD,
-            SoTien: hd.ConNo,
-          });
-          if (qrRes.success && qrRes.data) {
-            setQrData(qrRes.data);
+  const loadInvoiceData = useCallback(
+    async (showInitialSpinner = false) => {
+      try {
+        if (showInitialSpinner) setLoading(true);
+        const res = await thanhToanService.getChiTietHoaDon(maHD);
+        if (res.success && res.data) {
+          const hd = res.data.hoaDon;
+          setHoaDon(hd);
+          setThongTinNH(res.data.thongTinThanhToan);
+          setLichSu(res.data.lichSuThanhToan || []);
+          setSoTienThu(hd.ConNo || 0);
+
+          if (hd.ConNo > 0 && !qrInitializedRef.current) {
+            qrInitializedRef.current = true;
+            setLoadingQR(true);
+            const qrRes = await thanhToanService.taoLinkPayOS({
+              MaHD: maHD,
+              SoTien: hd.ConNo,
+            });
+            if (qrRes.success && qrRes.data) {
+              setQrData(qrRes.data);
+            }
+            setLoadingQR(false);
+          } else if (hd.ConNo <= 0) {
+            setQrData(null);
           }
-          setLoadingQR(false);
         } else {
-          setQrData(null);
+          showError(res.message || 'Không tải được thông tin hóa đơn');
+          router.push('/chuTro/thanhToan');
         }
-      } else {
-        showError(res.message || 'Không tải được thông tin hóa đơn');
+      } catch {
+        showError('Không tải được thông tin hóa đơn');
         router.push('/chuTro/thanhToan');
+      } finally {
+        if (showInitialSpinner) setLoading(false);
       }
-    } catch {
-      showError('Không tải được thông tin hóa đơn');
-      router.push('/chuTro/thanhToan');
-    } finally {
-      setLoading(false);
-    }
-  }, [maHD, router, showError]);
+    },
+    [maHD] // Chỉ phụ thuộc vào maHD để tuyệt đối không tự chạy lại khi state render
+  );
 
   useEffect(() => {
-    if (maHD) fetchDetail();
-  }, [maHD, fetchDetail]);
+    qrInitializedRef.current = false;
+    if (maHD) {
+      loadInvoiceData(true);
+    }
+  }, [maHD, loadInvoiceData]);
 
-  // Tự động kiểm tra xác thực chuyển khoản từ PayOS mỗi 3 giây
+  // Kiểm tra trạng thái thanh toán ngầm mỗi 4 giây (Hoàn toàn im lặng, không làm nháy trang)
   useEffect(() => {
     if (!qrData?.MaTT || autoVerified || !hoaDon || hoaDon.ConNo <= 0) return;
 
@@ -79,15 +89,15 @@ export default function XacNhanTraTienPage() {
           setAutoVerified(true);
           clearInterval(timer);
           showSuccess('Đã xác thực chuyển khoản tự động từ PayOS thành công!');
-          await fetchDetail();
+          await loadInvoiceData(false);
         }
       } catch {
-        // Bỏ qua lỗi mạng tạm thời khi polling
+        // Bỏ qua lỗi mạng tạm thời khi polling ngầm
       }
-    }, 3000);
+    }, 4000);
 
     return () => clearInterval(timer);
-  }, [qrData, autoVerified, hoaDon, fetchDetail, showSuccess]);
+  }, [qrData?.MaTT, autoVerified, hoaDon?.ConNo, loadInvoiceData]);
 
   const handleThuTienMatTrucTiep = (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +120,7 @@ export default function XacNhanTraTienPage() {
           });
           if (res.success) {
             showSuccess('Đã xác nhận người thuê trả tiền mặt thành công!');
-            await fetchDetail();
+            await loadInvoiceData(false);
           } else {
             showError(res.message || 'Không thể xác nhận thu tiền mặt');
           }
@@ -148,7 +158,7 @@ export default function XacNhanTraTienPage() {
                   ? 'Đã xác nhận thanh toán thành công!'
                   : 'Đã từ chối giao dịch!')
             );
-            await fetchDetail();
+            await loadInvoiceData(false);
           } else {
             showError(res.message || 'Lỗi khi duyệt giao dịch');
           }
@@ -173,7 +183,10 @@ export default function XacNhanTraTienPage() {
       ? `HDT${hoaDon.MaHDT} HD${hoaDon?.MaHD} ${hoaDon?.TenPhong}`
       : `HD${hoaDon?.MaHD} ${hoaDon?.TenPhong}`);
 
-  const vietQrUrl = hoaDon
+  // ƯU TIÊN DÙNG MÃ QR ĐỘNG CỦA PAYOS (qrData.qrCode) ĐỂ PAYOS TỰ ĐỘNG BẮT ĐƯỢC GIAO DỊCH
+  const qrImageUrl = qrData?.qrCode
+    ? `https://quickchart.io/qr?text=${encodeURIComponent(qrData.qrCode)}&size=320&margin=1`
+    : hoaDon
     ? `https://img.vietqr.io/image/${bankBin}-${stk}-compact2.png?amount=${
         qrData?.amount || hoaDon.ConNo
       }&addInfo=${encodeURIComponent(noiDungCK)}&accountName=${encodeURIComponent(
@@ -216,7 +229,6 @@ export default function XacNhanTraTienPage() {
             ) : (
               <>
                 <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
-                  {/* Tóm tắt công nợ */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
                       <span className="text-xs font-semibold text-slate-500">
@@ -255,14 +267,13 @@ export default function XacNhanTraTienPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2 border-t border-slate-100">
-                      {/* CỘT TRÁI: HIỆN SẴN MÃ QR PAYOS CÓ NỘI DUNG HỢP ĐỒNG */}
                       <div className="lg:col-span-5 rounded-2xl border-2 border-[#00FFCC] bg-slate-50 p-5 flex flex-col items-center text-center justify-between space-y-4">
                         <div className="space-y-1">
                           <span className="px-3 py-1 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold">
                             Mã QR PayOS Tự Động Xác Thực
                           </span>
                           <p className="text-xs text-slate-600 pt-1">
-                            Đã gắn sẵn số tiền & nội dung Hợp đồng. Hệ thống tự động gạch nợ sau 3 giây khi quét mã
+                            Đã gắn sẵn số tiền & mã đơn hàng #{qrData?.orderCode}. Tự động gạch nợ sau khi quét mã
                           </p>
                         </div>
 
@@ -273,10 +284,16 @@ export default function XacNhanTraTienPage() {
                         ) : (
                           <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
                             <img
-                              src={vietQrUrl}
+                              src={qrImageUrl}
                               alt="Mã QR Thanh toán Hợp đồng"
                               className="w-56 h-auto mx-auto rounded-lg"
                             />
+                          </div>
+                        )}
+
+                        {qrData?.payosNote && !qrData?.qrCode && (
+                          <div className="w-full p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-medium">
+                            Lưu ý PayOS: {qrData.payosNote}
                           </div>
                         )}
 
@@ -288,7 +305,7 @@ export default function XacNhanTraTienPage() {
                             </strong>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-slate-500">Số tài khoản:</span>
+                            <span className="text-slate-500">Số tài khoản nhận:</span>
                             <strong className="text-teal-700">{stk}</strong>
                           </div>
                           <div className="flex justify-between">
@@ -312,7 +329,6 @@ export default function XacNhanTraTienPage() {
                         </div>
                       </div>
 
-                      {/* CỘT PHẢI: FORM XÁC NHẬN KHI NGƯỜI THUÊ TRẢ TIỀN MẶT */}
                       <form
                         onSubmit={handleThuTienMatTrucTiep}
                         className="lg:col-span-7 flex flex-col justify-between space-y-5 bg-slate-50 rounded-2xl border border-slate-200 p-5 sm:p-6"
@@ -383,7 +399,6 @@ export default function XacNhanTraTienPage() {
                   )}
                 </div>
 
-                {/* Lịch sử giao dịch của Hóa đơn này */}
                 <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-4">
                   <h2 className="text-base font-bold text-slate-900">
                     Lịch Sử Giao Dịch Của Hóa Đơn #{hoaDon.MaHD}

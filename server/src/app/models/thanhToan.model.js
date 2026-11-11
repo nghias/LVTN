@@ -54,7 +54,7 @@ const ThanhToanModel = {
     return rows;
   },
 
-  // 5. Tìm giao dịch theo mã OrderCode của PayOS (Ưu tiên tìm theo cột OrderCode)
+  // 5. Tìm giao dịch theo mã OrderCode của PayOS
   findByPayOSOrderCode: async (orderCode) => {
     const numericOrderCode = Number(orderCode);
     const token = `[PAYOS:${orderCode}]`;
@@ -74,18 +74,18 @@ const ThanhToanModel = {
     return rows[0] || null;
   },
 
-  // 6. Tính tổng số tiền đã thanh toán thành công của 1 MaHD
+  // 6. Tính tổng số tiền đã thanh toán thành công của 1 MaHD (Đã sửa lỗi ép kiểu số 1 trong IN)
   getTotalPaidByMaHD: async (maHD) => {
     const [rows] = await db.execute(
       `SELECT COALESCE(SUM(SoTien), 0) AS TongDaTra
        FROM ThanhToan
-       WHERE MaHD = ? AND TrangThai IN ('ThanhCong', 'DaThanhToan', 'DaXacNhan', '1', 1)`,
+       WHERE MaHD = ? AND TrangThai IN ('ThanhCong', 'DaThanhToan', 'DaXacNhan')`,
       [Number(maHD)]
     );
     return Number(rows[0]?.TongDaTra || 0);
   },
 
-  // 7. Tạo mới giao dịch thanh toán (Có hỗ trợ lưu cột OrderCode)
+  // 7. Tạo mới giao dịch thanh toán
   create: async ({
     MaHD,
     NgayTT = null,
@@ -97,11 +97,16 @@ const ThanhToanModel = {
     GhiChu = null,
     TrangThai = 'ChoXacNhan',
   }) => {
-    const rawOrderCode = OrderCode !== null && OrderCode !== undefined ? OrderCode : orderCode;
+    const rawOrderCode =
+      OrderCode !== null && OrderCode !== undefined ? OrderCode : orderCode;
     const finalOrderCode =
-      rawOrderCode !== null && rawOrderCode !== undefined && String(rawOrderCode).trim() !== ''
+      rawOrderCode !== null &&
+      rawOrderCode !== undefined &&
+      String(rawOrderCode).trim() !== ''
         ? Number(rawOrderCode)
         : null;
+
+    const safeGhiChu = GhiChu ? String(GhiChu).slice(0, 250) : null;
 
     if (NgayTT) {
       const [result] = await db.execute(
@@ -114,7 +119,7 @@ const ThanhToanModel = {
           String(PhuongThuc).trim(),
           finalOrderCode,
           MinhChung || null,
-          GhiChu || null,
+          safeGhiChu,
           TrangThai,
         ]
       );
@@ -129,7 +134,7 @@ const ThanhToanModel = {
           String(PhuongThuc).trim(),
           finalOrderCode,
           MinhChung || null,
-          GhiChu || null,
+          safeGhiChu,
           TrangThai,
         ]
       );
@@ -145,14 +150,17 @@ const ThanhToanModel = {
     const fields = ['TrangThai = ?'];
     const params = [TrangThai];
 
-    const resolvedOrderCode = OrderCode !== undefined ? OrderCode : orderCode;
+    const resolvedOrderCode =
+      OrderCode !== undefined ? OrderCode : orderCode;
     if (resolvedOrderCode !== undefined) {
       fields.push('OrderCode = ?');
-      params.push(resolvedOrderCode !== null ? Number(resolvedOrderCode) : null);
+      params.push(
+        resolvedOrderCode !== null ? Number(resolvedOrderCode) : null
+      );
     }
     if (GhiChu !== undefined) {
       fields.push('GhiChu = ?');
-      params.push(GhiChu);
+      params.push(GhiChu ? String(GhiChu).slice(0, 250) : null);
     }
     if (MinhChung !== undefined) {
       fields.push('MinhChung = ?');
@@ -170,7 +178,29 @@ const ThanhToanModel = {
     return result.affectedRows > 0;
   },
 
-  // 9. Xóa giao dịch thanh toán
+  // 9. Xóa các bản ghi ChuyenKhoan ChoXacNhan bị trùng lặp của cùng 1 MaHD (Chỉ giữ lại 1 bản ghi mới nhất)
+  cleanupDuplicatePendingPayOS: async (maHD, keepMaTT = null) => {
+    if (keepMaTT) {
+      await db.execute(
+        `DELETE FROM ThanhToan
+         WHERE MaHD = ?
+           AND PhuongThuc = 'ChuyenKhoan'
+           AND TrangThai = 'ChoXacNhan'
+           AND MaTT <> ?`,
+        [Number(maHD), Number(keepMaTT)]
+      );
+    } else {
+      await db.execute(
+        `DELETE FROM ThanhToan
+         WHERE MaHD = ?
+           AND PhuongThuc = 'ChuyenKhoan'
+           AND TrangThai = 'ChoXacNhan'`,
+        [Number(maHD)]
+      );
+    }
+  },
+
+  // 10. Xóa giao dịch thanh toán
   delete: async (maTT) => {
     const [result] = await db.execute(
       `DELETE FROM ThanhToan WHERE MaTT = ?`,

@@ -5,16 +5,19 @@ const HoaDonModel = require('../models/hoaDon.model');
 const ThanhToanModel = require('../models/thanhToan.model');
 const ThongTinThanhToanModel = require('../models/thongTinThanhToan.model');
 
-// Khóa cấu hình PayOS
-const PAYOS_CLIENT_ID =
-  process.env.PAYOS_CLIENT_ID || '8355a8cb-4e14-4b30-b467-0083dc9e73cd';
-const PAYOS_API_KEY =
-  process.env.PAYOS_API_KEY || '3d8a9833-d1eb-4fc1-805c-7ad441e82e7f';
-const PAYOS_CHECKSUM_KEY =
+// Khóa cấu hình PayOS (Lấy từ biến môi trường trên Render)
+const PAYOS_CLIENT_ID = (
+  process.env.PAYOS_CLIENT_ID || '8355a8cb-4e14-4b30-b467-0083dc9e73cd'
+).trim();
+const PAYOS_API_KEY = (
+  process.env.PAYOS_API_KEY || '3d8a9833-d1eb-4fc1-805c-7ad441e82e7f'
+).trim();
+const PAYOS_CHECKSUM_KEY = (
   process.env.PAYOS_CHECKSUM_KEY ||
-  'b434d4727cf7878f62d483190670ab1efe77a6d2e';
+  'b434d4727cf7878f62d483190670ab1efe77a6d2e'
+).trim();
 
-// Hàm lấy MaND đang đăng nhập (Tương thích cả req.user.maND, req.user.MaND, query, body)
+// Hàm lấy MaND đang đăng nhập
 function extractCurrentMaND(req) {
   return (
     req.user?.maND ||
@@ -26,7 +29,7 @@ function extractCurrentMaND(req) {
   );
 }
 
-// Lấy thông tin tài khoản thực tế từ DB để kiểm tra chính xác quyền ChuTro / QuanLy / KhachThue
+// Lấy thông tin tài khoản thực tế từ DB
 async function getCurrentUserFromDB(req) {
   const maND = extractCurrentMaND(req);
   if (!maND) return null;
@@ -37,7 +40,7 @@ async function getCurrentUserFromDB(req) {
   return rows[0] || null;
 }
 
-// Kiểm tra có phải Chủ trọ hay không (Chỉ Chủ trọ mới được sửa ThongTinThanhToan)
+// Kiểm tra có phải Chủ trọ hay không
 function isLandlordRole(user) {
   if (!user) return false;
   const role = String(user.Quyen || '').trim();
@@ -56,7 +59,6 @@ async function getAccessibleRoomsAndKhu(user) {
     `SELECT MaKhu, MaND, TenKhu, DiaChi FROM khutro ORDER BY MaKhu ASC`
   );
 
-  // 1. Chủ trọ: Toàn quyền tất cả các phòng & khu trọ
   if (role === 'ChuTro' || role === 'Admin' || maND === 1) {
     return {
       allowedRoomIds: allRooms.map((r) => Number(r.MaPhong)),
@@ -65,7 +67,6 @@ async function getAccessibleRoomsAndKhu(user) {
     };
   }
 
-  // 2. Quản lý: Chỉ được xem và xác nhận trả tiền mặt cho các phòng thuộc Khu trọ mình quản lý
   if (role === 'QuanLy') {
     const myKhuIds = allKhu
       .filter((k) => Number(k.MaND) === maND)
@@ -80,7 +81,6 @@ async function getAccessibleRoomsAndKhu(user) {
     };
   }
 
-  // 3. Khách thuê: Chỉ xem và thanh toán hóa đơn của phòng mình đang thuê
   const [myRoomRows] = await db.execute(
     `SELECT DISTINCT hdt.MaPhong
      FROM chitiethopdongthue ct
@@ -98,7 +98,13 @@ async function getAccessibleRoomsAndKhu(user) {
 }
 
 // Hàm tạo chữ ký HMAC-SHA256 cho PayOS Create Payment Link
-function createPayOSSignature({ amount, cancelUrl, description, orderCode, returnUrl }) {
+function createPayOSSignature({
+  amount,
+  cancelUrl,
+  description,
+  orderCode,
+  returnUrl,
+}) {
   const dataStr = `amount=${amount}&cancelUrl=${cancelUrl}&description=${description}&orderCode=${orderCode}&returnUrl=${returnUrl}`;
   return crypto
     .createHmac('sha256', PAYOS_CHECKSUM_KEY)
@@ -114,7 +120,12 @@ function verifyPayOSWebhookSignature(webhookBody) {
   const queryString = sortedKeys
     .map((key) => {
       let val = dataObj[key];
-      if (val === null || val === undefined || val === 'undefined' || val === 'null') {
+      if (
+        val === null ||
+        val === undefined ||
+        val === 'undefined' ||
+        val === 'null'
+      ) {
         val = '';
       } else if (typeof val === 'object') {
         val = JSON.stringify(val);
@@ -131,16 +142,37 @@ function verifyPayOSWebhookSignature(webhookBody) {
   return computedSig === webhookBody.signature;
 }
 
-// Hàm đồng bộ lại cột TienDaTra trong bảng HoaDon từ tổng các giao dịch ThanhCong
+// Hàm đồng bộ lại cột TienDaTra trong bảng HoaDon an toàn (Không gây lỗi 500 kể cả khi thiếu hàm trong HoaDonModel)
 async function syncHoaDonTienDaTra(maHD) {
   const hoaDon = await HoaDonModel.getById(maHD);
   if (!hoaDon) return null;
   const totalPaid = await ThanhToanModel.getTotalPaidByMaHD(maHD);
-  await HoaDonModel.updateTienDaTra(maHD, totalPaid);
+
+  if (typeof HoaDonModel.updateTienDaTra === 'function') {
+    await HoaDonModel.updateTienDaTra(maHD, totalPaid);
+  } else {
+    try {
+      await db.execute(`UPDATE hoadon SET TienDaTra = ? WHERE MaHD = ?`, [
+        Number(totalPaid) || 0,
+        Number(maHD),
+      ]);
+    } catch {
+      await db.execute(`UPDATE HoaDon SET TienDaTra = ? WHERE MaHD = ?`, [
+        Number(totalPaid) || 0,
+        Number(maHD),
+      ]);
+    }
+  }
+
+  // Nếu hóa đơn đã trả đủ tiền -> Tự động xóa các giao dịch QR ChoXacNhan dư thừa của hóa đơn này
+  if (Number(totalPaid) >= Number(hoaDon.TongTien) && Number(hoaDon.TongTien) > 0) {
+    await ThanhToanModel.cleanupDuplicatePendingPayOS(maHD, null);
+  }
+
   return totalPaid;
 }
 
-// Lấy mã OrderCode từ cột OrderCode (ưu tiên) hoặc trích xuất dự phòng từ GhiChu / MinhChung
+// Lấy mã OrderCode từ cột OrderCode hoặc trích xuất từ GhiChu / MinhChung
 function extractOrderCode(orderCodeColumn, ghiChu, minhChung) {
   if (
     orderCodeColumn !== null &&
@@ -183,7 +215,7 @@ const ThanhToanController = {
     }
   },
 
-  // 2. PUT /api/thanh-toan/thong-tin (CHỈ CHỦ TRỌ MỚI CÓ QUYỀN CẬP NHẬT)
+  // 2. PUT /api/thanh-toan/thong-tin
   updateThongTinThanhToan: async (req, res) => {
     try {
       const currentUser = await getCurrentUserFromDB(req);
@@ -199,7 +231,8 @@ const ThanhToanController = {
       if (!TenNganHang || !STK || !ChuTaiKhoan) {
         return res.status(400).json({
           success: false,
-          message: 'Vui lòng nhập đầy đủ Tên ngân hàng, Số tài khoản và Chủ tài khoản',
+          message:
+            'Vui lòng nhập đầy đủ Tên ngân hàng, Số tài khoản và Chủ tài khoản',
         });
       }
 
@@ -248,9 +281,8 @@ const ThanhToanController = {
         });
       }
 
-      const { allowedRoomIds, allRooms, allKhu } = await getAccessibleRoomsAndKhu(
-        currentUser
-      );
+      const { allowedRoomIds, allRooms, allKhu } =
+        await getAccessibleRoomsAndKhu(currentUser);
       const thongTinNH = await ThongTinThanhToanModel.getPrimary();
       const canEditPaymentInfo = isLandlordRole(currentUser);
 
@@ -267,14 +299,10 @@ const ThanhToanController = {
         });
       }
 
-      // Lấy danh sách hóa đơn của các phòng được phép truy cập
       const hoaDons = await HoaDonModel.getByRoomIds(allowedRoomIds);
       const maHDList = hoaDons.map((hd) => Number(hd.MaHD));
-
-      // Lấy lịch sử thanh toán của các hóa đơn đó
       const thanhToans = await ThanhToanModel.getByMaHDList(maHDList);
 
-      // Lấy tên khách đại diện theo từng phòng
       const [repRows] = await db.execute(
         `SELECT hdt.MaPhong, ct.MaND, COALESCE(ttcn.HoTen, nd.TenTK) AS HoTen, ttcn.SDT, ct.VaiTro
          FROM hopdongthue hdt
@@ -380,7 +408,8 @@ const ThanhToanController = {
       console.error('Lỗi getDanhSachVaLichSu:', error);
       return res.status(500).json({
         success: false,
-        message: 'Lỗi máy chủ khi tải dữ liệu quản lý thanh toán: ' + error.message,
+        message:
+          'Lỗi máy chủ khi tải dữ liệu quản lý thanh toán: ' + error.message,
       });
     }
   },
@@ -405,9 +434,8 @@ const ThanhToanController = {
         });
       }
 
-      const { allowedRoomIds, allRooms, allKhu } = await getAccessibleRoomsAndKhu(
-        currentUser
-      );
+      const { allowedRoomIds, allRooms, allKhu } =
+        await getAccessibleRoomsAndKhu(currentUser);
       if (!allowedRoomIds.includes(Number(hoaDon.MaPhong))) {
         return res.status(403).json({
           success: false,
@@ -422,7 +450,6 @@ const ThanhToanController = {
         ? allKhu.find((k) => Number(k.MaKhu) === Number(room.MaKhu))
         : null;
 
-      // Lấy Hợp đồng đang có hiệu lực và người đại diện của phòng
       const [hdRows] = await db.execute(
         `SELECT hdt.MaHDT, COALESCE(ttcn.HoTen, nd.TenTK) AS TenKhachThue, ttcn.SDT
          FROM hopdongthue hdt
@@ -540,14 +567,12 @@ const ThanhToanController = {
         ''
       );
 
-      // Lấy MaHDT của hợp đồng phòng đó để gắn vào nội dung chuyển khoản
       const [hdRows] = await db.execute(
         `SELECT MaHDT FROM hopdongthue WHERE MaPhong = ? ORDER BY CASE WHEN TrangThai = 'ConHieuLuc' THEN 0 ELSE 1 END, MaHDT DESC LIMIT 1`,
         [Number(hoaDon.MaPhong)]
       );
       const maHDT = hdRows[0]?.MaHDT || null;
 
-      // Nội dung chuyển khoản có sẵn thông tin Hợp đồng & Hóa đơn (Tối đa 25 ký tự theo chuẩn Napas/PayOS)
       const rawDesc = maHDT
         ? `HDT${maHDT} HD${hoaDon.MaHD} ${tenPhong}`
         : `HD${hoaDon.MaHD} ${tenPhong}`;
@@ -555,27 +580,35 @@ const ThanhToanController = {
 
       const thongTinNH = await ThongTinThanhToanModel.getPrimary();
 
-      // Kiểm tra xem hóa đơn này đã có giao dịch PayOS đang chờ (ChoXacNhan) với cùng số tiền chưa
-      if (!forceNew) {
-        const existingList = await ThanhToanModel.getByMaHD(hoaDon.MaHD);
-        const pendingPayOS = existingList.find(
-          (item) =>
-            item.PhuongThuc === 'ChuyenKhoan' &&
-            item.TrangThai === 'ChoXacNhan' &&
-            Number(item.SoTien) === soTienThanhToan &&
-            extractOrderCode(
-              item.OrderCode ?? item.orderCode,
-              item.GhiChu,
-              item.MinhChung
-            )
+      // Bước 1: Kiểm tra giao dịch ChuyenKhoan ChoXacNhan hiện có của hóa đơn này
+      const existingList = await ThanhToanModel.getByMaHD(hoaDon.MaHD);
+      const pendingPayOSList = existingList.filter(
+        (item) =>
+          item.PhuongThuc === 'ChuyenKhoan' &&
+          item.TrangThai === 'ChoXacNhan'
+      );
+
+      let reusableMaTT = null;
+
+      if (pendingPayOSList.length > 0) {
+        const latestPending = pendingPayOSList[0];
+        reusableMaTT = latestPending.MaTT;
+
+        // Dọn dẹp ngay các dòng ChoXacNhan bị sinh trùng trước đó (chỉ giữ lại dòng mới nhất)
+        if (pendingPayOSList.length > 1) {
+          await ThanhToanModel.cleanupDuplicatePendingPayOS(
+            hoaDon.MaHD,
+            reusableMaTT
+          );
+        }
+
+        const existingOrderCode = extractOrderCode(
+          latestPending.OrderCode ?? latestPending.orderCode,
+          latestPending.GhiChu,
+          latestPending.MinhChung
         );
 
-        if (pendingPayOS) {
-          const existingOrderCode = extractOrderCode(
-            pendingPayOS.OrderCode ?? pendingPayOS.orderCode,
-            pendingPayOS.GhiChu,
-            pendingPayOS.MinhChung
-          );
+        if (!forceNew && existingOrderCode && Number(latestPending.SoTien) === soTienThanhToan) {
           try {
             const checkRes = await fetch(
               `https://api-merchant.payos.vn/v2/payment-requests/${existingOrderCode}`,
@@ -590,9 +623,8 @@ const ThanhToanController = {
             const checkJson = await checkRes.json();
 
             if (checkJson?.code === '00' && checkJson?.data) {
-              // Nếu đơn cũ đã được thanh toán trên PayOS -> Tự động gạch nợ luôn!
               if (checkJson.data.status === 'PAID') {
-                await ThanhToanModel.updateStatus(pendingPayOS.MaTT, {
+                await ThanhToanModel.updateStatus(reusableMaTT, {
                   TrangThai: 'ThanhCong',
                   OrderCode: existingOrderCode,
                   NgayTT: true,
@@ -603,7 +635,7 @@ const ThanhToanController = {
                   success: true,
                   message: 'Đã tải mã QR PayOS của hợp đồng & hóa đơn',
                   data: {
-                    MaTT: pendingPayOS.MaTT,
+                    MaTT: reusableMaTT,
                     MaHD: hoaDon.MaHD,
                     MaHDT: maHDT,
                     OrderCode: existingOrderCode,
@@ -622,33 +654,80 @@ const ThanhToanController = {
                       'TRAN TUAN NGHIA',
                     bin: checkJson.data.bin || '970422',
                     thongTinNganHang: thongTinNH,
+                    payosCreated: true,
                   },
                 });
               }
             }
-          } catch (e) {
-            // Nếu lỗi kết nối thì tiếp tục tạo mới bên dưới
+          } catch (err) {
+            console.error('Lỗi kiểm tra đơn PayOS cũ:', err.message);
+          }
+
+          // QUAN TRỌNG: Nếu đơn cũ chưa tồn tại trên PayOS nhưng vừa mới tạo (< 60 giây) và không ép tạo mới,
+          // trả về luôn bản ghi hiện tại để KHÔNG sinh orderCode mới liên tục!
+          if (!forceNew) {
+            const createdTime = latestPending.NgayTT
+              ? new Date(latestPending.NgayTT).getTime()
+              : 0;
+            if (createdTime > 0 && Date.now() - createdTime < 60000) {
+              return res.status(200).json({
+                success: true,
+                message: 'Giữ nguyên mã giao dịch đang chờ xác nhận',
+                data: {
+                  MaTT: reusableMaTT,
+                  MaHD: hoaDon.MaHD,
+                  MaHDT: maHDT,
+                  OrderCode: existingOrderCode,
+                  orderCode: existingOrderCode,
+                  amount: soTienThanhToan,
+                  description,
+                  checkoutUrl: null,
+                  qrCode: null,
+                  accountNumber: thongTinNH?.STK || '0931493785',
+                  accountName: thongTinNH?.ChuTaiKhoan || 'TRAN TUAN NGHIA',
+                  bin: '970422',
+                  thongTinNganHang: thongTinNH,
+                  payosCreated: false,
+                  payosNote:
+                    'Đơn hàng chưa tạo được trên PayOS (Kiểm tra lại PAYOS_CHECKSUM_KEY đủ 64 ký tự trên Render).',
+                },
+              });
+            }
           }
         }
       }
 
+      // Bước 2: Sinh orderCode mới (Số nguyên an toàn 9 chữ số)
       const orderCode = Number(
         `${hoaDon.MaHD}${Date.now().toString().slice(-7)}`
       );
-      const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+      const clientUrl = process.env.CLIENT_URL || 'https://thexomtro.vercel.app';
       const returnUrl = `${clientUrl}/chuTro/thanhToan/xacNhan/${hoaDon.MaHD}?payos=success&orderCode=${orderCode}`;
       const cancelUrl = `${clientUrl}/chuTro/thanhToan/xacNhan/${hoaDon.MaHD}?payos=cancel`;
 
-      const maTT = await ThanhToanModel.create({
-        MaHD: hoaDon.MaHD,
-        SoTien: soTienThanhToan,
-        PhuongThuc: 'ChuyenKhoan',
-        OrderCode: orderCode,
-        MinhChung: String(orderCode),
-        GhiChu: `[PAYOS:${orderCode}] Tự động xác thực ${description}`,
-        TrangThai: 'ChoXacNhan',
-      });
+      // Tái sử dụng dòng ChoXacNhan cũ (nếu có) thay vì INSERT dòng mới gây rác DB
+      let maTT = reusableMaTT;
+      if (maTT) {
+        await ThanhToanModel.updateStatus(maTT, {
+          TrangThai: 'ChoXacNhan',
+          OrderCode: orderCode,
+          MinhChung: String(orderCode),
+          GhiChu: `[PAYOS:${orderCode}] Tự động xác thực ${description}`,
+          NgayTT: true,
+        });
+      } else {
+        maTT = await ThanhToanModel.create({
+          MaHD: hoaDon.MaHD,
+          SoTien: soTienThanhToan,
+          PhuongThuc: 'ChuyenKhoan',
+          OrderCode: orderCode,
+          MinhChung: String(orderCode),
+          GhiChu: `[PAYOS:${orderCode}] Tự động xác thực ${description}`,
+          TrangThai: 'ChoXacNhan',
+        });
+      }
 
+      // Bước 3: Gọi API tạo Payment Link của PayOS
       const signature = createPayOSSignature({
         amount: soTienThanhToan,
         cancelUrl,
@@ -701,9 +780,12 @@ const ThanhToanController = {
               'TRAN TUAN NGHIA',
             bin: payosResult.data.bin || '970422',
             thongTinNganHang: thongTinNH,
+            payosCreated: true,
           },
         });
       }
+
+      console.error('PayOS từ chối tạo Payment Link:', payosResult);
 
       return res.status(200).json({
         success: true,
@@ -722,7 +804,10 @@ const ThanhToanController = {
           accountName: thongTinNH?.ChuTaiKhoan || 'TRAN TUAN NGHIA',
           bin: '970422',
           thongTinNganHang: thongTinNH,
-          payosNote: payosResult?.desc || '',
+          payosCreated: false,
+          payosNote:
+            payosResult?.desc ||
+            'PayOS từ chối tạo đơn (Vui lòng kiểm tra lại PAYOS_CHECKSUM_KEY 64 ký tự)',
         },
       });
     } catch (error) {
@@ -739,7 +824,7 @@ const ThanhToanController = {
     try {
       const body = req.body || {};
 
-      // 1. Trả về 200 OK ngay lập tức cho gói tin kiểm tra Webhook của PayOS (orderCode = 123)
+      // Trả về 200 OK ngay cho gói tin test Webhook từ PayOS (orderCode = 123 / VQRIO123)
       if (
         !body.data ||
         Number(body.data.orderCode) === 123 ||
@@ -758,7 +843,6 @@ const ThanhToanController = {
         return res.status(200).json({ error: 0, success: true });
       }
 
-      // 2. Kiểm tra chữ ký HMAC hoặc đối chiếu trực tiếp với PayOS API
       let isVerified = verifyPayOSWebhookSignature(body) && body.code === '00';
 
       if (!isVerified) {
@@ -782,11 +866,13 @@ const ThanhToanController = {
             isVerified = true;
           }
         } catch (verifyErr) {
-          console.error('Lỗi đối chiếu PayOS API trong Webhook:', verifyErr.message);
+          console.error(
+            'Lỗi đối chiếu PayOS API trong Webhook:',
+            verifyErr.message
+          );
         }
       }
 
-      // 3. Nếu đã xác thực thanh toán thành công -> Cập nhật bảng ThanhToan và HoaDon
       if (isVerified) {
         const giaoDich = await ThanhToanModel.findByPayOSOrderCode(orderCode);
 
@@ -908,9 +994,10 @@ const ThanhToanController = {
       });
     } catch (error) {
       console.error('Lỗi kiemTraTrangThaiPayOS:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Không thể kiểm tra trạng thái giao dịch PayOS',
+      return res.status(200).json({
+        success: true,
+        paid: false,
+        status: 'PENDING',
       });
     }
   },
@@ -987,14 +1074,25 @@ const ThanhToanController = {
     try {
       const currentUser = await getCurrentUserFromDB(req);
       const role = String(currentUser?.Quyen || '').trim();
-      if (!['ChuTro', 'QuanLy', 'Admin'].includes(role) && Number(currentUser?.MaND) !== 1) {
+      if (
+        !['ChuTro', 'QuanLy', 'Admin'].includes(role) &&
+        Number(currentUser?.MaND) !== 1
+      ) {
         return res.status(403).json({
           success: false,
-          message: 'Chỉ Chủ trọ hoặc Quản lý khu trọ mới có quyền xác nhận thu tiền!',
+          message:
+            'Chỉ Chủ trọ hoặc Quản lý khu trọ mới có quyền xác nhận thu tiền!',
         });
       }
 
-      const { MaHD, SoTien, PhuongThuc = 'TienMat', OrderCode = null, GhiChu, MinhChung } = req.body;
+      const {
+        MaHD,
+        SoTien,
+        PhuongThuc = 'TienMat',
+        OrderCode = null,
+        GhiChu,
+        MinhChung,
+      } = req.body;
       const hoaDon = await HoaDonModel.getById(MaHD);
       if (!hoaDon) {
         return res.status(404).json({
@@ -1007,7 +1105,8 @@ const ThanhToanController = {
       if (!allowedRoomIds.includes(Number(hoaDon.MaPhong))) {
         return res.status(403).json({
           success: false,
-          message: 'Bạn không có quyền xác nhận thanh toán cho phòng thuộc khu trọ khác!',
+          message:
+            'Bạn không có quyền xác nhận thanh toán cho phòng thuộc khu trọ khác!',
         });
       }
 
@@ -1033,7 +1132,9 @@ const ThanhToanController = {
         MinhChung: MinhChung || null,
         GhiChu:
           GhiChu ||
-          `${nguoiXacNhan} xác nhận đã thu ${PhuongThuc === 'TienMat' ? 'tiền mặt' : 'chuyển khoản'}`,
+          `${nguoiXacNhan} xác nhận đã thu ${
+            PhuongThuc === 'TienMat' ? 'tiền mặt' : 'chuyển khoản'
+          }`,
         TrangThai: 'ThanhCong',
       });
 
@@ -1041,7 +1142,8 @@ const ThanhToanController = {
 
       return res.status(201).json({
         success: true,
-        message: 'Đã xác nhận trả tiền và cập nhật công nợ hóa đơn thành công!',
+        message:
+          'Đã xác nhận trả tiền và cập nhật công nợ hóa đơn thành công!',
         data: {
           MaTT: maTT,
           TienDaTraMoi: totalPaid,
@@ -1051,7 +1153,7 @@ const ThanhToanController = {
       console.error('Lỗi thuTienMatTrucTiep:', error);
       return res.status(500).json({
         success: false,
-        message: 'Lỗi máy chủ khi xác nhận thu tiền mặt',
+        message: 'Lỗi máy chủ khi xác nhận thu tiền mặt: ' + error.message,
       });
     }
   },
@@ -1061,10 +1163,14 @@ const ThanhToanController = {
     try {
       const currentUser = await getCurrentUserFromDB(req);
       const role = String(currentUser?.Quyen || '').trim();
-      if (!['ChuTro', 'QuanLy', 'Admin'].includes(role) && Number(currentUser?.MaND) !== 1) {
+      if (
+        !['ChuTro', 'QuanLy', 'Admin'].includes(role) &&
+        Number(currentUser?.MaND) !== 1
+      ) {
         return res.status(403).json({
           success: false,
-          message: 'Chỉ Chủ trọ hoặc Quản lý mới được quyền duyệt xác nhận trả tiền!',
+          message:
+            'Chỉ Chủ trọ hoặc Quản lý mới được quyền duyệt xác nhận trả tiền!',
         });
       }
 
@@ -1074,7 +1180,8 @@ const ThanhToanController = {
       if (!['ThanhCong', 'TuChoi'].includes(TrangThai)) {
         return res.status(400).json({
           success: false,
-          message: 'Trạng thái duyệt không hợp lệ (Chỉ nhận ThanhCong hoặc TuChoi)',
+          message:
+            'Trạng thái duyệt không hợp lệ (Chỉ nhận ThanhCong hoặc TuChoi)',
         });
       }
 
@@ -1106,7 +1213,9 @@ const ThanhToanController = {
       const ghiChuMoi = GhiChu
         ? `${giaoDich.GhiChu ? giaoDich.GhiChu + ' | ' : ''}${GhiChu}`
         : `${giaoDich.GhiChu ? giaoDich.GhiChu + ' | ' : ''}${nguoiDuyet} đã ${
-            TrangThai === 'ThanhCong' ? 'xác nhận nhận tiền' : 'từ chối giao dịch'
+            TrangThai === 'ThanhCong'
+              ? 'xác nhận nhận tiền'
+              : 'từ chối giao dịch'
           }`;
 
       await ThanhToanModel.updateStatus(maTT, {
@@ -1133,7 +1242,8 @@ const ThanhToanController = {
       console.error('Lỗi duyetGiaoDichThanhToan:', error);
       return res.status(500).json({
         success: false,
-        message: 'Lỗi máy chủ khi duyệt xác nhận thanh toán',
+        message:
+          'Lỗi máy chủ khi duyệt xác nhận thanh toán: ' + error.message,
       });
     }
   },
