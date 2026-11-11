@@ -143,7 +143,7 @@ function normalizeTinDangItem(item: any): TinDangHome {
     ? item.AnhPhongList
     : [];
 
-const normalizedAnhPhongList: AnhPhongHomeItem[] = rawAnhPhongList
+  const normalizedAnhPhongList: AnhPhongHomeItem[] = rawAnhPhongList
     .map((img): AnhPhongHomeItem | null => {
       const fullUrl = resolveHomeRoomImageUrl(img);
       if (!fullUrl) return null;
@@ -336,7 +336,6 @@ export class HomeService {
       const queryString = query.toString();
       const suffix = queryString ? `?${queryString}` : "";
 
-      // Ưu tiên gọi API /tin-dang/public vừa cập nhật ở TinDangController
       const primaryRes = await fetch(`${API_URL}/tin-dang/public${suffix}`, {
         method: "GET",
         cache: "no-store",
@@ -352,7 +351,6 @@ export class HomeService {
         }
       }
 
-      // Fallback sang /phong-tro/public/tin-dang
       const fallbackRes = await fetch(
         `${API_URL}/phong-tro/public/tin-dang${suffix}`,
         {
@@ -375,7 +373,7 @@ export class HomeService {
     }
   }
 
-  // 3. Lấy chi tiết 1 phòng & toàn bộ ảnh theo MaTin
+  // 3. Lấy chi tiết 1 phòng & toàn bộ ảnh theo MaTin (Hỗ trợ fallback từ getHomeData)
   static async getPublicTinDangDetail(
     maTin: number
   ): Promise<TinDangHome | null> {
@@ -383,13 +381,25 @@ export class HomeService {
       const res = await fetch(`${API_URL}/tin-dang/public/${maTin}`, {
         method: "GET",
         cache: "no-store",
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.success || !json?.data?.tinDang) {
-        return null;
+      }).catch(() => null);
+
+      if (res && res.ok) {
+        const json = await res.json().catch(() => null);
+        const rawTin = json?.data?.tinDang || json?.data;
+        if (rawTin && typeof rawTin === "object" && !Array.isArray(rawTin)) {
+          const normalized = normalizeTinDangItem(rawTin);
+          if (isAvailablePublicTinDang(normalized)) {
+            return normalized;
+          }
+        }
       }
-      const normalized = normalizeTinDangItem(json.data.tinDang);
-      return isAvailablePublicTinDang(normalized) ? normalized : null;
+
+      // Fallback: Tìm trong danh sách tổng hợp của HomeData nếu endpoint lẻ không trả về
+      const homeData = await HomeService.getHomeData();
+      const matched = homeData.tinDang.find(
+        (item) => Number(item.MaTin) === Number(maTin)
+      );
+      return matched || null;
     } catch (error) {
       console.error("Lỗi khi tải chi tiết tin đăng:", error);
       return null;

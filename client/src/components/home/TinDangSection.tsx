@@ -1,7 +1,8 @@
 // src/components/home/TinDangSection.tsx
 "use client";
 
-import { useMemo, useState, useEffect, SyntheticEvent } from "react";
+import { useMemo, SyntheticEvent } from "react";
+import Link from "next/link";
 import {
   resolveRoomImageUrl,
   DEFAULT_ROOM_FALLBACK_IMAGE,
@@ -13,7 +14,7 @@ import {
   extractManagerContact,
 } from "./home.data";
 
-interface RoomImageObject {
+export interface RoomImageObject {
   MaAnh: number;
   DuongDan: string;
   AnhChinh: number;
@@ -35,9 +36,9 @@ interface TinDangSectionProps {
   onSelectContactRoom: (tin: TinDangItem) => void;
 }
 
-// Trích xuất danh sách ảnh theo đúng cấu trúc { MaAnh, DuongDan, AnhChinh } của ChiTietPhongTroPage
+// Trích xuất danh sách ảnh theo đúng cấu trúc { MaAnh, DuongDan, AnhChinh }
 // Ưu tiên ảnh có AnhChinh = 1 lên đầu tiên
-function extractRoomImageList(tin: TinDangItem): RoomImageObject[] {
+export function extractRoomImageList(tin: TinDangItem): RoomImageObject[] {
   const anyTin = tin as any;
   const rawList: RoomImageObject[] = [];
 
@@ -114,11 +115,6 @@ export default function TinDangSection({
   onResetFilters,
   onSelectContactRoom,
 }: TinDangSectionProps) {
-  const [selectedDetailTin, setSelectedDetailTin] =
-    useState<TinDangItem | null>(null);
-  // Dùng activeImageUrl giống hệt ChiTietPhongTroPage
-  const [activeImageUrl, setActiveImageUrl] = useState<string>("");
-
   // Chốt chặn tự chuyển về ảnh dự phòng nếu có ảnh dữ liệu mẫu cũ bị 404
   const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.currentTarget;
@@ -128,30 +124,6 @@ export default function TinDangSection({
     }
   };
 
-  // Mở Modal và gán activeImageUrl giống hệt ChiTietPhongTroPage
-  const handleOpenDetailModal = (tin: TinDangItem) => {
-    setSelectedDetailTin(tin);
-    const images = extractRoomImageList(tin);
-    const firstImg = images.length > 0 ? images[0].DuongDan : null;
-    setActiveImageUrl(resolveRoomImageUrl(firstImg));
-  };
-
-  const handleCloseDetailModal = () => {
-    setSelectedDetailTin(null);
-    setActiveImageUrl("");
-  };
-
-  useEffect(() => {
-    if (!selectedDetailTin) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleCloseDetailModal();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedDetailTin]);
-
   // Chốt chặn lọc chỉ giữ lại phòng Còn trống & tin đăng Đang hiển thị
   const validTotalTinDangList = useMemo(() => {
     return tinDangList.filter((tin) => isAvailablePublicTinDang(tin as any));
@@ -159,7 +131,7 @@ export default function TinDangSection({
 
   const validFilteredTinDangList = useMemo(() => {
     return filteredTinDangList.filter((tin) =>
-      isAvailablePublicTinDang(tin as any),
+      isAvailablePublicTinDang(tin as any)
     );
   }, [filteredTinDangList]);
 
@@ -184,7 +156,8 @@ export default function TinDangSection({
           position: index + 1,
           item: {
             "@type": "Accommodation",
-            "@id": `#phong-tro-${tin.MaTin}`,
+            "@id": `/tinDang/${tin.MaTin}`,
+            url: `/tinDang/${tin.MaTin}`,
             name: `${tin.TieuDe} - Phòng ${tin.TenPhong} (${tin.TenKhu})`,
             description:
               tin.MoTa ||
@@ -206,42 +179,6 @@ export default function TinDangSection({
       }),
     };
   }, [validFilteredTinDangList]);
-
-  const detailImageList = useMemo<RoomImageObject[]>(() => {
-    return selectedDetailTin ? extractRoomImageList(selectedDetailTin) : [];
-  }, [selectedDetailTin]);
-
-  const detailContact = useMemo(() => {
-    return selectedDetailTin
-      ? extractManagerContact(selectedDetailTin, khuTroList)
-      : null;
-  }, [selectedDetailTin, khuTroList]);
-
-  const detailDiaChi = useMemo(() => {
-    if (!selectedDetailTin) return "";
-    const anyTin = selectedDetailTin as any;
-    if (anyTin.DiaChi) return String(anyTin.DiaChi);
-    const foundKhu = khuTroList.find(
-      (k) => Number(k.MaKhu) === Number(selectedDetailTin.MaKhu),
-    );
-    return foundKhu?.DiaChi || "Đang cập nhật địa chỉ";
-  }, [selectedDetailTin, khuTroList]);
-
-  // Lấy danh sách tiện ích của phòng (TienIch hoặc DanhSachTienIch) giống ChiTietPhongTroPage
-  const detailTienIchList = useMemo<TienIchItem[]>(() => {
-    if (!selectedDetailTin) return [];
-    const anyTin = selectedDetailTin as any;
-    if (Array.isArray(anyTin.TienIch) && anyTin.TienIch.length > 0) {
-      return anyTin.TienIch;
-    }
-    if (
-      Array.isArray(anyTin.DanhSachTienIch) &&
-      anyTin.DanhSachTienIch.length > 0
-    ) {
-      return anyTin.DanhSachTienIch;
-    }
-    return tienIchList;
-  }, [selectedDetailTin, tienIchList]);
 
   return (
     <section
@@ -446,6 +383,7 @@ export default function TinDangSection({
             const firstImgPath =
               roomImageObjs.length > 0 ? roomImageObjs[0].DuongDan : null;
             const imageUrl = resolveRoomImageUrl(firstImgPath);
+            const detailHref = `/tinDang/${tin.MaTin}`;
 
             const isValidDate =
               tin.NgayDang && !isNaN(new Date(tin.NgayDang).getTime());
@@ -466,10 +404,10 @@ export default function TinDangSection({
                 itemType="https://schema.org/Accommodation"
                 className="group bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition overflow-hidden flex flex-col"
               >
-                <figure
-                  onClick={() => handleOpenDetailModal(tin)}
-                  className="relative h-48 w-full bg-slate-100 overflow-hidden m-0 cursor-pointer"
-                  title="Nhấn để xem thông tin chi tiết và toàn bộ ảnh phòng"
+                <Link
+                  href={detailHref}
+                  className="relative h-48 w-full bg-slate-100 overflow-hidden m-0 block"
+                  title="Nhấn để xem trang chi tiết phòng"
                 >
                   <img
                     src={imageUrl}
@@ -495,7 +433,7 @@ export default function TinDangSection({
                       📷 {roomImageObjs.length || 1} ảnh
                     </span>
                   </div>
-                </figure>
+                </Link>
 
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
                   <span className="text-xs font-bold text-slate-500">
@@ -515,11 +453,13 @@ export default function TinDangSection({
                   <div className="space-y-3">
                     <div>
                       <div className="flex items-baseline justify-between gap-2">
-                        <h3
-                          onClick={() => handleOpenDetailModal(tin)}
-                          className="text-lg font-bold text-slate-900 hover:text-teal-700 cursor-pointer transition"
-                        >
-                          Phòng {tin.TenPhong}
+                        <h3 className="text-lg font-bold text-slate-900">
+                          <Link
+                            href={detailHref}
+                            className="hover:text-teal-700 transition"
+                          >
+                            Phòng {tin.TenPhong}
+                          </Link>
                         </h3>
                         <span
                           itemProp="floorSize"
@@ -556,10 +496,14 @@ export default function TinDangSection({
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
                       <h4
                         itemProp="name"
-                        onClick={() => handleOpenDetailModal(tin)}
-                        className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug hover:text-teal-700 cursor-pointer transition"
+                        className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug"
                       >
-                        {tin.TieuDe}
+                        <Link
+                          href={detailHref}
+                          className="hover:text-teal-700 transition"
+                        >
+                          {tin.TieuDe}
+                        </Link>
                       </h4>
                       <p
                         itemProp="description"
@@ -597,13 +541,12 @@ export default function TinDangSection({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDetailModal(tin)}
-                        className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition text-center shrink-0 cursor-pointer"
+                      <Link
+                        href={detailHref}
+                        className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition text-center shrink-0"
                       >
                         Xem chi tiết
-                      </button>
+                      </Link>
 
                       {contact.hasPhoneFromDB && (
                         <a
@@ -631,221 +574,6 @@ export default function TinDangSection({
               </article>
             );
           })}
-        </div>
-      )}
-
-      {/* MODAL XEM CHI TIẾT PHÒNG (Áp dụng thiết kế & cơ chế của ChiTietPhongTroPage) */}
-      {selectedDetailTin && detailContact && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="modal-room-detail-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-xs p-3 sm:p-6 overflow-y-auto"
-          onClick={handleCloseDetailModal}
-        >
-          <div
-            className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden my-auto max-h-[92vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header Modal */}
-            <div className="px-5 py-4 bg-[#00FFCC] text-slate-900 flex items-center justify-between gap-3 shrink-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#00FFCC] text-slate-900">
-                  {selectedDetailTin.TenKhu}
-                </span>
-                <h3
-                  id="modal-room-detail-title"
-                  className="text-base sm:text-lg font-bold"
-                >
-                  Chi Tiết Phòng {selectedDetailTin.TenPhong}
-                </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-900/10 text-slate-900 border border-slate-900/20">
-                  Đang trống • Mã tin #{selectedDetailTin.MaTin}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCloseDetailModal}
-                aria-label="Đóng cửa sổ chi tiết phòng"
-                className="w-8 h-8 rounded-xl bg-slate-900/10 hover:bg-slate-900/20 text-slate-900 flex items-center justify-center font-bold text-sm transition cursor-pointer shrink-0"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Body Modal (Bố cục 12 cột đồng bộ với ChiTietPhongTroPage) */}
-            <div className="p-5 sm:p-8 overflow-y-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Cột trái: Bộ sưu tập toàn bộ ảnh phòng (AnhPhong) */}
-              <div className="lg:col-span-7 space-y-3">
-                <div className="w-full h-64 sm:h-80 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
-                  <img
-                    src={activeImageUrl || DEFAULT_ROOM_FALLBACK_IMAGE}
-                    alt={selectedDetailTin.TenPhong}
-                    onError={handleImageError}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                {/* Dải toàn bộ ảnh thu nhỏ của phòng giống hệt ChiTietPhongTroPage */}
-                {detailImageList.length > 0 && (
-                  <div className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-1">
-                    {detailImageList.map((img) => {
-                      const resolved = resolveRoomImageUrl(img.DuongDan);
-                      const isSelected = activeImageUrl === resolved;
-                      return (
-                        <button
-                          key={img.MaAnh}
-                          type="button"
-                          onClick={() => setActiveImageUrl(resolved)}
-                          className={`relative w-20 h-16 rounded-xl overflow-hidden border-2 shrink-0 cursor-pointer transition ${
-                            isSelected
-                              ? "border-[#00FFCC] scale-105"
-                              : "border-slate-200 opacity-75 hover:opacity-100"
-                          }`}
-                        >
-                          <img
-                            src={resolved}
-                            alt="Thumb"
-                            onError={handleImageError}
-                            className="w-full h-full object-cover"
-                          />
-                          {Number(img.AnhChinh) === 1 && (
-                            <span className="absolute bottom-0 inset-x-0 bg-[#00FFCC] text-slate-900 text-[9px] font-bold text-center">
-                              Ảnh chính
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Mô tả bài đăng */}
-                <div className="space-y-1.5 pt-2">
-                  <h4 className="text-sm font-bold text-slate-900">
-                    {selectedDetailTin.TieuDe}
-                  </h4>
-                  <div className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200 whitespace-pre-line">
-                    {selectedDetailTin.MoTa ||
-                      "Chưa có mô tả chi tiết cho bài đăng này."}
-                  </div>
-                </div>
-              </div>
-
-              {/* Cột phải: Thông số phòng, Tiện ích & Liên hệ */}
-              <div className="lg:col-span-5 flex flex-col justify-between space-y-5">
-                <div className="space-y-5">
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                    <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900">
-                      {selectedDetailTin.TenKhu}
-                    </span>
-                    <p className="text-xs text-slate-600">{detailDiaChi}</p>
-                    <p className="text-2xl font-extrabold text-teal-700 pt-1">
-                      {Number(selectedDetailTin.Gia).toLocaleString("vi-VN")} đ
-                      / tháng
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="p-3.5 rounded-xl border border-slate-200">
-                      <span className="text-slate-500 block">Diện tích</span>
-                      <strong className="text-sm text-slate-900">
-                        {Number(selectedDetailTin.DienTich)} m²
-                      </strong>
-                    </div>
-                    <div className="p-3.5 rounded-xl border border-slate-200">
-                      <span className="text-slate-500 block">Trạng thái</span>
-                      <strong className="text-sm text-emerald-700">
-                        Đang trống
-                      </strong>
-                    </div>
-                  </div>
-
-                  {/* Danh sách Tiện ích đi kèm đồng bộ từ ChiTietPhongTroPage */}
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
-                      Tiện ích đi kèm ({detailTienIchList.length})
-                    </h4>
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {detailTienIchList.length > 0 ? (
-                        detailTienIchList.map((ti) => (
-                          <div
-                            key={ti.MaTI}
-                            className="p-3 rounded-xl bg-[#00FFCC]/15 border border-teal-200 flex items-start justify-between gap-2"
-                          >
-                            <div>
-                              <p className="text-xs font-bold text-slate-900">
-                                {ti.TenTI}
-                              </p>
-                              {(ti as any).MoTa && (
-                                <p className="text-[11px] text-slate-600 mt-0.5">
-                                  {(ti as any).MoTa}
-                                </p>
-                              )}
-                            </div>
-                            <span className="text-teal-700 font-bold text-xs">
-                              ✓
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-slate-400 italic">
-                          Phòng này chưa được cấu hình tiện ích.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Thông tin liên hệ Quản lý & Nút thuê */}
-                <div className="pt-4 border-t border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Người phụ trách ({selectedDetailTin.TenKhu})
-                      </p>
-                      <p className="text-sm font-bold text-slate-900">
-                        {detailContact.tenQuanLy}
-                      </p>
-                    </div>
-                    {detailContact.hasPhoneFromDB && (
-                      <a
-                        href={`tel:${detailContact.sdtHienThi.replace(/\s+/g, "")}`}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-900 transition"
-                      >
-                        📞 {detailContact.sdtHienThi}
-                      </a>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2.5">
-                    {detailContact.hasPhoneFromDB && (
-                      <a
-                        href={detailContact.zaloUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 text-[#0068FF] border border-[#0068FF] transition text-center"
-                      >
-                        Nhắn Zalo
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const roomToContact = selectedDetailTin;
-                        handleCloseDetailModal();
-                        onSelectContactRoom(roomToContact);
-                      }}
-                      className="flex-1 px-4 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition cursor-pointer"
-                    >
-                      Liên hệ thuê phòng này
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </section>
