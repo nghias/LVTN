@@ -36,6 +36,28 @@ interface TinDangSectionProps {
   onSelectContactRoom: (tin: TinDangItem) => void;
 }
 
+// Định dạng ngày cố định theo múi giờ Việt Nam để Server (UTC) và Client (GMT+7) luôn khớp 100%
+function formatDateVN(dateInput?: string | Date | null): {
+  formattedDate: string;
+  isoDate?: string;
+} {
+  if (!dateInput) return { formattedDate: "Mới cập nhật" };
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return { formattedDate: "Mới cập nhật" };
+
+  const formattedDate = new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Asia/Ho_Chi_Minh",
+  }).format(date);
+
+  return {
+    formattedDate,
+    isoDate: date.toISOString(),
+  };
+}
+
 // Trích xuất danh sách ảnh theo đúng cấu trúc { MaAnh, DuongDan, AnhChinh }
 // Ưu tiên ảnh có AnhChinh = 1 lên đầu tiên
 export function extractRoomImageList(tin: TinDangItem): RoomImageObject[] {
@@ -131,7 +153,7 @@ export default function TinDangSection({
 
   const validFilteredTinDangList = useMemo(() => {
     return filteredTinDangList.filter((tin) =>
-      isAvailablePublicTinDang(tin as any)
+      isAvailablePublicTinDang(tin as any),
     );
   }, [filteredTinDangList]);
 
@@ -387,12 +409,7 @@ export default function TinDangSection({
 
             const isValidDate =
               tin.NgayDang && !isNaN(new Date(tin.NgayDang).getTime());
-            const formattedDate = isValidDate
-              ? new Date(tin.NgayDang!).toLocaleDateString("vi-VN")
-              : "Mới cập nhật";
-            const isoDate = isValidDate
-              ? new Date(tin.NgayDang!).toISOString()
-              : undefined;
+            const { formattedDate, isoDate } = formatDateVN(tin.NgayDang);
 
             const seoImageAlt = `Phòng ${tin.TenPhong} - ${tin.TenKhu}`;
 
@@ -439,10 +456,15 @@ export default function TinDangSection({
                   <span className="text-xs font-bold text-slate-500">
                     Mã tin #{tin.MaTin}
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200">
+                  <span
+                    suppressHydrationWarning
+                    className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 text-slate-900 border border-teal-200"
+                  >
                     Đăng ngày:{" "}
                     {isoDate ? (
-                      <time dateTime={isoDate}>{formattedDate}</time>
+                      <time dateTime={isoDate} suppressHydrationWarning>
+                        {formattedDate}
+                      </time>
                     ) : (
                       formattedDate
                     )}
@@ -478,6 +500,7 @@ export default function TinDangSection({
                         itemProp="offers"
                         itemScope
                         itemType="https://schema.org/Offer"
+                        suppressHydrationWarning
                         className="mt-1 text-base font-bold text-teal-700"
                       >
                         <meta itemProp="priceCurrency" content="VND" />
