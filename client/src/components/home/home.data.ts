@@ -26,6 +26,8 @@ export interface TinDangItem {
   TrangThaiPhong: string;
   MaKhu: number;
   TenKhu: string;
+  DiaChiKhu?: string | null;
+  DanhSachTienIch?: string | null;
   AnhDaiDien?: string | null;
   TenChuTro?: string | null;
   TenQuanLy?: string | null;
@@ -51,6 +53,7 @@ export interface ChatMessage {
   sender: "ai" | "user";
   text: string;
   time: string;
+  suggestedRooms?: TinDangItem[];
 }
 
 export interface ManagerContactInfo {
@@ -62,33 +65,14 @@ export interface ManagerContactInfo {
   telUrl: string;
 }
 
-export const VONG_LAP_VAN_HANH = [
-  {
-    buoc: "01",
-    tieuDe: "Tìm phòng & Tư vấn cùng AI",
-    nhan: "Nhanh chóng",
-    moTa: "Xem hình ảnh, giá thuê thực tế và trò chuyện với Trợ lý ảo 24/7.",
-  },
-  {
-    buoc: "02",
-    tieuDe: "Hợp đồng",
-    nhan: "Minh bạch",
-    moTa: "Ký hợp đồng rõ ràng, lưu trữ hồ sơ và bảo mật an toàn.",
-  },
-  {
-    buoc: "03",
-    tieuDe: "Có hệ thống lấy số liệu nước tự động",
-    nhan: "Chính xác",
-    moTa: "Theo dõi tiêu thụ nước tự động.",
-  },
-  {
-    buoc: "04",
-    tieuDe: "Thanh toán Hóa đơn dễ dàng",
-    nhan: "Tiện lợi",
-    moTa: "Nhận thông báo hóa đơn và thanh toán nhanh chóng qua.",
-  },
-];
-
+export interface OwnerContactInfo {
+  tenChuTro: string;
+  sdtHienThi: string;
+  cleanPhone: string;
+  hasPhoneFromDB: boolean;
+  zaloUrl: string;
+  telUrl: string;
+}
 
 export const GOI_Y_CAU_HOI_AI = [
   "Hiện có những phòng nào đang trống?",
@@ -96,8 +80,10 @@ export const GOI_Y_CAU_HOI_AI = [
   "Cách liên hệ Zalo quản lý khu trọ?",
 ];
 
-export const formatVND = (amount: number | string) =>
-  new Intl.NumberFormat("vi-VN").format(Number(amount) || 0) + " đ";
+export const formatVND = (amount: number | string) => {
+  const numeric = Math.round(Number(amount) || 0);
+  return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " đ";
+};
 
 export const extractManagerContact = (
   tin: TinDangItem,
@@ -105,31 +91,69 @@ export const extractManagerContact = (
 ): ManagerContactInfo => {
   const khu = khuTroList.find((k) => Number(k.MaKhu) === Number(tin.MaKhu));
 
+  // Luôn ưu tiên TenQuanLy của TinDang hoặc KhuTro trước
   const tenQuanLy =
     tin.TenQuanLy ||
-    tin.TenChuTro ||
-    tin.HoTen ||
     khu?.TenQuanLy ||
-    khu?.TenChuTro ||
+    tin.HoTen ||
     khu?.HoTen ||
+    tin.TenChuTro ||
+    khu?.TenChuTro ||
     `Quản lý ${tin.TenKhu}`;
 
+  // Luôn ưu tiên SDTQuanLy của TinDang hoặc KhuTro trước
   const rawPhone =
     tin.SDTQuanLy ||
-    tin.SDTChuTro ||
+    khu?.SDTQuanLy ||
     tin.SDT ||
     tin.SoDienThoai ||
-    khu?.SDTQuanLy ||
-    khu?.SDTChuTro ||
     khu?.SDT ||
     khu?.SoDienThoai ||
+    tin.SDTChuTro ||
+    khu?.SDTChuTro ||
     "";
 
-  const cleanPhone = rawPhone.replace(/[^0-9]/g, "");
+  const cleanPhone = String(rawPhone).replace(/[^0-9]/g, "");
 
   return {
     tenQuanLy,
-    sdtHienThi: rawPhone.trim(),
+    sdtHienThi: String(rawPhone).trim(),
+    cleanPhone,
+    hasPhoneFromDB: cleanPhone.length > 0,
+    zaloUrl: cleanPhone ? `https://zalo.me/${cleanPhone}` : "#",
+    telUrl: cleanPhone ? `tel:${cleanPhone}` : "#",
+  };
+};
+
+/**
+ * 2. Trích xuất thông tin Chủ trọ (Bắt buộc luôn có mặt ở mọi cơ sở)
+ */
+export const extractOwnerContact = (
+  tin: TinDangItem,
+  khuTroList: KhuTroWithContact[]
+): OwnerContactInfo => {
+  const khu = khuTroList.find((k) => Number(k.MaKhu) === Number(tin.MaKhu));
+  const anyKhuWithOwner = khuTroList.find(
+    (k) => k.TenChuTro || k.SDTChuTro
+  );
+
+  const tenChuTro =
+    tin.TenChuTro?.trim() ||
+    khu?.TenChuTro?.trim() ||
+    anyKhuWithOwner?.TenChuTro?.trim() ||
+    "Nguyễn Thị Quỳnh Dư";
+
+  const rawPhone =
+    tin.SDTChuTro?.trim() ||
+    khu?.SDTChuTro?.trim() ||
+    anyKhuWithOwner?.SDTChuTro?.trim() ||
+    "";
+
+  const cleanPhone = String(rawPhone).replace(/[^0-9]/g, "");
+
+  return {
+    tenChuTro,
+    sdtHienThi: String(rawPhone).trim(),
     cleanPhone,
     hasPhoneFromDB: cleanPhone.length > 0,
     zaloUrl: cleanPhone ? `https://zalo.me/${cleanPhone}` : "#",

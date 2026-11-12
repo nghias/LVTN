@@ -12,7 +12,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi" suppressHydrationWarning>
-      <body className="min-h-screen flex flex-col antialiased bg-white text-slate-900">
+      <body
+        suppressHydrationWarning
+        className="min-h-screen flex flex-col antialiased bg-white text-slate-900"
+      >
         <GlobalLoadingProvider>
           <AlertModalProvider>
             {children}

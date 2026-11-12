@@ -231,6 +231,7 @@ export default function HomePageClient({
         isOpen={isChatOpen}
         onToggleOpen={() => setIsChatOpen((prev) => !prev)}
         onClose={() => setIsChatOpen(false)}
+        onSelectContactRoom={(room) => setContactRoom(room)}
         tinDangList={tinDangList}
         khuTroList={khuTroList}
         giaDienNuoc={giaDienNuoc}
