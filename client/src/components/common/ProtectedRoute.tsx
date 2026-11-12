@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import { AuthService } from '../../services/auth.service';
 import { RoleType, UserProfile } from '../../types/auth.type';
 
@@ -10,27 +10,45 @@ interface ProtectedRouteProps {
   children: (user: UserProfile) => React.ReactNode;
 }
 
-export default function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
+export default function ProtectedRoute({
+  allowedRoles,
+  children,
+}: ProtectedRouteProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Giữ allowedRoles trong useRef để khi gõ chữ ở các ô input trang con re-render không kích hoạt lại useEffect
+  const allowedRolesRef = useRef<RoleType[]>(allowedRoles);
+  allowedRolesRef.current = allowedRoles;
 
   useEffect(() => {
     let isMounted = true;
 
     const verifySession = async () => {
       try {
-        const res = await AuthService.getMe();
-        const currentUser = res.data?.user;
+        if (!user) {
+          setLoading(true);
+        }
 
-        if (!currentUser) {
+        const res = await AuthService.getMe();
+        const currentUser =
+          res.data?.user || (res.data as unknown as UserProfile);
+
+        if (!isMounted) return;
+
+        if (!currentUser || !currentUser.Quyen) {
           router.replace('/auth');
           return;
         }
 
         // Nếu truy cập vào trang không đúng quyền thì đẩy về đúng trang của quyền đó
-        if (!allowedRoles.includes(currentUser.Quyen)) {
-          if (currentUser.Quyen === 'ChuTro' || currentUser.Quyen === 'QuanLy') {
+        if (!allowedRolesRef.current.includes(currentUser.Quyen)) {
+          if (
+            currentUser.Quyen === 'ChuTro' ||
+            currentUser.Quyen === 'QuanLy'
+          ) {
             router.replace('/chuTro/thongKe');
           } else {
             router.replace('/nguoiThue/thongKe');
@@ -38,12 +56,12 @@ export default function ProtectedRoute({ allowedRoles, children }: ProtectedRout
           return;
         }
 
-        if (isMounted) {
-          setUser(currentUser);
-          setLoading(false);
-        }
+        setUser(currentUser);
+        setLoading(false);
       } catch {
-        router.replace('/auth');
+        if (isMounted) {
+          router.replace('/auth');
+        }
       }
     };
 
@@ -52,12 +70,16 @@ export default function ProtectedRoute({ allowedRoles, children }: ProtectedRout
     return () => {
       isMounted = false;
     };
-  }, [allowedRoles, router]);
+    // Chỉ kiểm tra khi chuyển đường dẫn trang (pathname), tuyệt đối không chạy lại khi gõ phím
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-600 text-base">Đang kiểm tra phiên đăng nhập bảo mật...</p>
+        <p className="text-gray-600 text-base">
+          Đang kiểm tra phiên đăng nhập bảo mật...
+        </p>
       </div>
     );
   }

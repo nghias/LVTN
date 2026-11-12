@@ -12,6 +12,8 @@ import {
   TinDangItem,
   KhuTroWithContact,
   extractManagerContact,
+  formatVND,
+  formatDateVN,
 } from "./home.data";
 
 export interface RoomImageObject {
@@ -36,35 +38,10 @@ interface TinDangSectionProps {
   onSelectContactRoom: (tin: TinDangItem) => void;
 }
 
-// Định dạng ngày cố định theo múi giờ Việt Nam để Server (UTC) và Client (GMT+7) luôn khớp 100%
-function formatDateVN(dateInput?: string | Date | null): {
-  formattedDate: string;
-  isoDate?: string;
-} {
-  if (!dateInput) return { formattedDate: "Mới cập nhật" };
-  const date = new Date(dateInput);
-  if (isNaN(date.getTime())) return { formattedDate: "Mới cập nhật" };
-
-  const formattedDate = new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Asia/Ho_Chi_Minh",
-  }).format(date);
-
-  return {
-    formattedDate,
-    isoDate: date.toISOString(),
-  };
-}
-
-// Trích xuất danh sách ảnh theo đúng cấu trúc { MaAnh, DuongDan, AnhChinh }
-// Ưu tiên ảnh có AnhChinh = 1 lên đầu tiên
 export function extractRoomImageList(tin: TinDangItem): RoomImageObject[] {
   const anyTin = tin as any;
   const rawList: RoomImageObject[] = [];
 
-  // 1. Ưu tiên lấy từ DanhSachAnh hoặc AnhPhongList (mảng object từ bảng AnhPhong)
   const sourceArray = Array.isArray(anyTin.DanhSachAnh)
     ? anyTin.DanhSachAnh
     : Array.isArray(anyTin.AnhPhongList)
@@ -92,7 +69,6 @@ export function extractRoomImageList(tin: TinDangItem): RoomImageObject[] {
     }
   });
 
-  // 2. Nếu mảng rỗng nhưng có AnhDaiDien thì bổ sung từ AnhDaiDien
   if (
     rawList.length === 0 &&
     typeof tin.AnhDaiDien === "string" &&
@@ -105,7 +81,6 @@ export function extractRoomImageList(tin: TinDangItem): RoomImageObject[] {
     });
   }
 
-  // 3. Khử trùng lặp theo URL đã chuẩn hóa và sắp xếp AnhChinh = 1 lên đầu
   const seenUrls = new Set<string>();
   const uniqueList: RoomImageObject[] = [];
 
@@ -137,7 +112,6 @@ export default function TinDangSection({
   onResetFilters,
   onSelectContactRoom,
 }: TinDangSectionProps) {
-  // Chốt chặn tự chuyển về ảnh dự phòng nếu có ảnh dữ liệu mẫu cũ bị 404
   const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.currentTarget;
     if (target.src !== DEFAULT_ROOM_FALLBACK_IMAGE) {
@@ -146,18 +120,16 @@ export default function TinDangSection({
     }
   };
 
-  // Chốt chặn lọc chỉ giữ lại phòng Còn trống & tin đăng Đang hiển thị
   const validTotalTinDangList = useMemo(() => {
     return tinDangList.filter((tin) => isAvailablePublicTinDang(tin as any));
   }, [tinDangList]);
 
   const validFilteredTinDangList = useMemo(() => {
     return filteredTinDangList.filter((tin) =>
-      isAvailablePublicTinDang(tin as any),
+      isAvailablePublicTinDang(tin as any)
     );
   }, [filteredTinDangList]);
 
-  // Tạo JSON-LD Structured Data
   const jsonLdSchema = useMemo(() => {
     return {
       "@context": "https://schema.org",
@@ -211,6 +183,7 @@ export default function TinDangSection({
       {!loading && validFilteredTinDangList.length > 0 && (
         <script
           type="application/ld+json"
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdSchema) }}
         />
       )}
@@ -407,10 +380,7 @@ export default function TinDangSection({
             const imageUrl = resolveRoomImageUrl(firstImgPath);
             const detailHref = `/tinDang/${tin.MaTin}`;
 
-            const isValidDate =
-              tin.NgayDang && !isNaN(new Date(tin.NgayDang).getTime());
             const { formattedDate, isoDate } = formatDateVN(tin.NgayDang);
-
             const seoImageAlt = `Phòng ${tin.TenPhong} - ${tin.TenKhu}`;
 
             return (
@@ -512,7 +482,7 @@ export default function TinDangSection({
                           itemProp="availability"
                           href="https://schema.org/InStock"
                         />
-                        {Number(tin.Gia).toLocaleString("vi-VN")} đ / tháng
+                        {formatVND(tin.Gia)} / tháng
                       </p>
                     </div>
 

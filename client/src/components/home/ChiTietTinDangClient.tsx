@@ -8,6 +8,7 @@ import HomeHeader from "@/components/layout/homeHeader";
 import AppFooter from "@/components/layout/AppFooter";
 import ContactRoomModal from "@/components/home/ContactRoomModal";
 import AiChatbotWidget from "@/components/home/AiChatbotWidget";
+import { useAlertModal } from "@/components/common/AlertModalProvider";
 
 import {
   HomeService,
@@ -24,6 +25,8 @@ import {
   KhuTroWithContact,
   TinDangItem,
   extractManagerContact,
+  formatVND,
+  formatDateVN,
 } from "./home.data";
 import {
   extractRoomImageList,
@@ -34,18 +37,30 @@ interface ChiTietTinDangClientProps {
   maTin: number;
 }
 
+const DEFAULT_GIA_DIEN_NUOC: GiaDienNuocHome = {
+  MaGia: 1,
+  GiaDien: 3500,
+  GiaNuoc: 15000,
+  NgayApDung: "2026-01-01",
+};
+
 export default function ChiTietTinDangClient({
   maTin,
 }: ChiTietTinDangClientProps) {
+  const { showSuccess } = useAlertModal();
+
   const [loading, setLoading] = useState<boolean>(true);
   const [currentTin, setCurrentTin] = useState<TinDangHome | null>(null);
   const [allTinDang, setAllTinDang] = useState<TinDangHome[]>([]);
   const [khuTroList, setKhuTroList] = useState<KhuTroWithContact[]>([]);
   const [systemTienIch, setSystemTienIch] = useState<TienIchItem[]>([]);
-  const [giaDienNuoc, setGiaDienNuoc] = useState<GiaDienNuocHome | null>(null);
+  const [giaDienNuoc, setGiaDienNuoc] = useState<GiaDienNuocHome>(
+    DEFAULT_GIA_DIEN_NUOC
+  );
   const [activeImageUrl, setActiveImageUrl] = useState<string>("");
   const [relatedFilter, setRelatedFilter] = useState<"ALL" | "SAME_KHU">("ALL");
   const [contactRoom, setContactRoom] = useState<TinDangItem | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
   const handleImageError = (e: SyntheticEvent<HTMLImageElement, Event>) => {
     const target = e.currentTarget;
@@ -53,6 +68,18 @@ export default function ChiTietTinDangClient({
       target.onerror = null;
       target.src = DEFAULT_ROOM_FALLBACK_IMAGE;
     }
+  };
+
+  const handleCopyPhone = (phone: string, tenNguoiLienHe: string) => {
+    if (!phone) return;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(phone);
+    }
+    showSuccess(
+      `Đã sao chép số điện thoại ${phone} của ${tenNguoiLienHe}!`,
+      "Sao chép thành công",
+      2
+    );
   };
 
   useEffect(() => {
@@ -75,7 +102,9 @@ export default function ChiTietTinDangClient({
         setAllTinDang(validList);
         setKhuTroList((homePayload.khuTro || []) as KhuTroWithContact[]);
         setSystemTienIch(homePayload.tienIch || []);
-        setGiaDienNuoc(homePayload.giaDienNuoc || null);
+        if (homePayload.giaDienNuoc) {
+          setGiaDienNuoc(homePayload.giaDienNuoc);
+        }
 
         const matchedTin =
           validList.find((t) => Number(t.MaTin) === Number(maTin)) || null;
@@ -175,9 +204,7 @@ export default function ChiTietTinDangClient({
   }, [allTinDang, currentTin]);
 
   const formattedNgayDang = useMemo(() => {
-    if (!currentTin?.NgayDang) return "Mới cập nhật";
-    const d = new Date(currentTin.NgayDang);
-    return isNaN(d.getTime()) ? "Mới cập nhật" : d.toLocaleDateString("vi-VN");
+    return formatDateVN(currentTin?.NgayDang).formattedDate;
   }, [currentTin]);
 
   return (
@@ -264,7 +291,10 @@ export default function ChiTietTinDangClient({
                   Còn trống • Mã tin #{currentTin.MaTin}
                 </span>
               </div>
-              <span className="text-xs font-bold text-slate-800">
+              <span
+                suppressHydrationWarning
+                className="text-xs font-bold text-slate-800"
+              >
                 Ngày đăng: {formattedNgayDang}
               </span>
             </div>
@@ -343,8 +373,11 @@ export default function ChiTietTinDangClient({
                     <p className="text-xs text-slate-600 pt-1">
                       📍 Địa chỉ: <strong>{detailDiaChi}</strong>
                     </p>
-                    <p className="text-2xl sm:text-3xl font-extrabold text-teal-700 pt-1">
-                      {Number(currentTin.Gia).toLocaleString("vi-VN")} đ{" "}
+                    <p
+                      suppressHydrationWarning
+                      className="text-2xl sm:text-3xl font-extrabold text-teal-700 pt-1"
+                    >
+                      {formatVND(currentTin.Gia)}{" "}
                       <span className="text-sm font-semibold text-slate-500">
                         / tháng
                       </span>
@@ -360,18 +393,20 @@ export default function ChiTietTinDangClient({
                     </div>
                     <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
                       <span className="text-slate-500 block">Giá điện</span>
-                      <strong className="text-sm text-slate-900">
-                        {giaDienNuoc
-                          ? `${Number(giaDienNuoc.GiaDien).toLocaleString("vi-VN")} đ/kWh`
-                          : "3.500 đ/kWh"}
+                      <strong
+                        suppressHydrationWarning
+                        className="text-sm text-slate-900"
+                      >
+                        {formatVND(giaDienNuoc.GiaDien)}/kWh
                       </strong>
                     </div>
                     <div className="p-3.5 rounded-xl border border-slate-200 bg-white col-span-2 sm:col-span-1">
                       <span className="text-slate-500 block">Giá nước</span>
-                      <strong className="text-sm text-slate-900">
-                        {giaDienNuoc
-                          ? `${Number(giaDienNuoc.GiaNuoc).toLocaleString("vi-VN")} đ/m³`
-                          : "15.000 đ/m³"}
+                      <strong
+                        suppressHydrationWarning
+                        className="text-sm text-slate-900"
+                      >
+                        {formatVND(giaDienNuoc.GiaNuoc)}/m³
                       </strong>
                     </div>
                   </div>
@@ -541,8 +576,11 @@ export default function ChiTietTinDangClient({
                           {Number(tin.DienTich)} m²
                         </span>
                       </div>
-                      <p className="mt-1 text-base font-bold text-teal-700">
-                        {Number(tin.Gia).toLocaleString("vi-VN")} đ / tháng
+                      <p
+                        suppressHydrationWarning
+                        className="mt-1 text-base font-bold text-teal-700"
+                      >
+                        {formatVND(tin.Gia)} / tháng
                       </p>
                       <h4 className="mt-2 text-sm font-bold text-slate-900 line-clamp-2">
                         <Link href={itemHref} className="hover:text-teal-700">
@@ -586,26 +624,21 @@ export default function ChiTietTinDangClient({
         </section>
       </main>
 
-      {contactRoom && (
-        <ContactRoomModal
-          {...({
-            room: contactRoom,
-            selectedRoom: contactRoom,
-            tinDang: contactRoom,
-            khuTroList,
-            isOpen: Boolean(contactRoom),
-            onClose: () => setContactRoom(null),
-          } as any)}
-        />
-      )}
+      <ContactRoomModal
+        contactRoom={contactRoom}
+        khuTroList={khuTroList}
+        onClose={() => setContactRoom(null)}
+        onCopyPhone={handleCopyPhone}
+      />
 
       <AiChatbotWidget
-        {...({
-          tinDangList: allTinDang,
-          khuTroList,
-          tienIchList: systemTienIch,
-          giaDienNuoc,
-        } as any)}
+        isOpen={isChatOpen}
+        onToggleOpen={() => setIsChatOpen((prev) => !prev)}
+        onClose={() => setIsChatOpen(false)}
+        tinDangList={allTinDang as unknown as TinDangItem[]}
+        khuTroList={khuTroList}
+        giaDienNuoc={giaDienNuoc}
+        onSelectContactRoom={(room) => setContactRoom(room)}
       />
 
       <AppFooter />

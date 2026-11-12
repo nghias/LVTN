@@ -68,7 +68,7 @@ export function GlobalLoadingProvider({
       if (loading) {
         if (customMessage) setMessage(customMessage);
         setManualLoading(true);
-      } else {
+            } else {
         setManualLoading(false);
         setMessage('Đang xử lý dữ liệu...');
       }
@@ -76,6 +76,7 @@ export function GlobalLoadingProvider({
     []
   );
 
+  // Tự động giải phóng trạng thái Loading khi chuyển trang
   useEffect(() => {
     activeCountRef.current = 0;
     setActiveRequests(0);
@@ -84,6 +85,7 @@ export function GlobalLoadingProvider({
     setMessage('Đang xử lý dữ liệu...');
   }, [pathname]);
 
+  // Khóa cuộn trang chỉ khi thực sự hiển thị màn hình Loading
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (isLoading) {
@@ -96,7 +98,7 @@ export function GlobalLoadingProvider({
     };
   }, [isLoading]);
 
-  // Đánh chặn fetch: luôn đính kèm Bearer Token, nhưng KHÔNG bật Loading với các request kiểm tra ngầm
+  // Đánh chặn fetch: Luôn gắn Bearer Token cho mọi API, nhưng CHỈ bật Loading cho các thao tác ghi (POST/PUT/PATCH/DELETE)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -124,10 +126,32 @@ export function GlobalLoadingProvider({
           urlString.includes('onrender.com') ||
           urlString.includes('localhost:5000'));
 
-      // Kiểm tra xem có phải request chạy ngầm (polling PayOS, tạo QR ngầm) hay không
-      const reqHeaders = new Headers(init?.headers || {});
+      // Xác định HTTP Method (Mặc định là GET)
+      const rawMethod =
+        init?.method ||
+        (typeof Request !== 'undefined' && input instanceof Request
+          ? input.method
+          : 'GET');
+      const method = String(rawMethod || 'GET').toUpperCase();
+
+      // Chỉ các lệnh thay đổi dữ liệu (POST, PUT, PATCH, DELETE) mới cần bật màn hình Loading khóa thao tác
+      // Toàn bộ lệnh GET (tìm kiếm khi gõ chữ, chọn bộ lọc, lấy chi tiết, kiểm tra phiên) chạy ngầm không khóa màn hình
+      const isMutationMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(
+        method
+      );
+
+      const reqHeaders = new Headers(
+        init?.headers ||
+          (typeof Request !== 'undefined' && input instanceof Request
+            ? input.headers
+            : undefined)
+      );
+
       const isSilentRequest =
+        !isMutationMethod ||
         reqHeaders.get('x-silent-fetch') === '1' ||
+        reqHeaders.get('x-skip-global-loading') === '1' ||
+        urlString.includes('/ai-chat') ||
         urlString.includes('/kiem-tra-payos/') ||
         urlString.includes('/tao-link-payos');
 

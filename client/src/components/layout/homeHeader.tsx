@@ -17,7 +17,9 @@ export default function HomeHeader() {
     { label: "Giới thiệu", href: "#gioi-thieu" },
   ];
 
-
+  const resolveNavHref = (hash: string) => {
+    return pathname === "/" ? hash : `/${hash}`;
+  };
 
   return (
     <header className="w-full bg-white text-slate-900 border-b-2 border-[#00FFCC] shadow-xs sticky top-0 z-40">
@@ -47,11 +49,11 @@ export default function HomeHeader() {
         {/* Điều hướng Desktop */}
         <nav className="hidden lg:flex items-center gap-1.5 shrink-0">
           {primaryNavItems.map((item) => {
-            const isActive = activeSection === item.href;
+            const isActive = pathname === "/" && activeSection === item.href;
             return (
               <a
                 key={item.href}
-                href={item.href}
+                href={resolveNavHref(item.href)}
                 onClick={() => setActiveSection(item.href)}
                 className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition no-underline ${
                   isActive
@@ -63,9 +65,6 @@ export default function HomeHeader() {
               </a>
             );
           })}
-
-          {/* Dropdown Phân quyền Cổng thông tin */}
-          
         </nav>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -76,7 +75,6 @@ export default function HomeHeader() {
             Đăng nhập
           </Link>
 
-          {/* Nút bật/tắt Menu Mobile */}
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -109,7 +107,7 @@ export default function HomeHeader() {
         </div>
       </div>
 
-      {/* Menu Mobile đồng bộ thiết kế NguoiThueHeader */}
+      {/* Menu Mobile */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-white border-t border-slate-200 px-4 pt-3 pb-5 shadow-xl space-y-4">
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
@@ -134,7 +132,7 @@ export default function HomeHeader() {
               {primaryNavItems.map((item) => (
                 <a
                   key={item.href}
-                  href={item.href}
+                  href={resolveNavHref(item.href)}
                   onClick={() => {
                     setActiveSection(item.href);
                     setMobileMenuOpen(false);
@@ -160,7 +158,6 @@ export default function HomeHeader() {
               >
                 Đăng nhập
               </Link>
-
             </div>
           </div>
         </div>

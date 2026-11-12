@@ -2,7 +2,7 @@
 "use client";
 
 import { GiaDienNuocHome, PhiDichVuItem } from "@/services/home.service";
-import { formatVND } from "./home.data";
+import { formatVND, formatDateVN } from "./home.data";
 
 interface BangGiaSectionProps {
   giaDienNuoc?: GiaDienNuocHome | null;
@@ -15,11 +15,9 @@ export default function BangGiaSection({
 }: BangGiaSectionProps) {
   const safePhiDichVuList = Array.isArray(phiDichVuList) ? phiDichVuList : [];
 
-  const formattedNgayApDung =
-    giaDienNuoc?.NgayApDung &&
-    !isNaN(new Date(giaDienNuoc.NgayApDung).getTime())
-      ? new Date(giaDienNuoc.NgayApDung).toLocaleDateString("vi-VN")
-      : "Mới nhất";
+  const formattedNgayApDung = giaDienNuoc?.NgayApDung
+    ? formatDateVN(giaDienNuoc.NgayApDung).formattedDate
+    : "Mới nhất";
 
   return (
     <section
@@ -33,7 +31,7 @@ export default function BangGiaSection({
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
           Đơn Giá Điện Nước & Phụ Phí Niêm Yết
         </h2>
-        <p className="text-xs text-slate-500 mt-1.5">
+        <p suppressHydrationWarning className="text-xs text-slate-500 mt-1.5">
           Áp dụng thống nhất khi tính Hóa đơn tự động hàng tháng trên hệ thống
           (Cập nhật ngày: {formattedNgayApDung})
         </p>
@@ -44,7 +42,10 @@ export default function BangGiaSection({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Đơn giá Điện (Đồng hồ IoT)
           </span>
-          <p className="text-2xl font-bold text-slate-900 my-2">
+          <p
+            suppressHydrationWarning
+            className="text-2xl font-bold text-slate-900 my-2"
+          >
             {formatVND(Number(giaDienNuoc?.GiaDien || 3500))}{" "}
             <span className="text-xs font-normal text-slate-500">/ kWh</span>
           </p>
@@ -57,7 +58,10 @@ export default function BangGiaSection({
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Đơn giá Nước (Đồng hồ IoT)
           </span>
-          <p className="text-2xl font-bold text-slate-900 my-2">
+          <p
+            suppressHydrationWarning
+            className="text-2xl font-bold text-slate-900 my-2"
+          >
             {formatVND(Number(giaDienNuoc?.GiaNuoc || 15000))}{" "}
             <span className="text-xs font-normal text-slate-500">/ m³</span>
           </p>
@@ -74,10 +78,13 @@ export default function BangGiaSection({
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
               Phí dịch vụ cố định
             </span>
-            <p className="text-xl font-bold text-slate-900 my-2">
+            <p
+              suppressHydrationWarning
+              className="text-xl font-bold text-slate-900 my-2"
+            >
               {Number(dv.DonGia) === 0
                 ? "Miễn phí"
-                : `${formatVND(Number(dv.DonGia))} / tháng`}
+                : `${formatVND(Number(dv.DonGia))} / ${dv.DonViTinh || "tháng"}`}
             </p>
             <span className="text-xs font-bold text-slate-700">{dv.TenDV}</span>
           </div>

@@ -80,9 +80,42 @@ export const GOI_Y_CAU_HOI_AI = [
   "Cách liên hệ Zalo quản lý khu trọ?",
 ];
 
+// Định dạng tiền tệ cố định không dùng Intl để tránh lỗi Hydration #418 (args[]=text)
 export const formatVND = (amount: number | string) => {
   const numeric = Math.round(Number(amount) || 0);
   return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") + " đ";
+};
+
+// Định dạng ngày DD/MM/YYYY cố định theo GMT+7 không dùng Intl để Server (UTC) và Client khớp 100%
+export const formatDateVN = (
+  dateInput?: string | Date | null
+): {
+  formattedDate: string;
+  isoDate?: string;
+} => {
+  if (!dateInput) return { formattedDate: "Mới cập nhật" };
+
+  const rawStr = typeof dateInput === "string" ? dateInput.trim() : "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawStr)) {
+    const [y, m, d] = rawStr.split("-");
+    return {
+      formattedDate: `${d}/${m}/${y}`,
+      isoDate: `${rawStr}T00:00:00.000Z`,
+    };
+  }
+
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return { formattedDate: "Mới cập nhật" };
+
+  const vnTime = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+  const dd = String(vnTime.getUTCDate()).padStart(2, "0");
+  const mm = String(vnTime.getUTCMonth() + 1).padStart(2, "0");
+  const yyyy = vnTime.getUTCFullYear();
+
+  return {
+    formattedDate: `${dd}/${mm}/${yyyy}`,
+    isoDate: date.toISOString(),
+  };
 };
 
 export const extractManagerContact = (
@@ -91,7 +124,6 @@ export const extractManagerContact = (
 ): ManagerContactInfo => {
   const khu = khuTroList.find((k) => Number(k.MaKhu) === Number(tin.MaKhu));
 
-  // Luôn ưu tiên TenQuanLy của TinDang hoặc KhuTro trước
   const tenQuanLy =
     tin.TenQuanLy ||
     khu?.TenQuanLy ||
@@ -101,7 +133,6 @@ export const extractManagerContact = (
     khu?.TenChuTro ||
     `Quản lý ${tin.TenKhu}`;
 
-  // Luôn ưu tiên SDTQuanLy của TinDang hoặc KhuTro trước
   const rawPhone =
     tin.SDTQuanLy ||
     khu?.SDTQuanLy ||
@@ -125,9 +156,6 @@ export const extractManagerContact = (
   };
 };
 
-/**
- * 2. Trích xuất thông tin Chủ trọ (Bắt buộc luôn có mặt ở mọi cơ sở)
- */
 export const extractOwnerContact = (
   tin: TinDangItem,
   khuTroList: KhuTroWithContact[]

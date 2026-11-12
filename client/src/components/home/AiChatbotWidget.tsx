@@ -4,26 +4,25 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { GiaDienNuocHome } from "@/services/home.service";
-import { aiChatService } from "@/services/aiChat.service";
+import { aiChatService, SharedChatState } from "@/services/aiChat.service";
 import {
-  ChatMessage,
   TinDangItem,
   KhuTroWithContact,
   formatVND,
 } from "./home.data";
 
 interface AiChatbotWidgetProps {
-  isOpen: boolean;
-  onToggleOpen: () => void;
-  onClose: () => void;
+  isOpen?: boolean;
+  onToggleOpen?: () => void;
+  onClose?: () => void;
   tinDangList: TinDangItem[];
   khuTroList: KhuTroWithContact[];
-  giaDienNuoc: GiaDienNuocHome;
+  giaDienNuoc?: GiaDienNuocHome | null;
   onSelectContactRoom?: (room: TinDangItem) => void;
 }
 
 export default function AiChatbotWidget({
-  isOpen,
+  isOpen: externalIsOpen,
   onToggleOpen,
   onClose,
   tinDangList,
@@ -31,23 +30,52 @@ export default function AiChatbotWidget({
 }: AiChatbotWidgetProps) {
   const router = useRouter();
   const [chatInput, setChatInput] = useState<string>("");
-  const [isAiTyping, setIsAiTyping] = useState<boolean>(false);
   const [questionPage, setQuestionPage] = useState<number>(0);
-  const [aiDynamicQuestions, setAiDynamicQuestions] = useState<string[]>([]);
 
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome-ai",
-      sender: "ai",
-      text: "Xin chào! Tôi là Trợ lý ảo AI của hệ thống Xóm Trọ (ứng dụng Gemini 2.5 Flash). Bạn cần tìm phòng trống theo mức giá, hỏi chi tiết tiện ích đi kèm, bảng phí dịch vụ hàng tháng hay đơn giá điện nước IoT?",
-      time: "Bây giờ",
-    },
-  ]);
+  // Đồng bộ với kho trạng thái xuyên trang (giữ nguyên đoạn chat khi chuyển trang)
+  const [chatState, setChatState] = useState<SharedChatState>(() =>
+    aiChatService.getState()
+  );
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const questionScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Tự động tạo ngân hàng câu hỏi động dựa trên dữ liệu thực tế đang có trên hệ thống
+  useEffect(() => {
+    setChatState({ ...aiChatService.getState() });
+    const unsubscribe = aiChatService.subscribe(() => {
+      setChatState({ ...aiChatService.getState() });
+    });
+    return unsubscribe;
+  }, []);
+
+  // Nếu từ nút "Nhờ AI tư vấn chọn phòng" ở HeroSection truyền isOpen=true xuống thì đồng bộ mở luôn
+  useEffect(() => {
+    if (externalIsOpen === true && !chatState.isOpen) {
+      aiChatService.setOpen(true);
+    }
+  }, [externalIsOpen, chatState.isOpen]);
+
+  const isChatVisible = chatState.isOpen;
+  const isAiTyping = chatState.isTyping;
+  const chatMessages = chatState.messages;
+  const aiDynamicQuestions = chatState.dynamicQuestions;
+
+  const handleToggleChat = () => {
+    const nextOpen = !isChatVisible;
+    aiChatService.setOpen(nextOpen);
+    if (nextOpen && onToggleOpen && !externalIsOpen) {
+      onToggleOpen();
+    } else if (!nextOpen && onClose) {
+      onClose();
+    }
+  };
+
+  const handleCloseChat = () => {
+    aiChatService.setOpen(false);
+    if (onClose) onClose();
+  };
+
+  // Ngân hàng câu hỏi động dựa trên dữ liệu thực tế
   const questionPool = useMemo(() => {
     const pool: string[] = [
       "Hiện có những phòng nào đang trống?",
@@ -82,7 +110,6 @@ export default function AiChatbotWidget({
     return Array.from(new Set(pool));
   }, [tinDangList, khuTroList]);
 
-  // Danh sách câu hỏi hiển thị trên thanh gợi ý (ưu tiên câu hỏi theo mạch chat của AI, hoặc xoay vòng từ questionPool)
   const displayedQuestions = useMemo(() => {
     if (aiDynamicQuestions.length > 0) {
       return aiDynamicQuestions;
@@ -100,12 +127,12 @@ export default function AiChatbotWidget({
   }, [aiDynamicQuestions, questionPool, questionPage]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isChatVisible) {
       chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [chatMessages, isOpen, isAiTyping]);
+  }, [chatMessages, isChatVisible, isAiTyping]);
 
-  // Điều hướng trực tiếp đến trang chi tiết tin đăng khi bấm vào phòng gợi ý
+  // Chuyển sang trang chi tiết tin đăng mà VẪN GIỮ NGUYÊN lịch sử & khung chat
   const handleViewRoomDetail = (roomFromAi: TinDangItem) => {
     const matchedInHome = tinDangList.find(
       (t) =>
@@ -115,7 +142,8 @@ export default function AiChatbotWidget({
 
     const maTin = matchedInHome?.MaTin || roomFromAi.MaTin;
     if (maTin) {
-      router.push(`/tin-dang/${maTin}`);
+      aiChatService.setOpen(true);
+      router.push(`/tinDang/${maTin}`);
     } else {
       document
         .getElementById("tin-dang")
@@ -123,9 +151,8 @@ export default function AiChatbotWidget({
     }
   };
 
-  // Xoay vòng bộ câu hỏi gợi ý mới
   const handleRefreshQuestions = () => {
-    setAiDynamicQuestions([]);
+    aiChatService.clearDynamicQuestions();
     setQuestionPage((prev) => prev + 1);
     questionScrollRef.current?.scrollTo({ left: 0, behavior: "smooth" });
   };
@@ -134,97 +161,19 @@ export default function AiChatbotWidget({
     const content = (customQuestion ?? chatInput).trim();
     if (!content || isAiTyping) return;
 
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}`;
-
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      sender: "user",
-      text: content,
-      time: currentTime,
-    };
-
-    const historyForApi = chatMessages
-      .filter((m) => m.id !== "welcome-ai")
-      .map((m) => ({
-        sender: m.sender,
-        text: m.text,
-      }));
-
-    setChatMessages((prev) => [...prev, userMsg]);
-    if (!customQuestion) setChatInput("");
-    setIsAiTyping(true);
-
-    try {
-      const res = await aiChatService.sendMessage(content, historyForApi);
-
-      const aiReplyText =
-        res?.success && res?.data?.reply
-          ? res.data.reply
-          : res?.message ||
-            "Hiện tại hệ thống tư vấn đang bận, bạn vui lòng thử lại sau giây lát nhé!";
-
-      const suggestedRooms =
-        res?.success && Array.isArray(res?.data?.suggestedRooms)
-          ? res.data.suggestedRooms
-          : [];
-
-      // Cập nhật thanh câu hỏi động theo ngữ cảnh câu trả lời vừa nhận
-      if (
-        res?.success &&
-        Array.isArray(res?.data?.suggestedQuestions) &&
-        res.data.suggestedQuestions.length > 0
-      ) {
-        setAiDynamicQuestions(
-          res.data.suggestedQuestions.filter((q) => q !== content)
-        );
-        questionScrollRef.current?.scrollTo({ left: 0, behavior: "smooth" });
-      } else {
-        setQuestionPage((prev) => prev + 1);
-      }
-
-      const replyDate = new Date();
-      const replyTime = `${String(replyDate.getHours()).padStart(
-        2,
-        "0"
-      )}:${String(replyDate.getMinutes()).padStart(2, "0")}`;
-
-      const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        sender: "ai",
-        text: aiReplyText,
-        time: replyTime,
-        suggestedRooms,
-      };
-
-      setChatMessages((prev) => [...prev, aiMsg]);
-    } catch (error) {
-      console.error("Lỗi khi gọi AI Chatbot:", error);
-      const errDate = new Date();
-      const errTime = `${String(errDate.getHours()).padStart(2, "0")}:${String(
-        errDate.getMinutes()
-      ).padStart(2, "0")}`;
-
-      const errorMsg: ChatMessage = {
-        id: `ai-err-${Date.now()}`,
-        sender: "ai",
-        text: "Không thể kết nối tới máy chủ AI. Bạn vui lòng kiểm tra lại kết nối hoặc xem trực tiếp danh sách tin đăng trên trang chủ nhé!",
-        time: errTime,
-      };
-      setChatMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setIsAiTyping(false);
+    if (!customQuestion) {
+      setChatInput("");
     }
+    await aiChatService.askQuestion(content);
+    questionScrollRef.current?.scrollTo({ left: 0, behavior: "smooth" });
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end">
-      {isOpen && (
-        <div className="mb-3 w-85 sm:w-96 bg-white border-2 border-[#00FFCC] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-          {/* Header Chatbox đồng bộ tông màu #00FFCC */}
-          <div className="bg-[#00FFCC] text-slate-900 px-5 py-4 flex items-center justify-between gap-3 border-b border-teal-300">
+    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end pointer-events-none">
+      {isChatVisible && (
+        <div className="pointer-events-auto mb-3 w-85 sm:w-96 bg-white border-2 border-[#00FFCC] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+          {/* Header Chatbox */}
+          <div className="bg-[#00FFCC] text-slate-900 px-5 py-3.5 flex items-center justify-between gap-3 border-b border-teal-300">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-2xl bg-white text-slate-900 border border-teal-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                 AI
@@ -244,7 +193,7 @@ export default function AiChatbotWidget({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCloseChat}
               className="w-7 h-7 rounded-full bg-white/80 hover:bg-white text-slate-800 border border-teal-300 text-xs font-bold flex items-center justify-center transition cursor-pointer"
               title="Thu gọn hộp thoại"
             >
@@ -253,7 +202,7 @@ export default function AiChatbotWidget({
           </div>
 
           {/* Danh sách tin nhắn */}
-          <div className="p-4 h-88 overflow-y-auto bg-slate-50/70 space-y-3">
+          <div className="p-4 h-84 overflow-y-auto bg-slate-50/70 space-y-3">
             {chatMessages.map((msg) => (
               <div
                 key={msg.id}
@@ -270,7 +219,7 @@ export default function AiChatbotWidget({
                 >
                   {msg.text}
 
-                  {/* Nút mở Trang chi tiết tin đăng của phòng ngay trong tin nhắn AI */}
+                  {/* Nút mở Trang chi tiết tin đăng của phòng */}
                   {msg.sender === "ai" &&
                     msg.suggestedRooms &&
                     msg.suggestedRooms.length > 0 && (
@@ -309,19 +258,20 @@ export default function AiChatbotWidget({
               </div>
             ))}
 
+            {/* Chỉ hiển thị 1 dòng ngắn gọn khi AI đang tìm câu trả lời */}
             {isAiTyping && (
-              <div className="flex items-start">
-                <div className="bg-white border border-teal-200 rounded-2xl rounded-bl-xs px-3.5 py-2 text-xs text-slate-600 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#00FFCC] animate-ping" />
-                  AI đang tra cứu phòng, tiện ích & phí dịch vụ...
-                </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-teal-200 w-fit max-w-full shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping shrink-0" />
+                <span className="text-[11px] font-medium text-slate-600 truncate">
+                  Đang tìm câu trả lời...
+                </span>
               </div>
             )}
 
             <div ref={chatEndRef} />
           </div>
 
-          {/* Thanh câu hỏi gợi ý động (Tự động đổi theo mạch hội thoại + có nút Đổi gợi ý) */}
+          {/* Thanh câu hỏi gợi ý động */}
           <div className="px-3 py-2 bg-white border-t border-slate-100 space-y-1.5">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -385,14 +335,14 @@ export default function AiChatbotWidget({
       {/* Nút mở/đóng AI Chatbot */}
       <button
         type="button"
-        onClick={onToggleOpen}
-        className="flex items-center gap-2.5 px-5 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 shadow-lg shadow-[#00FFCC]/30 transition cursor-pointer"
+        onClick={handleToggleChat}
+        className="pointer-events-auto flex items-center gap-2.5 px-5 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 shadow-lg shadow-[#00FFCC]/30 transition cursor-pointer"
       >
         <span className="w-7 h-7 rounded-full bg-white text-slate-900 border border-teal-300 font-bold text-xs flex items-center justify-center shadow-2xs">
           AI
         </span>
         <span className="text-xs sm:text-sm font-bold text-slate-900 pr-1">
-          {isOpen ? "Đóng Trợ lý AI" : "Chat tư vấn AI 24/7"}
+          {isChatVisible ? "Đóng Trợ lý AI" : "Chat tư vấn AI 24/7"}
         </span>
       </button>
     </div>
