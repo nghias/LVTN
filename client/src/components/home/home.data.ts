@@ -65,71 +65,30 @@ export interface ManagerContactInfo {
 export const VONG_LAP_VAN_HANH = [
   {
     buoc: "01",
-    tieuDe: "Tư Vấn AI & Tìm Phòng",
-    moTa: "Tra cứu phòng trống đa tiêu chí kết hợp trợ lý ảo AI Chatbot giải đáp quy định, chi phí và gợi ý phòng 24/7.",
-    nhan: "AI Chatbot",
+    tieuDe: "Tìm phòng & Tư vấn cùng AI",
+    nhan: "Nhanh chóng",
+    moTa: "Xem hình ảnh, giá thuê thực tế và trò chuyện với Trợ lý ảo 24/7.",
   },
   {
     buoc: "02",
-    tieuDe: "Số Hóa Hợp Đồng & Tạm Trú",
-    moTa: "Cấp tài khoản cư dân nội bộ, tra cứu hợp đồng điện tử minh bạch và khai báo tạm trú - tạm vắng trực tuyến.",
-    nhan: "Hồ sơ số",
+    tieuDe: "Hợp đồng",
+    nhan: "Minh bạch",
+    moTa: "Ký hợp đồng rõ ràng, lưu trữ hồ sơ và bảo mật an toàn.",
   },
   {
     buoc: "03",
-    tieuDe: "Thu Thập Chỉ Số Điện Nước IoT",
-    moTa: "Đồng hồ điện tử IoT tự động ghi nhận và đồng bộ chỉ số tiêu thụ điện, nước theo thời gian thực về máy chủ.",
-    nhan: "Thiết bị IoT",
+    tieuDe: "Có hệ thống lấy số liệu nước tự động",
+    nhan: "Chính xác",
+    moTa: "Theo dõi tiêu thụ nước tự động.",
   },
   {
     buoc: "04",
-    tieuDe: "Đối Soát QR & Gạch Nợ Tự Động",
-    moTa: "Tự động lập hóa đơn hàng tháng, quét mã QR chuyển khoản, xác nhận giao dịch và tổng hợp báo cáo doanh thu.",
-    nhan: "Auto Payment",
+    tieuDe: "Thanh toán Hóa đơn dễ dàng",
+    nhan: "Tiện lợi",
+    moTa: "Nhận thông báo hóa đơn và thanh toán nhanh chóng qua.",
   },
 ];
 
-export const NHOM_DOI_TUONG = [
-  {
-    vaiTro: "Khách Vãng Lai",
-    doiTuong: "Đối với Người tìm phòng",
-    moTaChinh:
-      "Công cụ tra cứu phòng trống nhanh chóng, trực quan và sát với nhu cầu thực tế mà không qua trung gian rao vặt.",
-    diemNhanCongNghe: "Tích hợp Trợ lý ảo AI Chatbot tư vấn tự động",
-    tinhNang: [
-      "Bộ lọc đa tiêu chí theo từng cơ sở, diện tích, mức giá thuê và tiện ích đi kèm.",
-      "Niêm yết công khai đơn giá điện, nước và các khoản phí dịch vụ hàng tháng.",
-      "AI Chatbot tự động giải đáp thắc mắc về nội quy, chi phí và gợi ý phòng phù hợp.",
-      "Kết nối trực tiếp với chủ trọ để đặt lịch hẹn xem phòng nhanh chóng.",
-    ],
-  },
-  {
-    vaiTro: "Cư Dân Nội Bộ",
-    doiTuong: "Đối với Người thuê trọ",
-    moTaChinh:
-      "Không gian quản lý cá nhân minh bạch, tiện lợi trong suốt quá trình cư trú thông qua tài khoản nội bộ được cấp phát.",
-    diemNhanCongNghe: "Theo dõi điện nước IoT & Thanh toán QR tự động",
-    tinhNang: [
-      "Tra cứu chi tiết hợp đồng thuê phòng, danh mục tiện ích và phí dịch vụ đang áp dụng.",
-      "Gửi yêu cầu khai báo tạm trú - tạm vắng và báo cáo sự cố cơ sở vật chất trực tuyến.",
-      "Theo dõi chỉ số tiêu thụ điện, nước cập nhật tự động từ đồng hồ IoT kèm lịch sử hàng tháng.",
-      "Kiểm tra hóa đơn chi tiết và quét mã QR thanh toán chuyển khoản tự động.",
-    ],
-  },
-  {
-    vaiTro: "Quản Trị Viên",
-    doiTuong: "Đối với Chủ trọ đa cơ sở",
-    moTaChinh:
-      "Trung tâm điều hành tập trung giúp xóa bỏ hoàn toàn sổ sách giấy tờ thủ công và các file Excel rời rạc.",
-    diemNhanCongNghe: "Đồng bộ IoT, Gạch nợ tự động & Báo cáo chuyên sâu",
-    tinhNang: [
-      "Quản lý đồng bộ nhiều cơ sở, thiết lập linh hoạt diện tích, tiện ích và định giá từng phòng.",
-      "Toàn quyền cấp phát tài khoản, quản lý hồ sơ khách thuê, duyệt tạm trú và vòng đời hợp đồng.",
-      "Tự động thu thập chỉ số điện nước từ thiết bị IoT về máy chủ và đối soát gạch nợ hóa đơn.",
-      "Tổng hợp chính xác báo cáo thống kê doanh thu, công nợ và sản lượng tiêu thụ điện nước.",
-    ],
-  },
-];
 
 export const GOI_Y_CAU_HOI_AI = [
   "Hiện có những phòng nào đang trống?",

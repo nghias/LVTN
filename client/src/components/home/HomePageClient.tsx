@@ -17,7 +17,6 @@ import {
   KhuTroWithContact,
 } from "@/components/home/home.data";
 import HeroSection from "@/components/home/HeroSection";
-import EcosystemSection from "@/components/home/EcosystemSection";
 import TinDangSection from "@/components/home/TinDangSection";
 import KhuTroSection from "@/components/home/KhuTroSection";
 import BangGiaSection from "@/components/home/BangGiaSection";
@@ -190,8 +189,6 @@ export default function HomePageClient({
           onScrollToSection={scrollToSection}
           onOpenChat={() => setIsChatOpen(true)}
         />
-
-        <EcosystemSection onScrollToSection={scrollToSection} />
 
         <TinDangSection
           tinDangList={tinDangList}

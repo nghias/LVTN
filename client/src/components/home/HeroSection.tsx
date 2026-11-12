@@ -29,45 +29,42 @@ export default function HeroSection({
         <div className="lg:col-span-7 space-y-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900">
-              Nền tảng Quản lý Nhà trọ Đa cơ sở
+              Quản Lý Trọ Thông Minh
             </span>
             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-              Tích hợp IoT & Trí tuệ nhân tạo (AI)
+              Tiện nghi • Minh bạch • Hỗ trợ 24/7
             </span>
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-bold text-slate-900 leading-tight tracking-tight">
-            Giải Pháp Chuyển Đổi Số & Vận Hành Nhà Trọ{" "}
-            <span className="text-teal-700 underline decoration-[#00FFCC] decoration-4 underline-offset-4">
-              Khép Kín Toàn Diện
-            </span>
+            Tìm Phòng Ưng Ý – An Tâm Tận Hưởng Cuộc Sống Số
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            Thay vì một sàn rao vặt đại trà hay quản lý thủ công bằng sổ sách
-            giấy tờ, file Excel rời rạc, hệ thống thiết lập vòng lặp quản lý nội
-            bộ khép kín cho mô hình hộ kinh doanh nhà trọ đa cơ sở: từ{" "}
-            <strong>tra cứu phòng trống minh bạch</strong>,{" "}
-            <strong>trợ lý ảo AI tư vấn 24/7</strong>,{" "}
-            <strong>số hóa hợp đồng & thủ tục tạm trú</strong>, đến{" "}
-            <strong>thu thập chỉ số điện nước tự động qua IoT</strong> và{" "}
-            <strong>đối soát thanh toán QR hàng tháng</strong>.
+            Chào mừng bạn đến với cổng thông tin chính thức của hệ thống nhà
+            trọ. Không còn nỗi lo tin ảo hay chi phí mập mờ, chúng tôi mang đến
+            trải nghiệm thuê phòng hiện đại và minh bạch: từ{" "}
+            <strong>tra cứu phòng trống thực tế</strong>,{" "}
+            <strong>trợ lý ảo hổ trợ tư vấn chọn phòng</strong>,{" "}
+            <strong>ký hợp đồng an toàn và bảo mật</strong>, đến{" "}
+            <strong>theo dõi chỉ số nước tự động</strong> và{" "}
+            <strong>hóa đơn tự động gửi mỗi thanh toán nhanh chóng</strong>
           </p>
 
           {/* Chỉ số tổng quan thời gian thực */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Cơ sở vận hành
+                Hệ thống cơ sở
               </p>
               <p className="text-lg font-bold text-slate-900 mt-0.5">
-                {soKhuTro > 0 ? `${soKhuTro} khu` : "Đa cơ sở"}
+                3 cơ sở
               </p>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Phòng đang mở
+                Phòng trống
               </p>
               <p className="text-lg font-bold text-teal-700 mt-0.5">
                 {soPhongMo} phòng
@@ -76,7 +73,7 @@ export default function HeroSection({
 
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Đơn giá điện
+                Giá điện
               </p>
               <p className="text-lg font-bold text-slate-900 mt-0.5">
                 {formatVND(giaDienNuoc.GiaDien)}
@@ -85,7 +82,7 @@ export default function HeroSection({
 
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Đơn giá nước
+                Giá nước
               </p>
               <p className="text-lg font-bold text-slate-900 mt-0.5">
                 {formatVND(giaDienNuoc.GiaNuoc)}
@@ -100,39 +97,39 @@ export default function HeroSection({
               onClick={() => onScrollToSection("tin-dang")}
               className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
-              Tìm phòng trống ngay
+              Xem phòng ngay
             </button>
             <button
               type="button"
               onClick={onOpenChat}
               className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
-              Hỏi trợ lý AI
+              Nhờ AI tư vấn chọn phòng
             </button>
             <button
               type="button"
               onClick={() => onScrollToSection("bang-gia")}
               className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
-              Xem bảng giá niêm yết
+              Xem bảng giá dịch vụ
             </button>
           </div>
         </div>
-        {/* Cột phải: Sơ đồ 4 bước Vòng lặp vận hành khép kín */}
 
+        {/* Cột phải: Quy trình trải nghiệm dành cho khách thuê */}
         <div className="lg:col-span-5 bg-[#F0FDF4] text-slate-900 rounded-3xl p-6 sm:p-7 space-y-5 border border-emerald-200 shadow-sm">
           <div className="flex items-center justify-between gap-2 border-b border-emerald-200 pb-4">
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
-                Tự động hóa quy trình
+                Trải nghiệm thuê phòng 4.0
               </span>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
-                Vòng Lặp Vận Hành Khép Kín
+                4 Bước Thuê & Ở Thật Dễ Dàng
               </h2>
             </div>
 
             <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-              IoT + AI Core
+              Smart Living
             </span>
           </div>
 
