@@ -9,12 +9,14 @@ import AppFooter from "@/components/layout/AppFooter";
 import ContactRoomModal from "@/components/home/ContactRoomModal";
 import AiChatbotWidget from "@/components/home/AiChatbotWidget";
 import { useAlertModal } from "@/components/common/AlertModalProvider";
+import BangGiaSection from "@/components/home/BangGiaSection";
 
 import {
   HomeService,
   TinDangHome,
   TienIchItem,
   GiaDienNuocHome,
+  PhiDichVuItem,
   isAvailablePublicTinDang,
 } from "@/services/home.service";
 import {
@@ -57,6 +59,8 @@ export default function ChiTietTinDangClient({
   const [giaDienNuoc, setGiaDienNuoc] = useState<GiaDienNuocHome>(
     DEFAULT_GIA_DIEN_NUOC
   );
+    const [phiDichVuList, setPhiDichVuList] =
+    useState<PhiDichVuItem[]>([]);
   const [activeImageUrl, setActiveImageUrl] = useState<string>("");
   const [relatedFilter, setRelatedFilter] = useState<"ALL" | "SAME_KHU">("ALL");
   const [contactRoom, setContactRoom] = useState<TinDangItem | null>(null);
@@ -105,6 +109,8 @@ export default function ChiTietTinDangClient({
         if (homePayload.giaDienNuoc) {
           setGiaDienNuoc(homePayload.giaDienNuoc);
         }
+
+        setPhiDichVuList(homePayload.phiDichVu || []);
 
         const matchedTin =
           validList.find((t) => Number(t.MaTin) === Number(maTin)) || null;
@@ -486,6 +492,11 @@ export default function ChiTietTinDangClient({
             </div>
           </article>
         )}
+
+        <BangGiaSection
+          giaDienNuoc={giaDienNuoc}
+          phiDichVuList={phiDichVuList}
+        />
 
         {/* DANH SÁCH CÁC TIN ĐĂNG KHÁC Ở BÊN DƯỚI */}
         <section className="space-y-6 pt-4 border-t border-slate-200">

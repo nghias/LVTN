@@ -389,13 +389,17 @@ export default function TinDangSection({
                 id={`phong-tro-${tin.MaTin}`}
                 itemScope
                 itemType="https://schema.org/Accommodation"
-                className="group bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition overflow-hidden flex flex-col"
+                className="group relative cursor-pointer bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md hover:border-teal-300 transition overflow-hidden flex flex-col"
               >
+                {/* Link phủ toàn bộ card giúp nhấn vào bất kỳ đâu cũng tới trang chi tiết */}
                 <Link
                   href={detailHref}
-                  className="relative h-48 w-full bg-slate-100 overflow-hidden m-0 block"
+                  aria-label={`Xem chi tiết Phòng ${tin.TenPhong} - ${tin.TieuDe}`}
                   title="Nhấn để xem trang chi tiết phòng"
-                >
+                  className="absolute inset-0 z-10"
+                />
+
+                <div className="relative h-48 w-full bg-slate-100 overflow-hidden m-0 block">
                   <img
                     src={imageUrl}
                     alt={seoImageAlt}
@@ -420,7 +424,7 @@ export default function TinDangSection({
                       📷 {roomImageObjs.length || 1} ảnh
                     </span>
                   </div>
-                </Link>
+                </div>
 
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
                   <span className="text-xs font-bold text-slate-500">
@@ -445,13 +449,8 @@ export default function TinDangSection({
                   <div className="space-y-3">
                     <div>
                       <div className="flex items-baseline justify-between gap-2">
-                        <h3 className="text-lg font-bold text-slate-900">
-                          <Link
-                            href={detailHref}
-                            className="hover:text-teal-700 transition"
-                          >
-                            Phòng {tin.TenPhong}
-                          </Link>
+                        <h3 className="text-lg font-bold text-slate-900 group-hover:text-teal-700 transition">
+                          Phòng {tin.TenPhong}
                         </h3>
                         <span
                           itemProp="floorSize"
@@ -489,14 +488,9 @@ export default function TinDangSection({
                     <div className="space-y-1.5 pt-2 border-t border-slate-100">
                       <h4
                         itemProp="name"
-                        className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug"
+                        className="text-sm font-bold text-slate-900 group-hover:text-teal-700 transition line-clamp-2 leading-snug"
                       >
-                        <Link
-                          href={detailHref}
-                          className="hover:text-teal-700 transition"
-                        >
-                          {tin.TieuDe}
-                        </Link>
+                        {tin.TieuDe}
                       </h4>
                       <p
                         itemProp="description"
@@ -521,8 +515,9 @@ export default function TinDangSection({
                       {contact.hasPhoneFromDB ? (
                         <a
                           href={`tel:${contact.sdtHienThi.replace(/\s+/g, "")}`}
+                          onClick={(e) => e.stopPropagation()}
                           title={`Gọi ngay cho ${contact.tenQuanLy}`}
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 shrink-0 transition"
+                          className="relative z-20 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 shrink-0 transition"
                         >
                           📞 {contact.sdtHienThi}
                         </a>
@@ -534,19 +529,17 @@ export default function TinDangSection({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Link
-                        href={detailHref}
-                        className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 transition text-center shrink-0"
-                      >
+                      <span className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 group-hover:bg-slate-200 text-slate-800 border border-slate-200 transition text-center shrink-0">
                         Xem chi tiết
-                      </Link>
+                      </span>
 
                       {contact.hasPhoneFromDB && (
                         <a
                           href={contact.zaloUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 text-[#0068FF] border border-[#0068FF] transition text-center shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                          className="relative z-20 px-3 py-2 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 text-[#0068FF] border border-[#0068FF] transition text-center shrink-0"
                           title={`Nhắn Zalo cho ${contact.tenQuanLy}`}
                         >
                           Zalo
@@ -555,9 +548,12 @@ export default function TinDangSection({
 
                       <button
                         type="button"
-                        onClick={() => onSelectContactRoom(tin)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectContactRoom(tin);
+                        }}
                         aria-label={`Liên hệ thuê Phòng ${tin.TenPhong} tại ${tin.TenKhu}`}
-                        className="flex-1 px-3 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
+                        className="relative z-20 flex-1 px-3 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
                       >
                         Liên hệ thuê
                       </button>
