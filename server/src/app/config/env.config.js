@@ -27,4 +27,8 @@ module.exports = {
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
   aesSecretKey: process.env.AES_SECRET_KEY,
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  },
 };

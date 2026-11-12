@@ -11,8 +11,11 @@ const dichVuRouter = require('./dichVu.router');
 const dienNuocRouter = require('./dienNuoc.router');
 const hoaDonRouter = require('./hoaDon.router');
 const thanhToanRouter = require('./thanhToan.router');
+const aiChatRouter = require('./aiChat.router');
 
 
+
+router.use('/ai-chat', aiChatRouter);
 router.use('/auth', authRouter);
 router.use('/phong-tro', phongTroRouter);
 router.use('/khach-thue', khachThueRouter);
