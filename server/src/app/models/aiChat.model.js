@@ -2,7 +2,6 @@
 const db = require('../../database/db');
 const cryptoUtil = require('../../utils/crypto.util');
 
-// Hàm hỗ trợ giải mã SĐT an toàn (tương thích cả dữ liệu mã hóa AES-256 và số điện thoại thuần)
 const safeDecryptPhone = (rawVal) => {
   if (!rawVal) return '';
   const str = String(rawVal).trim();
@@ -25,11 +24,8 @@ const safeDecryptPhone = (rawVal) => {
 };
 
 const AiChatModel = {
-  /**
-   * Truy xuất toàn bộ dữ liệu thực tế từ MySQL / TiDB Cloud phục vụ kiến trúc RAG
-   */
   getRagContextData: async () => {
-    // 1. CHỈ lấy các phòng đang trống VÀ đã được đăng tin công khai (DangHienThi)
+    // 1. Lấy các phòng đang trống VÀ đang mở đăng tin (DangHienThi)
     const sqlPhongDaDangTin = `
       SELECT 
         td.MaTin,
@@ -69,7 +65,7 @@ const AiChatModel = {
       ORDER BY k.MaKhu ASC, p.Gia ASC, p.TenPhong ASC
     `;
 
-    // 2. Lấy thông tin liên hệ của Chủ trọ (Bắt buộc có cho mọi cơ sở)
+    // 2. Lấy thông tin Chủ trọ (hỗ trợ chung mọi cơ sở)
     const sqlChuTro = `
       SELECT 
         nd.MaND,
@@ -83,7 +79,7 @@ const AiChatModel = {
       LIMIT 1
     `;
 
-    // 3. Lấy danh sách các Cơ sở / Khu trọ và người quản lý phụ trách
+    // 3. Lấy danh sách Khu trọ
     const sqlKhuTro = `
       SELECT 
         k.MaKhu,
@@ -99,14 +95,36 @@ const AiChatModel = {
       ORDER BY k.MaKhu ASC
     `;
 
-    // 4. Lấy bảng Phí dịch vụ (Khớp đúng 4 cột: MaDV, TenDV, DonGia, DonViTinh)
+    // 4. Lấy bảng Phí dịch vụ (MaDV, TenDV, DonGia, DonViTinh)
     const sqlPhiDichVu = `
       SELECT MaDV, TenDV, DonGia, DonViTinh
       FROM PhiDichVu
       ORDER BY MaDV ASC
     `;
 
-    // 5. Lấy đơn giá điện nước hiện hành mới nhất
+    // 5. Lấy toàn bộ danh mục Tiện ích (MaTI, TenTI, MoTa) kèm các phòng trống đang có tiện ích đó
+    const sqlTienIch = `
+      SELECT 
+        ti.MaTI,
+        ti.TenTI,
+        ti.MoTa,
+        GROUP_CONCAT(
+          DISTINCT CASE 
+            WHEN p.TrangThai = 'Trong' AND td.TrangThai = 'DangHienThi' 
+            THEN p.TenPhong 
+            ELSE NULL 
+          END 
+          ORDER BY p.TenPhong SEPARATOR ', '
+        ) AS DanhSachPhongTrongCoTienIch
+      FROM TienIch ti
+      LEFT JOIN ChiTietTienIch ctti ON ti.MaTI = ctti.MaTI
+      LEFT JOIN Phong p ON ctti.MaPhong = p.MaPhong
+      LEFT JOIN TinDang td ON p.MaPhong = td.MaPhong AND td.TrangThai = 'DangHienThi'
+      GROUP BY ti.MaTI, ti.TenTI, ti.MoTa
+      ORDER BY ti.MaTI ASC
+    `;
+
+    // 6. Lấy đơn giá điện nước hiện hành
     const sqlGiaDienNuoc = `
       SELECT MaGia, GiaDien, GiaNuoc, NgayApDung
       FROM GiaDienNuoc
@@ -119,16 +137,17 @@ const AiChatModel = {
       [chuTroRows],
       [khuTroRows],
       [phiDichVuRows],
+      [tienIchRows],
       [giaDienNuocRows],
     ] = await Promise.all([
       db.execute(sqlPhongDaDangTin),
       db.execute(sqlChuTro),
       db.execute(sqlKhuTro),
       db.execute(sqlPhiDichVu),
+      db.execute(sqlTienIch),
       db.execute(sqlGiaDienNuoc).catch(() => [[]]),
     ]);
 
-    // Chuẩn hóa thông tin Chủ trọ
     const rawChuTro = chuTroRows[0] || {};
     const chuTroInfo = {
       TenChuTro: rawChuTro.TenChuTro || 'Nguyễn Thị Quỳnh Dư',
@@ -136,7 +155,6 @@ const AiChatModel = {
       EmailChuTro: rawChuTro.EmailChuTro || '',
     };
 
-    // Chuẩn hóa danh sách Khu trọ
     const khuTroList = (khuTroRows || []).map((k) => ({
       ...k,
       TenQuanLy: k.TenQuanLy || `Quản lý ${k.TenKhu}`,
@@ -145,7 +163,6 @@ const AiChatModel = {
       SDTChuTro: chuTroInfo.SDTChuTro,
     }));
 
-    // Chuẩn hóa danh sách Phòng trống đã đăng tin (Khớp 100% kiểu TinDangItem của Frontend)
     const phongTrongDaDangList = (phongRows || []).map((row) => {
       const sdtQuanLy = safeDecryptPhone(row.SDTQuanLy);
       return {
@@ -165,11 +182,9 @@ const AiChatModel = {
         TenKhu: row.TenKhu,
         DiaChiKhu: row.DiaChiKhu || '',
         DanhSachTienIch: row.DanhSachTienIch || 'Cơ bản',
-        // Thông tin Quản lý trực tiếp của cơ sở đó
         TenQuanLy: row.TenQuanLy || `Quản lý ${row.TenKhu}`,
         SDTQuanLy: sdtQuanLy,
         SDT: sdtQuanLy || chuTroInfo.SDTChuTro,
-        // Thông tin Chủ trọ luôn đi kèm cho mọi cơ sở
         TenChuTro: chuTroInfo.TenChuTro,
         SDTChuTro: chuTroInfo.SDTChuTro,
       };
@@ -180,6 +195,7 @@ const AiChatModel = {
       chuTroInfo,
       khuTroList,
       phiDichVuList: phiDichVuRows || [],
+      tienIchList: tienIchRows || [],
       giaDienNuoc: giaDienNuocRows?.[0] || {
         GiaDien: 3500,
         GiaNuoc: 15000,

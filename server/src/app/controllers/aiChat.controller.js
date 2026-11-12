@@ -22,6 +22,7 @@ const AiChatController = {
         data: {
           reply: result.reply,
           suggestedRooms: result.suggestedRooms || [],
+          suggestedQuestions: result.suggestedQuestions || [],
         },
       });
     } catch (error) {

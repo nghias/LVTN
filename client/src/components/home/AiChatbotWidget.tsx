@@ -1,14 +1,14 @@
 // src/components/home/AiChatbotWidget.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { GiaDienNuocHome } from "@/services/home.service";
 import { aiChatService } from "@/services/aiChat.service";
 import {
   ChatMessage,
   TinDangItem,
   KhuTroWithContact,
-  GOI_Y_CAU_HOI_AI,
   formatVND,
 } from "./home.data";
 
@@ -27,20 +27,77 @@ export default function AiChatbotWidget({
   onToggleOpen,
   onClose,
   tinDangList,
-  onSelectContactRoom,
+  khuTroList,
 }: AiChatbotWidgetProps) {
+  const router = useRouter();
   const [chatInput, setChatInput] = useState<string>("");
   const [isAiTyping, setIsAiTyping] = useState<boolean>(false);
+  const [questionPage, setQuestionPage] = useState<number>(0);
+  const [aiDynamicQuestions, setAiDynamicQuestions] = useState<string[]>([]);
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: "welcome-ai",
       sender: "ai",
-      text: "Xin chào! Tôi là Trợ lý ảo AI của hệ thống Xóm Trọ (ứng dụng Gemini 2.5 Flash). Bạn cần tìm phòng trống theo mức giá, tiện ích, hỏi giá điện nước IoT hay thông tin liên hệ quản lý cơ sở & chủ trọ?",
+      text: "Xin chào! Tôi là Trợ lý ảo AI của hệ thống Xóm Trọ (ứng dụng Gemini 2.5 Flash). Bạn cần tìm phòng trống theo mức giá, hỏi chi tiết tiện ích đi kèm, bảng phí dịch vụ hàng tháng hay đơn giá điện nước IoT?",
       time: "Bây giờ",
     },
   ]);
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const questionScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Tự động tạo ngân hàng câu hỏi động dựa trên dữ liệu thực tế đang có trên hệ thống
+  const questionPool = useMemo(() => {
+    const pool: string[] = [
+      "Hiện có những phòng nào đang trống?",
+      "Các tiện ích đi kèm trong phòng gồm những gì?",
+      "Bảng phí dịch vụ (Wifi, rác, giữ xe) tính thế nào?",
+      "Đơn giá điện nước IoT tính như thế nào?",
+      "Phòng nào hiện có Máy lạnh và Gác lửng?",
+    ];
+
+    if (tinDangList.length > 0) {
+      const firstRoom = tinDangList[0];
+      pool.push(`Phòng ${firstRoom.TenPhong} có những tiện ích gì?`);
+
+      const minPrice = Math.min(...tinDangList.map((t) => Number(t.Gia) || 0));
+      if (minPrice > 0) {
+        pool.push(`Tìm phòng trống giá khoảng ${formatVND(minPrice)}?`);
+      }
+
+      if (tinDangList.length >= 2) {
+        pool.push(
+          `So sánh phòng ${tinDangList[0].TenPhong} và ${tinDangList[1].TenPhong}?`
+        );
+      }
+    }
+
+    if (khuTroList.length > 0) {
+      const firstKhu = khuTroList[0];
+      pool.push(`Ở ${firstKhu.TenKhu} hiện còn phòng trống không?`);
+    }
+
+    pool.push("Thông tin liên hệ Quản lý cơ sở và Chủ trọ?");
+    return Array.from(new Set(pool));
+  }, [tinDangList, khuTroList]);
+
+  // Danh sách câu hỏi hiển thị trên thanh gợi ý (ưu tiên câu hỏi theo mạch chat của AI, hoặc xoay vòng từ questionPool)
+  const displayedQuestions = useMemo(() => {
+    if (aiDynamicQuestions.length > 0) {
+      return aiDynamicQuestions;
+    }
+    const pageSize = 4;
+    const total = questionPool.length;
+    if (total <= pageSize) return questionPool;
+
+    const start = (questionPage * 2) % total;
+    const items: string[] = [];
+    for (let i = 0; i < pageSize; i++) {
+      items.push(questionPool[(start + i) % total]);
+    }
+    return items;
+  }, [aiDynamicQuestions, questionPool, questionPage]);
 
   useEffect(() => {
     if (isOpen) {
@@ -48,26 +105,29 @@ export default function AiChatbotWidget({
     }
   }, [chatMessages, isOpen, isAiTyping]);
 
-  const handleClickRoomButton = (roomFromAi: TinDangItem) => {
+  // Điều hướng trực tiếp đến trang chi tiết tin đăng khi bấm vào phòng gợi ý
+  const handleViewRoomDetail = (roomFromAi: TinDangItem) => {
     const matchedInHome = tinDangList.find(
       (t) =>
         Number(t.MaPhong) === Number(roomFromAi.MaPhong) ||
         Number(t.MaTin) === Number(roomFromAi.MaTin)
     );
 
-    const targetRoom: TinDangItem = {
-      ...(matchedInHome || roomFromAi),
-      TenQuanLy:
-        roomFromAi.TenQuanLy || matchedInHome?.TenQuanLy || roomFromAi.TenChuTro,
-      SDTQuanLy:
-        roomFromAi.SDTQuanLy || matchedInHome?.SDTQuanLy || roomFromAi.SDTChuTro,
-      TenChuTro: roomFromAi.TenChuTro || matchedInHome?.TenChuTro,
-      SDTChuTro: roomFromAi.SDTChuTro || matchedInHome?.SDTChuTro,
-    };
-
-    if (onSelectContactRoom) {
-      onSelectContactRoom(targetRoom);
+    const maTin = matchedInHome?.MaTin || roomFromAi.MaTin;
+    if (maTin) {
+      router.push(`/tin-dang/${maTin}`);
+    } else {
+      document
+        .getElementById("tin-dang")
+        ?.scrollIntoView({ behavior: "smooth" });
     }
+  };
+
+  // Xoay vòng bộ câu hỏi gợi ý mới
+  const handleRefreshQuestions = () => {
+    setAiDynamicQuestions([]);
+    setQuestionPage((prev) => prev + 1);
+    questionScrollRef.current?.scrollTo({ left: 0, behavior: "smooth" });
   };
 
   const handleSendAiMessage = async (customQuestion?: string) => {
@@ -86,10 +146,12 @@ export default function AiChatbotWidget({
       time: currentTime,
     };
 
-    const historyForApi = chatMessages.map((m) => ({
-      sender: m.sender,
-      text: m.text,
-    }));
+    const historyForApi = chatMessages
+      .filter((m) => m.id !== "welcome-ai")
+      .map((m) => ({
+        sender: m.sender,
+        text: m.text,
+      }));
 
     setChatMessages((prev) => [...prev, userMsg]);
     if (!customQuestion) setChatInput("");
@@ -108,6 +170,20 @@ export default function AiChatbotWidget({
         res?.success && Array.isArray(res?.data?.suggestedRooms)
           ? res.data.suggestedRooms
           : [];
+
+      // Cập nhật thanh câu hỏi động theo ngữ cảnh câu trả lời vừa nhận
+      if (
+        res?.success &&
+        Array.isArray(res?.data?.suggestedQuestions) &&
+        res.data.suggestedQuestions.length > 0
+      ) {
+        setAiDynamicQuestions(
+          res.data.suggestedQuestions.filter((q) => q !== content)
+        );
+        questionScrollRef.current?.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        setQuestionPage((prev) => prev + 1);
+      }
 
       const replyDate = new Date();
       const replyTime = `${String(replyDate.getHours()).padStart(
@@ -134,7 +210,7 @@ export default function AiChatbotWidget({
       const errorMsg: ChatMessage = {
         id: `ai-err-${Date.now()}`,
         sender: "ai",
-        text: "Không thể kết nối tới máy chủ AI. Bạn vui lòng kiểm tra lại kết nối hoặc bấm trực tiếp vào thẻ phòng trên trang chủ để liên hệ quản lý nhé!",
+        text: "Không thể kết nối tới máy chủ AI. Bạn vui lòng kiểm tra lại kết nối hoặc xem trực tiếp danh sách tin đăng trên trang chủ nhé!",
         time: errTime,
       };
       setChatMessages((prev) => [...prev, errorMsg]);
@@ -161,7 +237,7 @@ export default function AiChatbotWidget({
                   <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                 </div>
                 <p className="text-[11px] font-medium text-slate-700">
-                  Gemini 2.5 Flash • Dữ liệu phòng thực tế 24/7
+                  Tư vấn phòng trống, tiện ích & phí dịch vụ 24/7
                 </p>
               </div>
             </div>
@@ -194,24 +270,24 @@ export default function AiChatbotWidget({
                 >
                   {msg.text}
 
-                  {/* Danh sách nút bấm mở Modal liên hệ ngay trong tin nhắn AI */}
+                  {/* Nút mở Trang chi tiết tin đăng của phòng ngay trong tin nhắn AI */}
                   {msg.sender === "ai" &&
                     msg.suggestedRooms &&
                     msg.suggestedRooms.length > 0 && (
                       <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-col gap-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700">
-                          Phòng trống gợi ý (Bấm để liên hệ Zalo/SĐT):
+                          Phòng trống gợi ý (Bấm để xem chi tiết tin đăng):
                         </span>
                         {msg.suggestedRooms.map((room) => (
                           <button
                             key={`${msg.id}-room-${room.MaPhong}`}
                             type="button"
-                            onClick={() => handleClickRoomButton(room)}
+                            onClick={() => handleViewRoomDetail(room)}
                             className="w-full text-left px-3 py-2 rounded-2xl bg-[#00FFCC]/25 hover:bg-[#00FFCC]/50 text-slate-900 border border-teal-300 transition flex items-center justify-between gap-2 cursor-pointer group"
                           >
                             <div className="min-w-0">
                               <div className="text-[11px] font-bold text-slate-900 truncate">
-                                Liên hệ / Xem phòng {room.TenPhong}
+                                Xem chi tiết phòng {room.TenPhong}
                               </div>
                               <div className="text-[10px] font-medium text-slate-600 truncate">
                                 {room.TenKhu} • {formatVND(room.Gia)}/tháng (
@@ -219,7 +295,7 @@ export default function AiChatbotWidget({
                               </div>
                             </div>
                             <span className="px-2.5 py-1 rounded-full bg-[#00FFCC] group-hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-[10px] font-bold shrink-0 transition">
-                              Mở liên hệ →
+                              Xem tin đăng →
                             </span>
                           </button>
                         ))}
@@ -237,7 +313,7 @@ export default function AiChatbotWidget({
               <div className="flex items-start">
                 <div className="bg-white border border-teal-200 rounded-2xl rounded-bl-xs px-3.5 py-2 text-xs text-slate-600 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#00FFCC] animate-ping" />
-                  AI đang tra cứu phòng trống & tổng hợp câu trả lời...
+                  AI đang tra cứu phòng, tiện ích & phí dịch vụ...
                 </div>
               </div>
             )}
@@ -245,19 +321,39 @@ export default function AiChatbotWidget({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Các câu hỏi gợi ý nhanh */}
-          <div className="px-3.5 py-2 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto">
-            {GOI_Y_CAU_HOI_AI.map((q) => (
+          {/* Thanh câu hỏi gợi ý động (Tự động đổi theo mạch hội thoại + có nút Đổi gợi ý) */}
+          <div className="px-3 py-2 bg-white border-t border-slate-100 space-y-1.5">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Gợi ý câu hỏi nhanh:
+              </span>
               <button
-                key={q}
                 type="button"
                 disabled={isAiTyping}
-                onClick={() => handleSendAiMessage(q)}
-                className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#00FFCC]/20 hover:bg-[#00FFCC] disabled:opacity-50 text-slate-900 border border-teal-200 whitespace-nowrap transition cursor-pointer shrink-0"
+                onClick={handleRefreshQuestions}
+                className="text-[10px] font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                title="Đổi bộ câu hỏi gợi ý khác"
               >
-                {q}
+                <span>↻ Đổi câu hỏi khác</span>
               </button>
-            ))}
+            </div>
+
+            <div
+              ref={questionScrollRef}
+              className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin"
+            >
+              {displayedQuestions.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  disabled={isAiTyping}
+                  onClick={() => handleSendAiMessage(q)}
+                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/25 hover:bg-[#00FFCC] disabled:opacity-50 text-slate-900 border border-teal-300 whitespace-nowrap transition cursor-pointer shrink-0"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Ô nhập câu hỏi */}
@@ -272,7 +368,7 @@ export default function AiChatbotWidget({
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Hỏi phòng trống, tiện ích, giá điện nước..."
+              placeholder="Hỏi phòng trống, tiện ích, phí dịch vụ..."
               className="flex-1 px-3.5 py-2 text-xs rounded-full border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-teal-400 text-slate-900"
             />
             <button
@@ -286,7 +382,7 @@ export default function AiChatbotWidget({
         </div>
       )}
 
-      {/* Nút mở/đóng AI Chatbot đồng bộ màu #00FFCC giống nút "Tìm phòng trống" */}
+      {/* Nút mở/đóng AI Chatbot */}
       <button
         type="button"
         onClick={onToggleOpen}

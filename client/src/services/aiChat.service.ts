@@ -19,6 +19,7 @@ export interface AiChatResponse {
   data?: {
     reply: string;
     suggestedRooms: TinDangItem[];
+    suggestedQuestions?: string[];
   };
 }
 
