@@ -36,7 +36,7 @@ export default function XuatBanCungModal({ maHDT, onClose }: XuatBanCungModalPro
   if (dangChuanBi) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-        <div className="rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-semibold text-[#059669] shadow-lg">
+        <div className="rounded-2xl border border-emerald-200 bg-white px-6 py-4 text-sm font-bold text-[#059669] shadow-lg">
           Đang chuẩn bị và tải file PDF hợp đồng #{maHDT} về máy...
         </div>
       </div>

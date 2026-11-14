@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import QuanLyHeader from "@/components/layout/QuanLyHeader";
 import { AuthService } from "@/services/auth.service";
 import { UserProfile } from "@/types/auth.type";
@@ -22,6 +23,9 @@ const DEFAULT_USER: UserProfile = {
 } as UserProfile;
 
 export default function QuanLyHopDongPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [user, setUser] = useState<UserProfile>(DEFAULT_USER);
   const [danhSachHopDongGoc, setDanhSachHopDongGoc] = useState<HopDongItem[]>(
     [],
@@ -35,7 +39,7 @@ export default function QuanLyHopDongPage() {
   const [maKhuLoc, setMaKhuLoc] = useState<string>("");
   const [maPhongLoc, setMaPhongLoc] = useState<string>("");
 
-  // Dữ liệu danh mục dùng cho Bộ lọc & Modal Sửa / Tạo
+  // Dữ liệu danh mục dùng cho Bộ lọc & Modal Tạo mới
   const [danhSachPhong, setDanhSachPhong] = useState<any[]>([]);
   const [danhSachKhachThue, setDanhSachKhachThue] = useState<any[]>([]);
   const [danhSachPhiDichVu, setDanhSachPhiDichVu] = useState<PhiDichVuItem[]>(
@@ -43,9 +47,8 @@ export default function QuanLyHopDongPage() {
   );
   const [danhSachHopDongCu, setDanhSachHopDongCu] = useState<any[]>([]);
 
-  // State điều khiển 4 Modal con
-  const [moModalSua, setMoModalSua] = useState<boolean>(false);
-  const [maHDTDangSua, setMaHDTDangSua] = useState<number | null>(null);
+  // State điều khiển các Modal
+  const [moModalTaoMoi, setMoModalTaoMoi] = useState<boolean>(false);
   const [hopDongCanXoa, setHopDongCanXoa] = useState<HopDongItem | null>(null);
   const [maHDTXemPdf, setMaHDTXemPdf] = useState<number | null>(null);
   const [maHDTXuatBanCung, setMaHDTXuatBanCung] = useState<number | null>(null);
@@ -108,7 +111,6 @@ export default function QuanLyHopDongPage() {
 
       setDanhSachHopDong(ds);
 
-      // Lưu lại danh sách gốc khi không có bộ lọc để giữ số đếm tổng quan chính xác
       if (
         !filterParams.tuKhoa.trim() &&
         !filterParams.trangThai &&
@@ -141,21 +143,6 @@ export default function QuanLyHopDongPage() {
     taiDanhSachHopDong();
     taiDuLieuDanhMuc();
   }, []);
-
-  // Trích xuất danh sách Khu trọ duy nhất từ danhSachPhong và danhSachHopDongGoc
-  const danhSachKhuTro = useMemo(() => {
-    const mapKhu = new Map<number, string>();
-    danhSachPhong.forEach((p) => {
-      if (p.MaKhu && p.TenKhu) mapKhu.set(Number(p.MaKhu), p.TenKhu);
-    });
-    danhSachHopDongGoc.forEach((hd: any) => {
-      if (hd.MaKhu && hd.TenKhu) mapKhu.set(Number(hd.MaKhu), hd.TenKhu);
-    });
-    return Array.from(mapKhu.entries()).map(([MaKhu, TenKhu]) => ({
-      MaKhu,
-      TenKhu,
-    }));
-  }, [danhSachPhong, danhSachHopDongGoc]);
 
   // Lọc danh sách phòng trong dropdown theo Khu trọ đang chọn
   const danhSachPhongTheoKhu = useMemo(() => {
@@ -204,15 +191,16 @@ export default function QuanLyHopDongPage() {
   );
 
   const moFormTaoMoi = () => {
-    setMaHDTDangSua(null);
-    setMoModalSua(true);
+    setMoModalTaoMoi(true);
   };
 
-  const moFormSua = (maHDT: number) => {
-    setMaHDTDangSua(maHDT);
-    setMoModalSua(true);
+  // Chuyển sang trang Sửa hợp đồng riêng khi nhấn nút "Sửa"
+  const chuyenTrangSua = (maHDT: number) => {
+    router.push(`${pathname}/sua?id=${maHDT}`);
   };
-
+  const chuyenTrangChiTiet = (maHDT: number) => {
+    router.push(`${pathname}/chiTiet?id=${maHDT}`);
+  };
   const lamMoiDuLieu = () => {
     taiDanhSachHopDong();
     taiDuLieuDanhMuc();
@@ -234,7 +222,6 @@ export default function QuanLyHopDongPage() {
           {/* Thanh Header Quản Lý trên cùng */}
           <QuanLyHeader user={user} />
 
-          {/* Mở rộng max-w-[1440px] để bảng 8 cột hiển thị trọn vẹn không cần kéo ngang */}
           <main className="mx-auto max-w-360 px-3 py-6 sm:px-5 lg:px-6">
             {/* 1. Tiêu đề trang & Nút Thêm Hợp Đồng */}
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
@@ -258,7 +245,6 @@ export default function QuanLyHopDongPage() {
             {/* 2. Khung Tìm kiếm & Bộ lọc */}
             <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs">
               <div className="grid grid-cols-1 gap-2.5 md:grid-cols-12 md:items-center">
-                {/* Ô tìm kiếm - mở rộng */}
                 <div className="relative md:col-span-7">
                   <input
                     type="text"
@@ -422,7 +408,7 @@ export default function QuanLyHopDongPage() {
               </div>
             </div>
 
-            {/* 4. Bảng Danh sách hợp đồng (Vừa khít 100% khung hình, không cần kéo ngang) */}
+            {/* 4. Bảng Danh sách hợp đồng */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-xs sm:text-[13px]">
@@ -479,7 +465,6 @@ export default function QuanLyHopDongPage() {
                           key={hd.MaHDT}
                           className="transition hover:bg-[#00FFCC]/5"
                         >
-                          {/* Cột 1: Mã HĐ */}
                           <td className="whitespace-nowrap px-2.5 py-3 pl-3.5 align-middle">
                             <div className="font-bold text-slate-900">
                               #{String(hd.MaHDT).padStart(3, "0")}
@@ -491,7 +476,6 @@ export default function QuanLyHopDongPage() {
                             )}
                           </td>
 
-                          {/* Cột 2: Phòng / Khu trọ */}
                           <td className="px-2.5 py-3 align-middle">
                             <div className="font-bold text-slate-900">
                               {hd.TenPhong}
@@ -504,7 +488,6 @@ export default function QuanLyHopDongPage() {
                             </div>
                           </td>
 
-                          {/* Cột 3: Người đại diện */}
                           <td className="whitespace-nowrap px-2.5 py-3 align-middle">
                             <div className="font-bold text-slate-900">
                               {hd.TenDaiDien || "Chưa cập nhật"}
@@ -520,14 +503,12 @@ export default function QuanLyHopDongPage() {
                             </div>
                           </td>
 
-                          {/* Cột 4: Số người ở */}
                           <td className="whitespace-nowrap px-2 py-3 text-center align-middle">
                             <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-[#00FFCC]/25 px-2.5 py-0.5 text-[11px] font-bold text-slate-900">
                               {hd.SoThanhVien || 1} thành viên
                             </span>
                           </td>
 
-                          {/* Cột 5: Thời hạn thuê */}
                           <td className="whitespace-nowrap px-2.5 py-3 align-middle text-[11px]">
                             <div className="text-slate-600">
                               <span className="inline-block w-7 text-slate-400">
@@ -547,7 +528,6 @@ export default function QuanLyHopDongPage() {
                             </div>
                           </td>
 
-                          {/* Cột 6: Giá phòng / Tiền cọc */}
                           <td className="whitespace-nowrap px-2.5 py-3 align-middle text-[11px]">
                             <div>
                               <span className="text-slate-400">Giá: </span>
@@ -563,7 +543,6 @@ export default function QuanLyHopDongPage() {
                             </div>
                           </td>
 
-                          {/* Cột 7: Trạng thái */}
                           <td className="whitespace-nowrap px-2 py-3 text-center align-middle">
                             <span
                               className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
@@ -582,11 +561,10 @@ export default function QuanLyHopDongPage() {
                             </span>
                           </td>
 
-                          {/* Cột 8: Thao tác (4 nút gọn gàng hiển thị đủ 100% không bị khuất nút Xóa) */}
                           <td className="whitespace-nowrap px-2.5 py-3 pr-3.5 text-center align-middle">
                             <div className="inline-flex items-center justify-center gap-1">
                               <button
-                                onClick={() => setMaHDTXemPdf(hd.MaHDT)}
+                                onClick={() => chuyenTrangChiTiet(hd.MaHDT)}
                                 className="cursor-pointer whitespace-nowrap rounded-full bg-[#00FFCC] px-2.5 py-1 text-[11px] font-bold text-slate-900 transition hover:bg-[#00e6b8]"
                               >
                                 Xem PDF
@@ -598,7 +576,7 @@ export default function QuanLyHopDongPage() {
                                 Xuất bản cứng
                               </button>
                               <button
-                                onClick={() => moFormSua(hd.MaHDT)}
+                                onClick={() => chuyenTrangSua(hd.MaHDT)}
                                 className="cursor-pointer whitespace-nowrap rounded-full bg-[#0F172A] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-slate-800"
                               >
                                 Sửa
@@ -620,15 +598,15 @@ export default function QuanLyHopDongPage() {
             </div>
           </main>
 
-          {/* 1. Modal Sửa / Tạo mới hợp đồng */}
+          {/* 1. Modal Tạo mới hợp đồng */}
           <SuaHopDongModal
-            moModal={moModalSua}
-            maHDTSua={maHDTDangSua}
+            moModal={moModalTaoMoi}
+            maHDTSua={null}
             danhSachPhong={danhSachPhong}
             danhSachKhachThue={danhSachKhachThue}
             danhSachPhiDichVu={danhSachPhiDichVu}
             danhSachHopDongCu={danhSachHopDongCu}
-            onClose={() => setMoModalSua(false)}
+            onClose={() => setMoModalTaoMoi(false)}
             onSuccess={lamMoiDuLieu}
           />
 

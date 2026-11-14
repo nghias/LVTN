@@ -304,16 +304,6 @@ export default function SuaHopDongModal({
     }
   };
 
-  // Hàm chọn nhanh ngày kết thúc tính từ Ngày bắt đầu thuê
-  const chonNhanhNgayKT = (loai: "1thang" | "6thang" | "1nam") => {
-    const goc = ngayBD || today;
-    let chuoiNgay = "";
-    if (loai === "1thang") chuoiNgay = congThemThang(goc, 1);
-    if (loai === "6thang") chuoiNgay = congThemThang(goc, 6);
-    if (loai === "1nam") chuoiNgay = congThemThang(goc, 12);
-    xuLyDoiNgayKT(chuoiNgay);
-  };
-
   // Quản lý thành viên trong form
   const themThanhVienVaoForm = () => {
     setThanhVienChon((prev) => {
@@ -494,9 +484,7 @@ export default function SuaHopDongModal({
       .map((tv) => ({
         ...tv,
         VaiTro:
-          kieuHopDong === "TachHopDongRieng"
-            ? ("DaiDien" as const)
-            : tv.VaiTro,
+          kieuHopDong === "TachHopDongRieng" ? ("DaiDien" as const) : tv.VaiTro,
       }));
 
     const payload = {
@@ -860,32 +848,7 @@ export default function SuaHopDongModal({
                       ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-300"
                       : "border-slate-300 focus:border-[#059669]"
                 }`}
-              />
-
-              {/* Gợi ý nút chọn nhanh ngày kết thúc tính từ Ngày bắt đầu */}
-              <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => chonNhanhNgayKT("1thang")}
-                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
-                >
-                  +1 tháng
-                </button>
-                <button
-                  type="button"
-                  onClick={() => chonNhanhNgayKT("6thang")}
-                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
-                >
-                  +6 tháng
-                </button>
-                <button
-                  type="button"
-                  onClick={() => chonNhanhNgayKT("1nam")}
-                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-[#059669] hover:bg-emerald-100"
-                >
-                  +1 năm
-                </button>
-              </div>
+              />              
 
               {loiForm.ngayKT && (
                 <p className="mt-1 text-xs font-medium text-rose-600">
@@ -998,8 +961,7 @@ export default function SuaHopDongModal({
                       <option value={0}>-- Chọn khách thuê --</option>
                       {danhSachKhachThue.map((kt) => (
                         <option key={kt.MaND} value={kt.MaND}>
-                          {kt.HoTen} - SĐT: {kt.SDT} - CCCD:{" "}
-                          {kt.CCCD || "---"}
+                          {kt.HoTen} - SĐT: {kt.SDT} - CCCD: {kt.CCCD || "---"}
                         </option>
                       ))}
                     </select>
@@ -1075,10 +1037,10 @@ export default function SuaHopDongModal({
                 return (
                   <label
                     key={pdv.MaPDV}
-                    className={`flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 transition ${
+                    className={`p-3 rounded-xl border text-left text-xs font-bold transition cursor-pointer flex items-center justify-between ${
                       checked
-                        ? "border-[#059669] bg-[#ECFDF5]/60"
-                        : "border-slate-200 bg-white hover:bg-slate-50"
+                        ? "bg-[#00FFCC]/30 border-teal-500 text-slate-900"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
                     }`}
                   >
                     <input
