@@ -394,7 +394,7 @@ export default function ChiTietTinDangClient({
                     <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
                       <span className="text-slate-500 block">Diện tích</span>
                       <strong className="text-sm text-slate-900">
-                        {Number(currentTin.DienTich)} m²
+                        {Number(currentTin.DienTich)} m<sup>2</sup>
                       </strong>
                     </div>
                     <div className="p-3.5 rounded-xl border border-slate-200 bg-white">

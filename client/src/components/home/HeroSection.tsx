@@ -42,23 +42,15 @@ export default function HeroSection({
 
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
             Hệ thống quản lý tập trung nhiều cơ sở, minh bạch diện tích, tiện
-            ích từng phòng (gác lửng, máy lạnh, quạt, phí rác, wifi) cùng{" "}
-            <strong className="text-slate-900">
-              Trợ lý ảo AI Chatbot tư vấn 24/7
-            </strong>{" "}
-            giúp bạn tra cứu và chọn ngay phòng trống phù hợp nhất. Mọi thủ tục{" "}
-            <strong className="text-slate-900">
+            ích từng phòng (gác lửng, máy lạnh, quạt, phí rác, wifi) cùng 
+              Trợ lý ảo AI Chatbot tư vấn 24/7 
+            giúp bạn tra cứu và chọn ngay phòng trống phù hợp nhất. Mọi thủ tục 
               hợp đồng, tạm trú - tạm vắng & báo sự cố đều trực tuyến và mã hóa
-              bảo mật
-            </strong>
-            , kết hợp{" "}
-            <strong className="text-slate-900">
-              đồng hồ điện tử IoT tự động chốt điện nước
-            </strong>{" "}
-            chính xác và{" "}
-            <strong className="text-slate-900">
-              thanh toán mã QR gạch nợ tức thì
-            </strong>
+              bảo mật 
+            , kết hợp 
+              đồng hồ điện tử IoT tự động chốt điện nước 
+            chính xác và 
+              thanh toán mã QR gạch nợ tức thì 
             .
           </p>
 
@@ -67,21 +59,21 @@ export default function HeroSection({
             <button
               type="button"
               onClick={() => onScrollToSection("tin-dang")}
-              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
+              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
               Xem phòng ngay
             </button>
             <button
               type="button"
               onClick={onOpenChat}
-              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
+              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
               Nhờ AI tư vấn chọn phòng
             </button>
             <button
               type="button"
               onClick={() => onScrollToSection("bang-gia")}
-              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition cursor-pointer"
+              className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl shadow-2xs transition cursor-pointer"
             >
               Xem bảng giá dịch vụ
             </button>
@@ -101,7 +93,7 @@ export default function HeroSection({
 
           <div className="p-4 rounded-2xl bg-[#00FFCC]/15 border border-teal-300">
             <p className="text-[10px] font-bold uppercase tracking-wider text-teal-800">
-              Phòng đang mở
+              Phòng đang trống
             </p>
             <p className="text-lg sm:text-xl font-bold text-teal-700 mt-1">
               {soPhongMo} phòng
@@ -110,7 +102,7 @@ export default function HeroSection({
 
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Giá điện niêm yết
+              Giá điện
             </p>
             <p className="text-lg sm:text-xl font-bold text-slate-900 mt-1">
               {formatVND(giaDienNuoc.GiaDien)}
@@ -119,7 +111,7 @@ export default function HeroSection({
 
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Giá nước niêm yết
+              Giá nước
             </p>
             <p className="text-lg sm:text-xl font-bold text-slate-900 mt-1">
               {formatVND(giaDienNuoc.GiaNuoc)}

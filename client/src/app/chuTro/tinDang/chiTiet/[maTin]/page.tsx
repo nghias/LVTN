@@ -274,9 +274,7 @@ export default function ChiTietTinDangPage() {
                         <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-900 text-[#00FFCC]">
                           {tinDang.TenKhu}
                         </span>
-                        <span className="text-xs font-bold text-slate-400">
-                          Mã tin #{tinDang.MaTin}
-                        </span>
+                        
                       </div>
                       {renderStatusBadge(tinDang.TrangThai)}
                     </div>
@@ -343,7 +341,7 @@ export default function ChiTietTinDangPage() {
                         Thuộc khu trọ
                       </span>
                       <p className="text-sm font-bold text-slate-900 mt-0.5">
-                        {tinDang.TenKhu} (Mã khu #{tinDang.MaKhu})
+                        {tinDang.TenKhu}
                       </p>
                     </div>
 
@@ -352,7 +350,7 @@ export default function ChiTietTinDangPage() {
                         Tên phòng
                       </span>
                       <p className="text-base font-extrabold text-slate-900 mt-0.5">
-                        Phòng {tinDang.TenPhong} (Mã #{tinDang.MaPhong})
+                        Phòng {tinDang.TenPhong}
                       </p>
                     </div>
 
@@ -381,7 +379,9 @@ export default function ChiTietTinDangPage() {
                           ? "Phòng trống"
                           : tinDang.TrangThaiPhong === "DaThue"
                             ? "Đã cho thuê"
-                            : tinDang.TrangThaiPhong}
+                            : tinDang.TrangThaiPhong === "BaoTri"
+                              ? "Đang sửa chữa"
+                              : "Không xác định"}
                       </span>
                     </div>
                   </div>

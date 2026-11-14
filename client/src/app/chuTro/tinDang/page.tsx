@@ -242,12 +242,12 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-              Quản Lý Tin Đăng Tìm Khách Thuê
+              Quản Lý Tin Đăng
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
               {isChuTro
-                ? "Quản lý toàn bộ tin đăng (bao gồm cả tin hết hạn) trên tất cả các cơ sở nhà trọ"
-                : "Quản lý các tin đăng (bao gồm cả tin hết hạn) thuộc khu trọ bạn được phân công"}
+                ? "Quản lý toàn bộ tin đăng trên tất cả các cơ sở nhà trọ"
+                : "Quản lý các tin đăng thuộc khu trọ bạn được phân công"}
             </p>
           </div>
 
@@ -265,7 +265,7 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
               onClick={handleCreateClick}
               className="flex-1 sm:flex-initial text-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition cursor-pointer"
             >
-              + Đăng Tin Mới
+              Đăng Tin Mới
             </button>
           </div>
         </div>
@@ -426,9 +426,7 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
                     <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900 text-[#00FFCC]">
                       {tin.TenKhu}
                     </span>
-                    <span className="text-xs font-bold text-slate-400">
-                      #{tin.MaTin}
-                    </span>
+                    
                   </div>
                   {renderStatusBadge(tin.TrangThai)}
                 </div>
@@ -443,7 +441,7 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
                           Phòng {tin.TenPhong}
                         </h3>
                         <span className="text-xs font-semibold text-slate-500">
-                          Diện tích: {Number(tin.DienTich)} m²
+                          Diện tích: {Number(tin.DienTich)} m<sup>2</sup>
                         </span>
                       </div>
 

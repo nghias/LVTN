@@ -497,7 +497,7 @@ export default function SuaTinDangPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-                  Chỉnh Sửa Tin Đăng #{maTin}
+                  Chỉnh Sửa Tin Đăng
                 </h1>
               </div>
 
@@ -542,7 +542,7 @@ export default function SuaTinDangPage() {
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
                   <h2 className="text-sm font-bold text-slate-900">
-                    Biểu mẫu cập nhật tin đăng #{maTin}
+                    Biểu mẫu cập nhật tin đăng 
                   </h2>
                 </div>
 

@@ -300,11 +300,8 @@ export default function SuaPhongTroPage() {
                 {/* Quản lý Ảnh */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Quản lý Hình ảnh Phòng trọ (Ảnh chính hiển thị ngoài thẻ)
+                    Quản lý Hình ảnh Phòng trọ
                   </label>
-                  <p className="text-[11px] text-slate-500 mb-3">
-                    Các ảnh bị xóa sẽ tự động được dọn dẹp khỏi Cloudinary sau khi bấm Lưu.
-                  </p>
 
                   <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-teal-400 bg-[#00FFCC]/10 hover:bg-[#00FFCC]/25 text-xs font-bold text-slate-900 cursor-pointer transition">
                     <span>+ Tải thêm ảnh mới</span>

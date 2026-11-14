@@ -146,7 +146,7 @@ export default function SuaTienIchPage() {
                 ← Quay lại danh sách Tiện ích
               </Link>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
-                Chỉnh Sửa Tiện Ích #{maTI}
+                Chỉnh Sửa Tiện Ích 
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
                 {user.Quyen === 'ChuTro'

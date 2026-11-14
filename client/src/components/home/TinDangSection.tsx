@@ -191,18 +191,18 @@ export default function TinDangSection({
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-1.5">
-            Tra cứu phòng trống trực tuyến
+            Tra cứu phòng trống 
           </span>
           <h2
             id="tin-dang-heading"
             className="text-xl sm:text-2xl font-bold text-slate-900"
           >
-            Danh Sách Phòng Đang Mở Cho Thuê ({validFilteredTinDangList.length}/
+            Danh Sách Phòng Đang Cần Cho Thuê ({validFilteredTinDangList.length}/
             {validTotalTinDangList.length})
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Hỗ trợ bộ lọc đa tiêu chí theo cơ sở, diện tích, mức giá thuê và xem
-            chi tiết toàn bộ hình ảnh thực tế của từng phòng
+            chi tiết của từng phòng
           </p>
         </div>
       </header>
@@ -505,7 +505,7 @@ export default function TinDangSection({
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Quản lý {tin.TenKhu}
+                          {tin.TenKhu}
                         </p>
                         <p className="text-xs font-bold text-slate-900 truncate">
                           {contact.tenQuanLy}

@@ -240,7 +240,7 @@ function ThemPhongTroContent() {
               {/* Tải ảnh phòng lên Cloudinary & Chọn Ảnh chính (AnhChinh = 1) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Hình ảnh phòng trọ (Tải lên Cloudinary)
+                  Hình ảnh phòng trọ
                 </label>
                 <p className="text-[11px] text-slate-500 mb-3">
                   Bấm vào nút <strong>&quot;Đặt làm ảnh chính&quot;</strong> trên bức ảnh bạn muốn hiển thị ở ngoài thẻ phòng.

@@ -118,7 +118,7 @@ export default function ThemKhachThuePage() {
                       type="text"
                       value={tenTK}
                       onChange={(e) => setTenTK(e.target.value)}
-                      placeholder="VD: khachthue_an hoặc SĐT/Email"
+                      placeholder="example@gmail.com"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
                     />
                   </div>
@@ -197,7 +197,7 @@ export default function ThemKhachThuePage() {
                         setSdt(e.target.value);
                         if (!tenTK) setTenTK(e.target.value);
                       }}
-                      placeholder="VD: 0901234567"
+                      placeholder="0901234567"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-500"
                     />
                   </div>
@@ -291,9 +291,9 @@ export default function ThemKhachThuePage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-7 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 font-bold text-xs sm:text-sm shadow-xs transition cursor-pointer disabled:opacity-50"
+                  className="px-7 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
                 >
-                  {submitting ? 'Đang tạo...' : '+ Tạo tài khoản khách thuê'}
+                  {submitting ? 'Đang tạo...' : 'Tạo tài khoản khách thuê'}
                 </button>
               </div>
             </form>

@@ -168,7 +168,7 @@ export default function QuanLyKhachThuePage() {
                   Quản Lý Hồ Sơ & Tài Khoản Khách Thuê
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Quản lý tài khoản đăng nhập (NguoiDung) và hồ sơ định danh cá nhân (ThongTinCaNhan)
+                  Quản lý tài khoản đăng nhập và hồ sơ định danh cá nhân của khách thuê trong hệ thống.
                 </p>
               </div>
 
@@ -176,7 +176,7 @@ export default function QuanLyKhachThuePage() {
                 href="/chuTro/khachThue/them"
                 className="cursor-pointer whitespace-nowrap rounded-full bg-[#00FFCC] px-5 py-2.5 text-xs font-bold text-slate-900 shadow-2xs transition hover:bg-[#00e6b8]"
               >
-                + Tạo tài khoản khách thuê
+                Tạo tài khoản khách thuê
               </Link>
             </div>
 
@@ -284,7 +284,7 @@ export default function QuanLyKhachThuePage() {
 
                           <td className="py-3.5 px-4">
                             <div className="font-semibold text-slate-800">
-                              {item.SDT || '—'}
+                              SĐT: {item.SDT || '—'}
                             </div>
                             <div className="text-xs text-slate-500">
                               CCCD: {item.CCCD || 'Chưa cập nhật'}

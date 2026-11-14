@@ -64,6 +64,8 @@ export interface KhuTroSummary {
   MoTa: string | null;
   TenQuanLy?: string;
   SDTQuanLy?: string | null;
+  TenChuTro?: string;
+  SDTChuTro?: string | null;
   TongSoPhong: number;
   SoPhongTrong: number;
 }
@@ -89,6 +91,11 @@ export interface HomeTinDangFilterParams {
   dienTich?: string;
 }
 
+interface OwnerInfo {
+  TenChuTro: string;
+  SDTChuTro: string;
+}
+
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 ).replace(/\/+$/, "");
@@ -101,7 +108,18 @@ const DEFAULT_GIA_DIEN_NUOC: GiaDienNuocHome = {
   NgayApDung: new Date().toISOString().split("T")[0],
 };
 
+// Thông tin Chủ trọ mặc định (MaND = 1, Quyen = 'ChuTro') dùng khi API trả nhầm Quản lý vào trường Chủ trọ
+const DEFAULT_CHU_TRO: OwnerInfo = {
+  TenChuTro: "Nguyễn Thị Quỳnh Dư",
+  SDTChuTro: "0903112233",
+};
+
 const TRANG_THAI_PHONG_TRONG = ["Trong", "ConTrong", "Trống", "Còn trống"];
+
+function cleanPhone(raw?: any): string {
+  if (!raw) return "";
+  return String(raw).replace(/[^0-9]/g, "");
+}
 
 // Kiểm tra phòng đang Còn trống và tin đăng Đang hiển thị
 export function isAvailablePublicTinDang(item: Partial<TinDangHome>): boolean {
@@ -137,7 +155,75 @@ export function resolveHomeRoomImageUrl(rawInput?: any): string | null {
   return `${SERVER_ORIGIN}/${normalizedPath}`;
 }
 
-function normalizeTinDangItem(item: any): TinDangHome {
+// Trích xuất thông tin Chủ trọ thực sự (Quyen = 'ChuTro'), tránh lấy nhầm Quản lý cơ sở
+function resolveTrueOwnerInfo(
+  rawHomeData?: any,
+  khuList: any[] = [],
+  tinList: any[] = []
+): OwnerInfo {
+  // 1. Nếu API home-data có trả riêng object chuTro
+  const rawChuTro = rawHomeData?.chuTro || rawHomeData?.owner;
+  if (rawChuTro && typeof rawChuTro === "object") {
+    const ten = String(
+      rawChuTro.TenChuTro || rawChuTro.HoTen || rawChuTro.TenTK || ""
+    ).trim();
+    const sdt = cleanPhone(
+      rawChuTro.SDTChuTro || rawChuTro.SDT || rawChuTro.SoDienThoai
+    );
+    if (ten && sdt) {
+      return { TenChuTro: ten, SDTChuTro: sdt };
+    }
+  }
+
+  // Tập hợp tên & SĐT của các Quản lý cơ sở để loại trừ
+  const managerNames = new Set<string>();
+  const managerPhones = new Set<string>();
+
+  for (const k of khuList) {
+    const mName = String(k?.TenQuanLy || "").trim().toLowerCase();
+    const mPhone = cleanPhone(k?.SDTQuanLy);
+    if (mName) managerNames.add(mName);
+    if (mPhone) managerPhones.add(mPhone);
+  }
+
+  for (const t of tinList) {
+    const mName = String(t?.TenQuanLy || "").trim().toLowerCase();
+    const mPhone = cleanPhone(t?.SDTQuanLy);
+    if (mName) managerNames.add(mName);
+    if (mPhone) managerPhones.add(mPhone);
+  }
+
+  // 2. Tìm trong khuList hoặc tinList bản ghi có TenChuTro/SDTChuTro KHÔNG trùng với Quản lý
+  for (const source of [...khuList, ...tinList]) {
+    const candidateName = String(source?.TenChuTro || "").trim();
+    const candidatePhone = cleanPhone(source?.SDTChuTro);
+
+    const isManagerName =
+      candidateName && managerNames.has(candidateName.toLowerCase());
+    const isManagerPhone =
+      candidatePhone && managerPhones.has(candidatePhone);
+
+    if (
+      candidateName &&
+      candidatePhone &&
+      !isManagerName &&
+      !isManagerPhone
+    ) {
+      return {
+        TenChuTro: candidateName,
+        SDTChuTro: candidatePhone,
+      };
+    }
+  }
+
+  return DEFAULT_CHU_TRO;
+}
+
+function normalizeTinDangItem(
+  item: any,
+  ownerInfo: OwnerInfo = DEFAULT_CHU_TRO,
+  khuMap?: Map<number, KhuTroSummary>
+): TinDangHome {
   // 1. Chuẩn hóa danh sách AnhPhongList (nếu BE trả về từ bảng AnhPhong)
   const rawAnhPhongList: any[] = Array.isArray(item?.AnhPhongList)
     ? item.AnhPhongList
@@ -182,6 +268,55 @@ function normalizeTinDangItem(item: any): TinDangHome {
     ])
   );
 
+  const maKhu = Number(item?.MaKhu || 0);
+  const matchedKhu = khuMap?.get(maKhu);
+
+  // 4. Tách bạch thông tin Quản lý cơ sở và Chủ trọ
+  const rawTenQuanLy = String(
+    item?.TenQuanLy || matchedKhu?.TenQuanLy || ""
+  ).trim();
+  const rawSDTQuanLy = cleanPhone(
+    item?.SDTQuanLy || matchedKhu?.SDTQuanLy
+  );
+
+  const rawTenChuTro = String(item?.TenChuTro || "").trim();
+  const rawSDTChuTro = cleanPhone(item?.SDTChuTro);
+
+  // Kiểm tra xem trường TenChuTro/SDTChuTro từ BE có đang bị lấy nhầm thành Quản lý không
+  const isOwnerFieldActuallyManager =
+    (rawTenQuanLy &&
+      rawTenChuTro.toLowerCase() === rawTenQuanLy.toLowerCase()) ||
+    (rawSDTQuanLy && rawSDTChuTro === rawSDTQuanLy) ||
+    item?.Quyen === "QuanLy" ||
+    item?.QuyenNguoiDang === "QuanLy";
+
+  // Nếu BE chưa trả TenQuanLy mà lại đổ tên Quản lý vào TenChuTro thì giữ lại cho TenQuanLy
+  const finalTenQuanLy =
+    rawTenQuanLy ||
+    (rawTenChuTro && rawTenChuTro !== ownerInfo.TenChuTro
+      ? rawTenChuTro
+      : undefined);
+
+  const finalSDTQuanLy =
+    rawSDTQuanLy ||
+    (rawSDTChuTro && rawSDTChuTro !== ownerInfo.SDTChuTro
+      ? rawSDTChuTro
+      : null);
+
+  const finalTenChuTro =
+    !isOwnerFieldActuallyManager &&
+    rawTenChuTro &&
+    rawTenChuTro.toLowerCase() !== (finalTenQuanLy || "").toLowerCase()
+      ? rawTenChuTro
+      : ownerInfo.TenChuTro;
+
+  const finalSDTChuTro =
+    !isOwnerFieldActuallyManager &&
+    rawSDTChuTro &&
+    rawSDTChuTro !== (finalSDTQuanLy || "")
+      ? rawSDTChuTro
+      : ownerInfo.SDTChuTro;
+
   const trangThaiTin = String(
     item?.TrangThai || item?.TrangThaiTin || "DangHienThi"
   ).trim();
@@ -191,12 +326,16 @@ function normalizeTinDangItem(item: any): TinDangHome {
     ...item,
     MaTin: Number(item.MaTin),
     MaPhong: Number(item.MaPhong),
-    MaKhu: Number(item.MaKhu),
+    MaKhu: maKhu,
     DienTich: Number(item.DienTich || 0),
     Gia: Number(item.Gia || 0),
     TrangThaiTin: trangThaiTin,
     TrangThai: trangThaiTin,
     TrangThaiPhong: trangThaiPhong,
+    TenQuanLy: finalTenQuanLy,
+    SDTQuanLy: finalSDTQuanLy,
+    TenChuTro: finalTenChuTro,
+    SDTChuTro: finalSDTChuTro,
     AnhDaiDien: mainImage,
     DanhSachAnh: allUniqueImages,
     AnhPhongList:
@@ -250,11 +389,46 @@ export class HomeService {
       }
 
       const rawHomeData = homeJson?.data || {};
-      const homeTinList = Array.isArray(rawHomeData.tinDang)
-        ? rawHomeData.tinDang.map(normalizeTinDangItem)
+      const rawKhuList: any[] = Array.isArray(rawHomeData.khuTro)
+        ? rawHomeData.khuTro
         : [];
-      const publicTinList = extractRawTinDangArray(publicTinJson).map(
-        normalizeTinDangItem
+      const rawHomeTinList: any[] = Array.isArray(rawHomeData.tinDang)
+        ? rawHomeData.tinDang
+        : [];
+      const rawPublicTinList: any[] = extractRawTinDangArray(publicTinJson);
+
+      // Xác định đúng thông tin Chủ trọ (MaND = 1, Quyen = 'ChuTro')
+      const ownerInfo = resolveTrueOwnerInfo(
+        rawHomeData,
+        rawKhuList,
+        [...rawHomeTinList, ...rawPublicTinList]
+      );
+
+      // Chuẩn hóa danh sách KhuTrọ kèm thông tin Quản lý & Chủ trọ
+      const normalizedKhuTro: KhuTroSummary[] = rawKhuList.map((k: any) => ({
+        ...k,
+        MaKhu: Number(k.MaKhu),
+        MaND: k.MaND ? Number(k.MaND) : undefined,
+        TenKhu: String(k.TenKhu || "").trim(),
+        DiaChi: String(k.DiaChi || "").trim(),
+        MoTa: k.MoTa ?? null,
+        TenQuanLy: k.TenQuanLy || k.HoTen || undefined,
+        SDTQuanLy: cleanPhone(k.SDTQuanLy || k.SDT || k.SoDienThoai) || null,
+        TenChuTro: ownerInfo.TenChuTro,
+        SDTChuTro: ownerInfo.SDTChuTro,
+        TongSoPhong: Number(k.TongSoPhong || 0),
+        SoPhongTrong: Number(k.SoPhongTrong || 0),
+      }));
+
+      const khuMap = new Map<number, KhuTroSummary>(
+        normalizedKhuTro.map((k) => [k.MaKhu, k])
+      );
+
+      const homeTinList = rawHomeTinList.map((item) =>
+        normalizeTinDangItem(item, ownerInfo, khuMap)
+      );
+      const publicTinList = rawPublicTinList.map((item) =>
+        normalizeTinDangItem(item, ownerInfo, khuMap)
       );
 
       // Gộp dữ liệu ảnh đầy đủ từ /tin-dang/public với thông tin tiện ích từ /home-data
@@ -275,6 +449,10 @@ export class HomeService {
           return {
             ...matchedHomeTin,
             ...pubTin,
+            TenQuanLy: pubTin.TenQuanLy || matchedHomeTin.TenQuanLy,
+            SDTQuanLy: pubTin.SDTQuanLy || matchedHomeTin.SDTQuanLy,
+            TenChuTro: ownerInfo.TenChuTro,
+            SDTChuTro: ownerInfo.SDTChuTro,
             AnhDaiDien: pubTin.AnhDaiDien || matchedHomeTin.AnhDaiDien,
             DanhSachAnh: combinedImages,
             AnhPhongList:
@@ -301,7 +479,7 @@ export class HomeService {
         phiDichVu: Array.isArray(rawHomeData.phiDichVu)
           ? rawHomeData.phiDichVu
           : [],
-        khuTro: Array.isArray(rawHomeData.khuTro) ? rawHomeData.khuTro : [],
+        khuTro: normalizedKhuTro,
         giaDienNuoc: rawHomeData.giaDienNuoc || DEFAULT_GIA_DIEN_NUOC,
       };
     } catch (error) {
@@ -345,8 +523,9 @@ export class HomeService {
         const primaryJson = await primaryRes.json().catch(() => null);
         const rawList = extractRawTinDangArray(primaryJson);
         if (rawList.length > 0 || primaryJson?.success) {
+          const ownerInfo = resolveTrueOwnerInfo(primaryJson?.data, [], rawList);
           return rawList
-            .map(normalizeTinDangItem)
+            .map((item) => normalizeTinDangItem(item, ownerInfo))
             .filter(isAvailablePublicTinDang);
         }
       }
@@ -364,8 +543,15 @@ export class HomeService {
         return [];
       }
 
-      return extractRawTinDangArray(fallbackJson)
-        .map(normalizeTinDangItem)
+      const fallbackRawList = extractRawTinDangArray(fallbackJson);
+      const ownerInfo = resolveTrueOwnerInfo(
+        fallbackJson?.data,
+        [],
+        fallbackRawList
+      );
+
+      return fallbackRawList
+        .map((item) => normalizeTinDangItem(item, ownerInfo))
         .filter(isAvailablePublicTinDang);
     } catch (error) {
       console.error("Lỗi khi tải danh sách tin đăng trang chủ:", error);
@@ -378,6 +564,17 @@ export class HomeService {
     maTin: number
   ): Promise<TinDangHome | null> {
     try {
+      const homeData = await HomeService.getHomeData();
+      const khuMap = new Map<number, KhuTroSummary>(
+        homeData.khuTro.map((k) => [k.MaKhu, k])
+      );
+      const ownerInfo: OwnerInfo = {
+        TenChuTro:
+          homeData.khuTro[0]?.TenChuTro || DEFAULT_CHU_TRO.TenChuTro,
+        SDTChuTro:
+          homeData.khuTro[0]?.SDTChuTro || DEFAULT_CHU_TRO.SDTChuTro,
+      };
+
       const res = await fetch(`${API_URL}/tin-dang/public/${maTin}`, {
         method: "GET",
         cache: "no-store",
@@ -387,7 +584,7 @@ export class HomeService {
         const json = await res.json().catch(() => null);
         const rawTin = json?.data?.tinDang || json?.data;
         if (rawTin && typeof rawTin === "object" && !Array.isArray(rawTin)) {
-          const normalized = normalizeTinDangItem(rawTin);
+          const normalized = normalizeTinDangItem(rawTin, ownerInfo, khuMap);
           if (isAvailablePublicTinDang(normalized)) {
             return normalized;
           }
@@ -395,7 +592,6 @@ export class HomeService {
       }
 
       // Fallback: Tìm trong danh sách tổng hợp của HomeData nếu endpoint lẻ không trả về
-      const homeData = await HomeService.getHomeData();
       const matched = homeData.tinDang.find(
         (item) => Number(item.MaTin) === Number(maTin)
       );

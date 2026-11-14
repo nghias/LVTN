@@ -33,14 +33,13 @@ export default function BangGiaSection({
         </h2>
         <p suppressHydrationWarning className="text-xs text-slate-500 mt-1.5">
           Áp dụng thống nhất khi tính Hóa đơn tự động hàng tháng trên hệ thống
-          (Cập nhật ngày: {formattedNgayApDung})
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Đơn giá Điện (Đồng hồ IoT)
+            Đơn giá Điện
           </span>
           <p
             suppressHydrationWarning
@@ -56,7 +55,7 @@ export default function BangGiaSection({
 
         <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Đơn giá Nước (Đồng hồ IoT)
+            Đơn giá Nước
           </span>
           <p
             suppressHydrationWarning

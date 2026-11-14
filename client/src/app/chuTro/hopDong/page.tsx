@@ -251,7 +251,7 @@ export default function QuanLyHopDongPage() {
                 onClick={moFormTaoMoi}
                 className="cursor-pointer whitespace-nowrap rounded-full bg-[#00FFCC] px-5 py-2.5 text-xs font-bold text-slate-900 shadow-2xs transition hover:bg-[#00e6b8]"
               >
-                + Thêm Hợp Đồng
+                Thêm Hợp Đồng
               </button>
             </div>
 

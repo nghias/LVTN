@@ -48,7 +48,6 @@ export default function KhuTroSection({
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
               <span className="text-[11px] font-bold text-emerald-600">
-                ● Đồng bộ đồng hồ IoT & Kiểm soát ra vào
               </span>
               <button
                 type="button"

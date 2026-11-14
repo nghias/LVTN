@@ -3,6 +3,26 @@ const db = require("../../database/db");
 
 const DANH_SACH_TRANG_THAI_TRONG = ["Trong", "ConTrong", "Trống", "Còn trống"];
 
+// Subquery lấy thông tin cá nhân theo từng MaND (tránh nhân bản dòng nếu ThongTinCaNhan có nhiều bản ghi)
+const SUBQUERY_THONG_TIN_CA_NHAN = `
+  SELECT MaND, MAX(HoTen) AS HoTen, MAX(SDT) AS SDT, MAX(Email) AS Email
+  FROM ThongTinCaNhan
+  GROUP BY MaND
+`;
+
+// Subquery lấy thông tin Chủ trọ (tài khoản có Quyen = 'ChuTro', MaND = 1)
+const SUBQUERY_CHU_TRO = `
+  SELECT 
+    nd.MaND,
+    COALESCE(tt.HoTen, nd.TenTK) AS TenChuTro,
+    tt.SDT AS SDTChuTro
+  FROM NguoiDung nd
+  LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt ON nd.MaND = tt.MaND
+  WHERE nd.Quyen = 'ChuTro'
+  ORDER BY nd.MaND ASC
+  LIMIT 1
+`;
+
 // Chuẩn hóa chuỗi ngày về định dạng YYYY-MM-DD cho cột DATE của MySQL 8.4
 function normalizeDate(value) {
   if (!value || String(value).trim() === "") return null;
@@ -112,7 +132,7 @@ const TinDangModel = {
         ttcn.SDT,
         ttcn.Email
       FROM NguoiDung nd
-      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
+      LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) ttcn ON nd.MaND = ttcn.MaND
       WHERE nd.MaND = ?
       LIMIT 1
     `;
@@ -233,8 +253,11 @@ const TinDangModel = {
         k.MaKhu,
         k.TenKhu,
         k.DiaChi,
-        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
-        ttcn.SDT AS SDTChuTro,
+        k.MaND AS MaQuanLy,
+        COALESCE(tt_ql.HoTen, nd_ql.TenTK) AS TenQuanLy,
+        tt_ql.SDT AS SDTQuanLy,
+        COALESCE(ct.TenChuTro, COALESCE(tt_ql.HoTen, nd_ql.TenTK)) AS TenChuTro,
+        COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro,
         (
           SELECT ap.DuongDan
           FROM AnhPhong ap
@@ -245,8 +268,9 @@ const TinDangModel = {
       FROM TinDang td
       INNER JOIN Phong p ON td.MaPhong = p.MaPhong
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
-      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
+      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
+      LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
       ${whereClause}
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
@@ -283,12 +307,16 @@ const TinDangModel = {
         k.MaKhu,
         k.TenKhu,
         k.DiaChi,
-        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
-        ttcn.SDT AS SDTChuTro
+        k.MaND AS MaQuanLy,
+        COALESCE(tt_ql.HoTen, nd_ql.TenTK) AS TenQuanLy,
+        tt_ql.SDT AS SDTQuanLy,
+        COALESCE(ct.TenChuTro, COALESCE(tt_ql.HoTen, nd_ql.TenTK)) AS TenChuTro,
+        COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro
       FROM Phong p
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
-      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
+      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
+      LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
       LEFT JOIN TinDang td 
         ON p.MaPhong = td.MaPhong 
         AND td.TrangThai IS NOT NULL 
@@ -324,8 +352,11 @@ const TinDangModel = {
         k.MaKhu,
         k.TenKhu,
         k.DiaChi,
-        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
-        ttcn.SDT AS SDTChuTro,
+        k.MaND AS MaQuanLy,
+        COALESCE(tt_ql.HoTen, nd_ql.TenTK) AS TenQuanLy,
+        tt_ql.SDT AS SDTQuanLy,
+        COALESCE(ct.TenChuTro, COALESCE(tt_ql.HoTen, nd_ql.TenTK)) AS TenChuTro,
+        COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro,
         (
           SELECT ap.DuongDan
           FROM AnhPhong ap
@@ -336,8 +367,9 @@ const TinDangModel = {
       FROM TinDang td
       INNER JOIN Phong p ON td.MaPhong = p.MaPhong
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
-      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
+      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
+      LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
       WHERE td.TrangThai = 'DangHienThi'
         AND p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống')
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
@@ -366,8 +398,11 @@ const TinDangModel = {
         k.MaKhu,
         k.TenKhu,
         k.DiaChi,
-        COALESCE(ttcn.HoTen, nd.TenTK) AS TenChuTro,
-        ttcn.SDT AS SDTChuTro,
+        k.MaND AS MaQuanLy,
+        COALESCE(tt_ql.HoTen, nd_ql.TenTK) AS TenQuanLy,
+        tt_ql.SDT AS SDTQuanLy,
+        COALESCE(ct.TenChuTro, COALESCE(tt_ql.HoTen, nd_ql.TenTK)) AS TenChuTro,
+        COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro,
         (
           SELECT ap.DuongDan
           FROM AnhPhong ap
@@ -378,8 +413,9 @@ const TinDangModel = {
       FROM TinDang td
       INNER JOIN Phong p ON td.MaPhong = p.MaPhong
       INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
-      LEFT JOIN ThongTinCaNhan ttcn ON nd.MaND = ttcn.MaND
+      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
+      LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
       WHERE td.MaTin = ?
         AND td.TrangThai = 'DangHienThi'
         AND p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống')

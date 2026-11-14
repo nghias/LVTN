@@ -125,7 +125,7 @@ export default function ContactRoomModal({
         <div className="p-4 rounded-2xl bg-[#00FFCC]/15 border border-teal-300 space-y-2.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-slate-600 font-medium">
-              Chủ trọ (Hỗ trợ mọi cơ sở):
+              Chủ trọ:
             </span>
             <span className="font-bold text-slate-900">
               {ownerContact.tenChuTro}
@@ -177,14 +177,6 @@ export default function ContactRoomModal({
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition cursor-pointer"
-        >
-          Đóng cửa sổ
-        </button>
       </div>
     </div>
   );

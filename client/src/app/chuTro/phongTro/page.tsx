@@ -143,7 +143,7 @@ export default function QuanLyKhuTroVaPhongPage() {
                     href="/chuTro/phongTro/khuTro/them"
                     className="flex-1 sm:flex-initial text-center px-4 py-2.5 rounded-full border-2 border-[#00FFCC] bg-white hover:bg-[#00FFCC]/20 text-slate-900 text-xs font-bold transition no-underline"
                   >
-                    + Thêm Khu Trọ
+                    Thêm Khu Trọ
                   </Link>
                 )}
 
@@ -155,7 +155,7 @@ export default function QuanLyKhuTroVaPhongPage() {
                   }
                   className="flex-1 sm:flex-initial text-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition no-underline"
                 >
-                  + Thêm Phòng Mới
+                  Thêm Phòng Mới
                 </Link>
               </div>
             </div>

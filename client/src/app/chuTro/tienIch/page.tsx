@@ -79,7 +79,7 @@ export default function QuanLyTienIchPage() {
                   Quản Lý Danh Mục Tiện Ích
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Thiết lập các tiện ích phòng trọ (Gác lửng, Máy lạnh, Tủ lạnh mini, Wifi...) và gán phòng áp dụng.
+                  Thiết lập các tiện ích phòng trọ.
                 </p>
               </div>
 
@@ -89,7 +89,7 @@ export default function QuanLyTienIchPage() {
                   onClick={() => router.push('/chuTro/tienIch/them')}
                   className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
                 >
-                  + Thêm Tiện Ích
+                  Thêm Tiện Ích
                 </button>
               </div>
             </div>
@@ -145,7 +145,7 @@ export default function QuanLyTienIchPage() {
                   onClick={() => router.push('/chuTro/tienIch/them')}
                   className="mt-4 px-5 py-2.5 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold hover:bg-[#00e6b8] transition cursor-pointer"
                 >
-                  + Thêm tiện ích đầu tiên
+                  Thêm tiện ích đầu tiên
                 </button>
               </div>
             ) : (
@@ -155,7 +155,6 @@ export default function QuanLyTienIchPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                        <th className="py-3.5 px-4 font-bold whitespace-nowrap w-24">Mã TI</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap w-60">Tên Tiện Ích</th>
                         <th className="py-3.5 px-4 font-bold">Mô Tả Chi Tiết</th>
                         <th className="py-3.5 px-4 font-bold text-center whitespace-nowrap w-40">
@@ -169,9 +168,6 @@ export default function QuanLyTienIchPage() {
                     <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
                       {danhSach.map((item) => (
                         <tr key={item.MaTI} className="hover:bg-slate-50/80 transition">
-                          <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">
-                            #{item.MaTI}
-                          </td>
                           <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">
                             {item.TenTI}
                           </td>

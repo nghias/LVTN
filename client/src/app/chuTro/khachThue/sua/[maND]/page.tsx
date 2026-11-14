@@ -103,19 +103,20 @@ export default function SuaKhachThuePage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                  Chỉnh Sửa Hồ Sơ & Tài Khoản Khách Thuê
+                  Chỉnh Sửa Hồ Sơ Khách Thuê
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Cập nhật thông tin định danh cá nhân và tài khoản khách thuê #{maND}
+                  Cập nhật thông tin định danh cá nhân và tài khoản khách thuê
                 </p>
               </div>
 
-              <Link
-                href="/chuTro/khachThue"
-                className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs sm:text-sm transition no-underline whitespace-nowrap"
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
               >
-                ← Quay lại danh sách
-              </Link>
+                ← Quay lại trang trước
+              </button>
             </div>
 
             {loading ? (
@@ -129,7 +130,7 @@ export default function SuaKhachThuePage() {
               >
                 <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Tên tài khoản đăng nhập (TenTK) <span className="text-red-500">*</span>
+                    Tên tài khoản đăng nhập <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
