@@ -179,6 +179,48 @@ const AuthController = {
     }
   },
 
+  getSupportContacts: async (req, res) => {
+  try {
+    const db = require('../../database/db');
+
+    const [[chuTroRows], [khuTroRows]] = await Promise.all([
+      db.execute(`
+        SELECT COALESCE(tt.HoTen, nd.TenTK) AS HoTen, tt.SDT
+        FROM NguoiDung nd
+        LEFT JOIN ThongTinCaNhan tt ON nd.MaND = tt.MaND
+        WHERE nd.Quyen = 'ChuTro'
+        ORDER BY nd.MaND ASC
+        LIMIT 1
+      `),
+      db.execute(`
+        SELECT 
+          k.MaKhu,
+          k.TenKhu,
+          COALESCE(tt.HoTen, nd.TenTK) AS TenQuanLy,
+          tt.SDT AS SDTQuanLy
+        FROM KhuTro k
+        LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
+        LEFT JOIN ThongTinCaNhan tt ON nd.MaND = tt.MaND
+        ORDER BY k.MaKhu ASC
+      `),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        chuTro: chuTroRows[0] || null,
+        khuTroList: khuTroRows || [],
+      },
+    });
+  } catch (error) {
+    console.error('Lỗi lấy thông tin liên hệ hỗ trợ:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể lấy thông tin liên hệ hỗ trợ',
+    });
+  }
+},
+
   // Bí danh nếu auth.router.js gọi AuthController.refresh
   refresh: async (req, res, next) => {
     return AuthController.refreshToken(req, res, next);
