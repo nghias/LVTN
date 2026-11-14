@@ -343,13 +343,11 @@ export default function LoginForm() {
                     {supportData.danhSachCoSo.map((cs) => (
                       <p key={cs.maKhu}>
                         <strong className="text-slate-900">
-                          {cs.tenKhu.toLowerCase().startsWith('quản lý')
-                            ? cs.tenKhu
-                            : `Quản lý ${cs.tenKhu}`}{' '}
-                          ({cs.tenQuanLy}):
+                          - {`Quản lý ${cs.tenKhu}`}{' '}
                         </strong>{' '}
-                        {cs.sdtQuanLy}
+                        <p>({cs.tenQuanLy}): {cs.sdtQuanLy}</p>
                       </p>
+                      
                     ))}
                   </>
                 ) : (
@@ -442,7 +440,7 @@ export default function LoginForm() {
                 onClick={() =>
                   setInfoPanel(infoPanel === 'support' ? null : 'support')
                 }
-                className="px-4 py-2.5 rounded-full text-sm font-bold text-slate-700 hover:bg-[#00FFCC]/25 transition cursor-pointer"
+                className="px-4 py-2.5 rounded-full text-xs font-bold text-slate-900 hover:bg-[#00FFCC]/25 transition cursor-pointer"
               >
                 Liên hệ hỗ trợ
               </button>
