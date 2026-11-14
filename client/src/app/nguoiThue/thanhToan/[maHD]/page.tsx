@@ -163,13 +163,13 @@ export default function NguoiThueThanhToanHoaDonPage() {
               </Link>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
                 {hoaDon
-                  ? `Thanh Toán Hóa Đơn #${hoaDon.MaHD} — Phòng ${hoaDon.TenPhong}`
+                  ? `Thanh Toán Hóa Đơn — Phòng ${hoaDon.TenPhong}`
                   : 'Thanh Toán Hóa Đơn'}
               </h1>
               {hoaDon && (
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
                   {hoaDon.TenKhu} • Kỳ {hoaDon.NgayTinh}
-                  {hoaDon.MaHDT ? ` • Hợp đồng #${hoaDon.MaHDT}` : ''}
+                  
                 </p>
               )}
             </div>
@@ -228,7 +228,7 @@ export default function NguoiThueThanhToanHoaDonPage() {
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        Chuyển khoản QR (Tự động xác nhận)
+                        Chuyển khoản QR
                       </button>
                       <button
                         type="button"
@@ -278,7 +278,7 @@ export default function NguoiThueThanhToanHoaDonPage() {
                                 </strong>
                               </p>
                               <p>
-                                Nội dung CK (Đã gắn sẵn trong QR):{' '}
+                                Nội dung CK:{' '}
                                 <strong className="bg-[#00FFCC]/30 px-2 py-0.5 rounded text-slate-900">
                                   {noiDungCK}
                                 </strong>
@@ -286,7 +286,7 @@ export default function NguoiThueThanhToanHoaDonPage() {
                             </div>
 
                             <div className="text-xs font-bold text-slate-900 bg-[#00FFCC]/30 py-2.5 px-4 rounded-full">
-                              Quét mã trên ứng dụng Ngân hàng — Hệ thống tự động xác nhận sau 3 giây!
+                              Quét mã trên ứng dụng Ngân hàng — Hệ thống tự động xác nhận!
                             </div>
                           </>
                         )}

@@ -244,7 +244,7 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
               Quản Lý Tin Đăng
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               {isChuTro
                 ? "Quản lý toàn bộ tin đăng trên tất cả các cơ sở nhà trọ"
                 : "Quản lý các tin đăng thuộc khu trọ bạn được phân công"}

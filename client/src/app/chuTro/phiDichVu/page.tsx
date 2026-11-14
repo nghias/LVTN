@@ -83,8 +83,8 @@ export default function QuanLyPhiDichVuPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Quản Lý Phí Dịch Vụ
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Thiết lập danh mục và đơn giá các dịch vụ (WiFi, Máy giặt chung, Vệ sinh & Rác, Giữ xe...) để chọn khi lập hợp đồng thuê.
+                <p className="text-xs text-slate-500 mt-1">
+                  Thiết lập danh mục và đơn giá các dịch vụ.
                 </p>
               </div>
 
@@ -94,7 +94,7 @@ export default function QuanLyPhiDichVuPage() {
                   onClick={() => router.push('/chuTro/phiDichVu/them')}
                   className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
                 >
-                  + Thêm Phí Dịch Vụ
+                  Thêm Phí Dịch Vụ
                 </button>
               </div>
             </div>
@@ -107,7 +107,7 @@ export default function QuanLyPhiDichVuPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Tìm theo tên dịch vụ, đơn vị tính, mô tả..."
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 />
                 <button
                   type="submit"
@@ -160,7 +160,6 @@ export default function QuanLyPhiDichVuPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                        <th className="py-3.5 px-4 font-bold whitespace-nowrap w-20">Mã DV</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap w-52">Tên Dịch Vụ</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap w-36">Đơn Giá</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap w-32">Đơn Vị Tính</th>
@@ -173,12 +172,9 @@ export default function QuanLyPhiDichVuPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-200 text-xs">
                       {danhSach.map((item) => (
                         <tr key={item.MaDV} className="hover:bg-slate-50/80 transition">
-                          <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">
-                            #{item.MaDV}
-                          </td>
                           <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">
                             {item.TenDV}
                           </td>

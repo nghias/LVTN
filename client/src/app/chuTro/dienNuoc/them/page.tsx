@@ -254,8 +254,8 @@ export default function ThemChiSoDienNuocPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1.5 tracking-tight">
                   Bảng Ghi Chỉ Số Điện Nước Nhanh
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                  Chỉ số cũ được khóa cố định từ kỳ trước để bảo toàn dữ liệu. Bạn có thể nhập nhanh nhiều phòng và nhấn Enter để xuống dòng.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Bạn có thể nhập nhanh nhiều phòng và nhấn Enter để xuống dòng.
                 </p>
               </div>
 
@@ -316,7 +316,7 @@ export default function ThemChiSoDienNuocPage() {
                     type="date"
                     value={ngayGhi}
                     onChange={(e) => setNgayGhi(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                     required
                   />
                 </div>
@@ -333,7 +333,7 @@ export default function ThemChiSoDienNuocPage() {
                         e.target.value as 'CHUA_GHI' | 'DANG_THUE' | 'TAT_CA'
                       )
                     }
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   >
                     <option value="CHUA_GHI">
                       Chưa ghi kỳ này ({soPhongChuaGhiKhu} phòng)
@@ -355,7 +355,7 @@ export default function ThemChiSoDienNuocPage() {
                     value={searchRoom}
                     onChange={(e) => setSearchRoom(e.target.value)}
                     placeholder="Gõ tên phòng (VD: P.101, P.106)..."
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
               </div>
@@ -402,16 +402,16 @@ export default function ThemChiSoDienNuocPage() {
                           Phòng / Trạng thái
                         </th>
                         <th className="py-3.5 px-3 font-bold whitespace-nowrap w-36 bg-slate-200/70">
-                          🔒 Điện Cũ (kWh)
+                          Điện Cũ (kWh)
                         </th>
                         <th className="py-3.5 px-3 font-bold whitespace-nowrap w-44 bg-amber-50">
-                          ⚡ Điện Mới (kWh) *
+                          Điện Mới (kWh) *
                         </th>
                         <th className="py-3.5 px-3 font-bold whitespace-nowrap w-36 bg-slate-200/70">
-                          🔒 Nước Cũ (m³)
+                          Nước Cũ (m³)
                         </th>
                         <th className="py-3.5 px-3 font-bold whitespace-nowrap w-44 bg-sky-50">
-                          💧 Nước Mới (m³) *
+                          Nước Mới (m³) *
                         </th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap">
                           Tiêu Thụ & Tạm Tính
@@ -421,7 +421,7 @@ export default function ThemChiSoDienNuocPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-200 text-xs">
                       {displayedRooms.map((room, idx) => {
                         const isRecorded = Boolean(room.DaGhiThangNay);
                         const entry = inputsByRoom[room.MaPhong] || {
@@ -684,7 +684,7 @@ export default function ThemChiSoDienNuocPage() {
 
                 {/* Thanh tổng kết bên dưới */}
                 <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="text-xs sm:text-sm text-slate-700">
+                  <div className="text-xs text-slate-700">
                     Đã nhập hoàn tất:{' '}
                     <strong className="text-slate-900">
                       {filledRoomEntries.length} phòng

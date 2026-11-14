@@ -234,7 +234,7 @@ export default function LoginForm() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-7 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] disabled:opacity-50 text-slate-900 font-bold text-sm shadow-sm border border-teal-300 transition cursor-pointer"
+                className="px-7 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] disabled:opacity-50 text-slate-900 font-bold text-xs shadow-sm border border-teal-300 transition cursor-pointer"
               >
                 {isSubmitting ? 'Đang xử lý...' : 'Đăng nhập'}
               </button>

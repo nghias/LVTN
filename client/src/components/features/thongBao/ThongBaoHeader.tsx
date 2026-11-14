@@ -22,12 +22,12 @@ export default function ThongBaoHeader({
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900">
             {isSupremeLandlord
-              ? "Quyền Chủ Trọ • Toàn Hệ Thống (3 Khu Trọ)"
+              ? "Quyền Chủ Trọ • Toàn Hệ Thống"
               : `Quyền Quản Lý • ${khuTroList.map((k) => k.TenKhu).join(", ")}`}
           </span>
 
           <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
+            className={`inline-flex items-center gap-1.5 rounded-lg text-[11px] font-semibold border ${
               socketConnected
                 ? "text-teal-700 bg-teal-50 border-teal-200"
                 : "text-amber-700 bg-amber-50 border-amber-200"
@@ -38,16 +38,15 @@ export default function ThongBaoHeader({
                 socketConnected ? "bg-teal-500 animate-pulse" : "bg-amber-500"
               }`}
             />
-            {socketConnected ? "WebSocket Trực Tiếp" : "Đang kết nối lại..."}
           </span>
         </div>
 
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-          Quản Lý & Phát Thông Báo Thời Gian Thực
+          Quản Lý & Phát Thông Báo
         </h1>
         <p className="text-xs sm:text-sm text-slate-500">
           {isSupremeLandlord
-            ? "Bạn có thể gửi thông báo tới toàn bộ hệ thống (bao gồm cả 3 quản lý và khách thuê) hoặc từng khu trọ riêng biệt."
+            ? "Bạn có thể gửi thông báo tới toàn bộ hệ thốnghoặc từng khu trọ riêng biệt."
             : "Bạn chỉ có thể gửi thông báo cho khách thuê đang cư trú tại khu trọ thuộc quyền quản lý của mình."}
         </p>
       </div>
@@ -55,9 +54,9 @@ export default function ThongBaoHeader({
       <button
         type="button"
         onClick={onOpenModal}
-        className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold transition cursor-pointer shrink-0 shadow-xs"
+        className="flex-1 sm:flex-initial text-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition no-underline whitespace-nowrap"
       >
-        + Soạn Thông Báo Mới
+        Soạn Thông Báo Mới
       </button>
     </div>
   );

@@ -199,8 +199,8 @@ export default function QuanLyDienNuocPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Quản Lý Chỉ Số & Đơn Giá Điện Nước
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Ghi nhận, tra cứu lịch sử chỉ số tiêu thụ điện (kWh), nước (m³) từng phòng và quản lý đơn giá điện nước.
+                <p className="text-xs text-slate-500 mt-1">
+                  Ghi nhận, tra cứu lịch sử chỉ số tiêu thụ điện, nước và quản lý đơn giá điện nước.
                 </p>
               </div>
 
@@ -210,14 +210,14 @@ export default function QuanLyDienNuocPage() {
                   onClick={() => router.push('/chuTro/dienNuoc/giaDienNuoc')}
                   className="px-5 py-2.5 rounded-full border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold transition cursor-pointer whitespace-nowrap"
                 >
-                  ⚙ Cập Nhật Giá Điện Nước
+                  Cập Nhật Giá Điện Nước
                 </button>
                 <button
                   type="button"
                   onClick={() => router.push('/chuTro/dienNuoc/them')}
                   className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
                 >
-                  + Thêm Chỉ Số Điện Nước
+                  Thêm Chỉ Số Điện Nước
                 </button>
               </div>
             </div>
@@ -325,7 +325,7 @@ export default function QuanLyDienNuocPage() {
                         search,
                       });
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   >
                     <option value="">-- Tất cả phòng --</option>
                     {filteredPhongOptions.map((p) => (
@@ -359,7 +359,7 @@ export default function QuanLyDienNuocPage() {
                         showError('Không thể tải dữ liệu theo kỳ ghi đã chọn.');
                       }
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
 
@@ -372,7 +372,7 @@ export default function QuanLyDienNuocPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Tìm theo tên phòng, tên khu trọ, mã CS..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
               </div>
@@ -435,7 +435,6 @@ export default function QuanLyDienNuocPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                        <th className="py-3.5 px-4 font-bold whitespace-nowrap">Mã CS</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap">Phòng / Cơ Sở</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap">Ngày Ghi</th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap">
@@ -452,12 +451,9 @@ export default function QuanLyDienNuocPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-200 text-xs">
                       {danhSach.map((item) => (
                         <tr key={item.MaCS} className="hover:bg-slate-50/80 transition">
-                          <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">
-                            #{item.MaCS}
-                          </td>
                           <td className="py-4 px-4 whitespace-nowrap">
                             <p className="font-bold text-slate-900">{item.TenPhong}</p>
                             <p className="text-xs text-slate-500">{item.TenKhu}</p>

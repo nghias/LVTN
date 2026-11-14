@@ -125,10 +125,10 @@ export default function SuaChiSoDienNuocPage() {
                 <span>← Quay lại danh sách Chỉ số điện nước</span>
               </button>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                Sửa Chỉ Số Điện Nước #{maCS}
+                Sửa Chỉ Số Điện Nước
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Đang chỉnh sửa bản ghi chỉ số của <strong>{tenPhong}</strong> ({tenKhu}). Chỉ số cũ đã được khóa để bảo toàn lịch sử dữ liệu.
+              <p className="text-xs text-slate-500 mt-1">
+                Đang chỉnh sửa bản ghi chỉ số của <strong>{tenPhong}</strong> ({tenKhu})
               </p>
             </div>
 
@@ -144,7 +144,7 @@ export default function SuaChiSoDienNuocPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      🔒 Phòng trọ (Cố định)
+                      Phòng trọ
                     </label>
                     <input
                       type="text"
@@ -183,7 +183,7 @@ export default function SuaChiSoDienNuocPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                        🔒 Số điện cũ (kWh) — Đã khóa
+                        Số điện cũ (kWh)
                       </label>
                       <input
                         type="text"
@@ -227,7 +227,7 @@ export default function SuaChiSoDienNuocPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                        🔒 Số nước cũ (m³) — Đã khóa
+                        Số nước cũ (m³)
                       </label>
                       <input
                         type="text"

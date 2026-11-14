@@ -462,7 +462,7 @@ function ThemTinDangContent() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Đăng Tin Tìm Khách Thuê Mới
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Điền thông tin chi tiết và điều chỉnh giá niêm yết để giới
                   thiệu phòng trọ đến khách tìm phòng
                 </p>

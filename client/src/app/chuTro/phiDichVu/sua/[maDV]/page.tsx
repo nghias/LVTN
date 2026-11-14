@@ -111,13 +111,13 @@ export default function SuaPhiDichVuPage() {
               </Link>
               <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                  Chỉnh Sửa Phí Dịch Vụ #{maDV}
+                  Chỉnh Sửa Phí Dịch Vụ
                 </h1>
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC]/30 text-slate-900 border border-[#00FFCC]">
                   Đang áp dụng cho {soHopDongApDung} hợp đồng
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 Cập nhật tên, đơn giá, đơn vị tính hoặc mô tả cho khoản phí dịch vụ này.
               </p>
             </div>

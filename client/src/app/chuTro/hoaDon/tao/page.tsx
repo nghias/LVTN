@@ -214,7 +214,7 @@ function TaoHoaDonThangContent() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tracking-tight">
                   Tạo Hóa Đơn Hàng Tháng Tự Động
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Hệ thống tự động lấy chỉ số điện nước, đơn giá, tiền phòng và phí dịch vụ hợp đồng. Không tạo trùng 2 hóa đơn trong 1 tháng.
                 </p>
               </div>
@@ -223,7 +223,7 @@ function TaoHoaDonThangContent() {
                 type="button"
                 disabled={submitting || selectedRoomIds.length === 0}
                 onClick={() => handleCreateInvoices()}
-                className="px-6 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs sm:text-sm font-bold shadow-xs cursor-pointer disabled:opacity-50 transition"
+                className="px-6 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 transition"
               >
                 {submitting
                   ? 'Đang tạo hóa đơn...'
@@ -282,7 +282,7 @@ function TaoHoaDonThangContent() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/70">
                 <p className="text-xs font-bold text-emerald-800">
-                  ✅ Đủ điều kiện tạo ngay
+                  Đủ điều kiện tạo ngay
                 </p>
                 <p className="text-lg font-bold text-emerald-900 mt-1">
                   {eligibleRooms.length} phòng
@@ -294,7 +294,7 @@ function TaoHoaDonThangContent() {
 
               <div className="p-4 rounded-2xl border border-sky-200 bg-sky-50/70">
                 <p className="text-xs font-bold text-sky-800">
-                  🔒 Đã tạo hóa đơn trong tháng
+                  Đã tạo hóa đơn trong tháng
                 </p>
                 <p className="text-lg font-bold text-sky-900 mt-1">
                   {alreadyCreatedRooms.length} phòng
@@ -306,7 +306,7 @@ function TaoHoaDonThangContent() {
 
               <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/70">
                 <p className="text-xs font-bold text-amber-800">
-                  ⚠️ Chưa đủ điều kiện (Thiếu chỉ số)
+                  Chưa đủ điều kiện
                 </p>
                 <p className="text-lg font-bold text-amber-900 mt-1">
                   {missingIndexRooms.length} phòng
@@ -371,18 +371,6 @@ function TaoHoaDonThangContent() {
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          {isEligible ? (
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleSelectRoom(room.MaPhong)}
-                              className="w-5 h-5 accent-teal-600 cursor-pointer"
-                            />
-                          ) : (
-                            <span className="w-5 h-5 inline-flex items-center justify-center text-xs font-bold text-slate-400">
-                              🔒
-                            </span>
-                          )}
 
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -422,7 +410,7 @@ function TaoHoaDonThangContent() {
                                 onClick={() => addPhatSinhRow(room.MaPhong)}
                                 className="px-3.5 py-1.5 rounded-full border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold cursor-pointer"
                               >
-                                + Thêm phí phát sinh
+                                Thêm phí phát sinh
                               </button>
                               <button
                                 type="button"
@@ -442,7 +430,7 @@ function TaoHoaDonThangContent() {
                               href={`/chuTro/hoaDon/chiTiet/${room.MaHDDaTao}`}
                               className="px-4 py-1.5 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold no-underline"
                             >
-                              Xem hóa đơn #{room.MaHDDaTao}
+                              Xem hóa đơn
                             </Link>
                           )}
 

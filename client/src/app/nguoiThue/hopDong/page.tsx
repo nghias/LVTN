@@ -205,7 +205,7 @@ export default function NguoiThueHopDongPage() {
     }
 
     showConfirm(
-      `Yêu cầu hủy Hợp đồng #${chiTiet.MaHDT} (Phòng ${chiTiet.TenPhong}) sẽ được gửi trực tiếp tới Quản lý khu trọ và Chủ trọ qua hệ thống Thông báo. Bạn chắc chắn muốn gửi?`,
+      `Yêu cầu hủy Hợp đồng (Phòng ${chiTiet.TenPhong}) sẽ được gửi trực tiếp tới Quản lý khu trọ và Chủ trọ qua hệ thống Thông báo. Bạn chắc chắn muốn gửi?`,
       'Xác nhận gửi yêu cầu hủy hợp đồng',
       async () => {
         setSubmittingCancel(true);
@@ -322,7 +322,7 @@ export default function NguoiThueHopDongPage() {
                       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-6 py-5">
                         <div>
                           <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                            Hợp Đồng Thuê Phòng #{chiTiet.MaHDT}
+                            Hợp Đồng Thuê Phòng
                           </h2>
                           <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500">
                             {chuanHoaNFC(chiTiet.TenPhong)} — {chuanHoaNFC(chiTiet.TenKhu)}

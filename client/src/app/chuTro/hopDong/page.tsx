@@ -252,7 +252,7 @@ export default function QuanLyHopDongPage() {
                     value={tuKhoa}
                     onChange={(e) => setTuKhoa(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && taiDanhSachHopDong()}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 pr-8 pl-3.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#00FFCC] focus:bg-white focus:outline-none sm:text-sm"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2.5 pr-8 pl-3.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#00FFCC] focus:bg-white focus:outline-none"
                   />
 
                   {tuKhoa && (
@@ -275,7 +275,7 @@ export default function QuanLyHopDongPage() {
                   <select
                     value={maPhongLoc}
                     onChange={(e) => xuLyChonPhong(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-700 focus:border-[#00FFCC] focus:bg-white focus:outline-none sm:text-sm"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-700 focus:border-[#00FFCC] focus:bg-white focus:outline-none"
                   >
                     <option value="">-- Tất cả phòng --</option>
                     {danhSachPhongTheoKhu.map((phong) => (
@@ -292,7 +292,7 @@ export default function QuanLyHopDongPage() {
                   <select
                     value={trangThaiLoc}
                     onChange={(e) => xuLyChonTrangThai(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-700 focus:border-[#00FFCC] focus:bg-white focus:outline-none sm:text-sm"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-700 focus:border-[#00FFCC] focus:bg-white focus:outline-none"
                   >
                     <option value="">-- Trạng thái --</option>
                     <option value="ConHieuLuc">Còn hiệu lực</option>

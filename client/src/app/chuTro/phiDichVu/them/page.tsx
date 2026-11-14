@@ -72,7 +72,7 @@ export default function ThemPhiDichVuPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tracking-tight">
                 Thêm Phí Dịch Vụ Mới
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 Tạo khoản phí dịch vụ trong danh mục chung để tích chọn khi lập hợp đồng thuê phòng.
               </p>
             </div>

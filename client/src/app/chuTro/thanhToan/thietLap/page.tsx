@@ -152,7 +152,7 @@ export default function ThietLapThongTinThanhToanPage() {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Số tài khoản nhận tiền (STK) *
+                        Số tài khoản nhận tiền *
                       </label>
                       <input
                         type="text"
