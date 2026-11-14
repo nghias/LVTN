@@ -8,6 +8,77 @@ const formatVND = (amount) => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' đ';
 };
 
+// Bộ nhớ đệm lưu tên Model đã gọi thành công
+let cachedWorkingModel = null;
+
+// Các mã model bị Google ngừng cấp cho key mới hoặc sai định danh
+const INVALID_MODEL_NAMES = new Set([
+  'gemini-2.5-flash',
+  'models/gemini-2.5-flash',
+  'gemini-3.0-flash',
+  'models/gemini-3.0-flash',
+]);
+
+// Danh sách các Model chuẩn ưu tiên thử lần lượt
+const getCandidateModels = () => {
+  const rawConfigured = (env.gemini.model || '').trim().replace(/^models\//, '');
+  const validConfigured =
+    rawConfigured && !INVALID_MODEL_NAMES.has(rawConfigured)
+      ? rawConfigured
+      : null;
+
+  const list = [
+    cachedWorkingModel,
+    validConfigured,
+    'gemini-3-flash-preview',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+  ].filter(Boolean);
+
+  return Array.from(new Set(list));
+};
+
+// Tự động truy vấn danh sách Model thực tế từ Google AI Studio nếu cần
+const discoverAvailableModelsFromApi = async (apiKey) => {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(
+        apiKey
+      )}`
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const models = Array.isArray(data?.models) ? data.models : [];
+
+    return models
+      .filter(
+        (m) =>
+          Array.isArray(m.supportedGenerationMethods) &&
+          m.supportedGenerationMethods.includes('generateContent')
+      )
+      .map((m) => String(m.name || '').replace(/^models\//, ''))
+      .filter(
+        (name) =>
+          name.startsWith('gemini') &&
+          !INVALID_MODEL_NAMES.has(name) &&
+          !name.includes('image') &&
+          !name.includes('tts') &&
+          !name.includes('audio') &&
+          !name.includes('embedding') &&
+          !name.includes('robotics') &&
+          !name.includes('computer-use')
+      )
+      .sort((a, b) => {
+        const aFlash = a.includes('flash') ? 0 : 1;
+        const bFlash = b.includes('flash') ? 0 : 1;
+        return aFlash - bFlash;
+      });
+  } catch (e) {
+    return [];
+  }
+};
+
 // Hàm sinh câu hỏi gợi ý động dựa trên dữ liệu thực tế của DB
 const buildDynamicFollowUps = (
   userQuestion,
@@ -31,7 +102,11 @@ const buildDynamicFollowUps = (
       }
       followUps.push('Phí dịch vụ hàng tháng ngoài tiền phòng gồm những gì?');
       followUps.push('Phòng nào hiện có Máy lạnh và Gác lửng?');
-    } else if (q.includes('tiện ích') || q.includes('máy lạnh') || q.includes('gác')) {
+    } else if (
+      q.includes('tiện ích') ||
+      q.includes('máy lạnh') ||
+      q.includes('gác')
+    ) {
       followUps.push('Tiện ích trong phòng có thu thêm phí hàng tháng không?');
       followUps.push(`Xem thông tin chi tiết phòng ${firstRoom.TenPhong}?`);
       followUps.push('Bảng giá phí dịch vụ Wifi, rác, giữ xe tính thế nào?');
@@ -44,13 +119,17 @@ const buildDynamicFollowUps = (
     ) {
       followUps.push('Các phòng trống hiện có những tiện ích gì đi kèm?');
       followUps.push('Chỉ số điện nước IoT được tính vào hóa đơn thế nào?');
-      followUps.push(`Chi phí thuê trọn gói phòng ${firstRoom.TenPhong} khoảng bao nhiêu?`);
+      followUps.push(
+        `Chi phí thuê trọn gói phòng ${firstRoom.TenPhong} khoảng bao nhiêu?`
+      );
       followUps.push('Hiện có những phòng nào đang trống?');
     } else {
       followUps.push('Hiện có những phòng nào đang trống?');
       followUps.push('Các tiện ích có sẵn trong phòng gồm những gì?');
       followUps.push('Bảng giá phí dịch vụ (Wifi, rác, giữ xe) và điện nước?');
-      followUps.push(`Phòng ${firstRoom.TenPhong} giá bao nhiêu và ở cơ sở nào?`);
+      followUps.push(
+        `Phòng ${firstRoom.TenPhong} giá bao nhiêu và ở cơ sở nào?`
+      );
     }
   } else {
     followUps.push('Bảng giá điện nước và phí dịch vụ tính như thế nào?');
@@ -74,9 +153,9 @@ const AiChatService = {
     } = await AiChatModel.getRagContextData();
 
     // 2. AUGMENTATION: Đóng gói dữ liệu nội bộ thành Context
-    const chuTroContactText = `Chủ trọ chung toàn hệ thống: ${chuTroInfo.TenChuTro} - SĐT/Zalo: ${
-      chuTroInfo.SDTChuTro || 'Đang cập nhật'
-    }`;
+    const chuTroContactText = `Chủ trọ chung toàn hệ thống: ${
+      chuTroInfo.TenChuTro
+    } - SĐT/Zalo: ${chuTroInfo.SDTChuTro || 'Đang cập nhật'}`;
 
     const khuTroContextText =
       khuTroList.length > 0
@@ -96,13 +175,21 @@ const AiChatService = {
         ? phongTrongDaDangList
             .map(
               (p, idx) =>
-                `${idx + 1}. [MaPhong=${p.MaPhong} | MaTin=${p.MaTin}] Phòng ${p.TenPhong} thuộc "${p.TenKhu}" (Đ/c: ${p.DiaChiKhu}):\n` +
-                `   + Giá thuê: ${formatVND(p.Gia)}/tháng | Diện tích: ${p.DienTich}m²\n` +
+                `${idx + 1}. [MaPhong=${p.MaPhong} | MaTin=${p.MaTin}] Phòng ${
+                  p.TenPhong
+                } thuộc "${p.TenKhu}" (Đ/c: ${p.DiaChiKhu}):\n` +
+                `   + Giá thuê: ${formatVND(p.Gia)}/tháng | Diện tích: ${
+                  p.DienTich
+                }m²\n` +
                 `   + Tiện ích trang bị sẵn theo phòng: ${p.DanhSachTienIch}\n` +
-                `   + Tiêu đề tin đăng: "${p.TieuDe}" ${p.MoTa ? `- Mô tả: ${p.MoTa}` : ''}\n` +
+                `   + Tiêu đề tin đăng: "${p.TieuDe}" ${
+                  p.MoTa ? `- Mô tả: ${p.MoTa}` : ''
+                }\n` +
                 `   + Quản lý cơ sở (${p.TenKhu}): ${p.TenQuanLy} (${
                   p.SDTQuanLy || 'Đang cập nhật'
-                }) | Chủ trọ: ${p.TenChuTro} (${p.SDTChuTro || 'Đang cập nhật'})`
+                }) | Chủ trọ: ${p.TenChuTro} (${
+                  p.SDTChuTro || 'Đang cập nhật'
+                })`
             )
             .join('\n\n')
         : 'Hiện tại không có phòng trống nào đang mở đăng tin cho thuê.';
@@ -123,11 +210,17 @@ const AiChatService = {
         : 'Chưa có danh mục tiện ích.';
 
     const dichVuContextText = [
-      `- Tiền điện: ${formatVND(giaDienNuoc?.GiaDien || 3500)} / kWh (Đo tự động bằng đồng hồ điện tử IoT riêng từng phòng)`,
-      `- Tiền nước: ${formatVND(giaDienNuoc?.GiaNuoc || 15000)} / m³ (Đo tự động bằng đồng hồ điện tử IoT riêng từng phòng)`,
+      `- Tiền điện: ${formatVND(
+        giaDienNuoc?.GiaDien || 3500
+      )} / kWh (Đo tự động bằng đồng hồ điện tử IoT riêng từng phòng)`,
+      `- Tiền nước: ${formatVND(
+        giaDienNuoc?.GiaNuoc || 15000
+      )} / m³ (Đo tự động bằng đồng hồ điện tử IoT riêng từng phòng)`,
       ...phiDichVuList.map(
         (dv) =>
-          `- Phí dịch vụ "${dv.TenDV}": ${formatVND(dv.DonGia)} / ${dv.DonViTinh} (Áp dụng minh bạch theo hợp đồng thuê hàng tháng)`
+          `- Phí dịch vụ "${dv.TenDV}": ${formatVND(dv.DonGia)} / ${
+            dv.DonViTinh
+          } (Áp dụng minh bạch theo hợp đồng thuê hàng tháng)`
       ),
     ].join('\n');
 
@@ -141,16 +234,20 @@ QUY TẮC BẮT BUỘC:
    - Khi khách hỏi về Tiện ích (gác lửng, máy lạnh, quạt, máy giặt chung, wifi, chỗ để xe, giờ giấc...): Hãy giải thích rõ mô tả tiện ích đó, liệt kê chính xác phòng trống nào đang có tiện ích đó và nói rõ tiện ích phòng được trang bị sẵn theo phòng.
    - Khi khách hỏi về Phí dịch vụ hoặc Chi phí hàng tháng: Hãy liệt kê đầy đủ đơn giá Điện, Nước (ghi tự động qua đồng hồ IoT) và toàn bộ các khoản Phí dịch vụ trong mục 4 (kèm Đơn giá và Đơn vị tính).
 3. QUY TẮC LIÊN HỆ:
-   - Khi giới thiệu phòng, cung cấp tên & SĐT của Quản lý phụ trách trực tiếp cơ sở đó VÀ luôn kèm thông tin Chủ trọ (${chuTroInfo.TenChuTro} - SĐT: ${chuTroInfo.SDTChuTro || 'Đang cập nhật'}).
+   - Khi giới thiệu phòng, cung cấp tên & SĐT của Quản lý phụ trách trực tiếp cơ sở đó VÀ luôn kèm thông tin Chủ trọ (${
+     chuTroInfo.TenChuTro
+   } - SĐT: ${chuTroInfo.SDTChuTro || 'Đang cập nhật'}).
    - Hướng dẫn khách bấm vào nút "Xem chi tiết phòng P.xxx" ngay bên dưới tin nhắn để mở trang chi tiết tin đăng của phòng đó.
 4. CÂU HỎI GỢI Ý ĐỘNG ("suggestedQuestions"):
-   - Luôn tạo 3 đến 4 câu hỏi ngắn gọn (dưới 12 từ mỗi câu), tự nhiên, đóng vai người tìm phòng hỏi tiếp dựa trên câu trả lời vừa rồi (ví dụ: hỏi sâu hơn về tiện ích của phòng vừa gợi ý, hỏi phí dịch vụ hàng tháng, so sánh 2 phòng trống...).
+   - Luôn tạo 3 đến 4 câu hỏi ngắn gọn (dưới 12 từ mỗi câu), tự nhiên, đóng vai người tìm phòng hỏi tiếp dựa trên câu trả lời vừa rồi.
 
 [DỮ LIỆU HỆ THỐNG THỜI GIAN THỰC]
 1. CÁC CƠ SỞ & NGƯỜI QUẢN LÝ / CHỦ TRỌ:
 ${khuTroContextText}
 
-2. DANH SÁCH PHÒNG TRỐNG ĐÃ ĐĂNG TIN CÔNG KHAI (${phongTrongDaDangList.length} phòng):
+2. DANH SÁCH PHÒNG TRỐNG ĐÃ ĐĂNG TIN CÔNG KHAI (${
+      phongTrongDaDangList.length
+    } phòng):
 ${phongContextText}
 
 3. DANH MỤC TIỆN ÍCH PHÒNG TRỌ (${tienIchList.length} tiện ích):
@@ -175,8 +272,9 @@ ${dichVuContextText}
     try {
       const ai = new GoogleGenAI({ apiKey: env.gemini.apiKey });
 
-      // Lọc lịch sử hội thoại và loại bỏ các tin nhắn 'model' ở đầu mảng (Gemini bắt buộc phần tử đầu là 'user')
-      const validHistory = (Array.isArray(chatHistory) ? chatHistory.slice(-6) : [])
+      const validHistory = (
+        Array.isArray(chatHistory) ? chatHistory.slice(-6) : []
+      )
         .filter((m) => m && m.text && String(m.text).trim())
         .map((m) => ({
           role: m.sender === 'user' ? 'user' : 'model',
@@ -195,41 +293,99 @@ ${dichVuContextText}
         },
       ];
 
-      const response = await ai.models.generateContent({
-        model: env.gemini.model || 'gemini-2.5-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.25,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              reply: {
-                type: Type.STRING,
-                description:
-                  'Câu trả lời tư vấn chi tiết cho khách tìm phòng dựa trên dữ liệu thực tế.',
-              },
-              suggestedMaPhongList: {
-                type: Type.ARRAY,
-                items: { type: Type.INTEGER },
-                description:
-                  'Danh sách MaPhong của các phòng trống liên quan trực tiếp đến câu trả lời.',
-              },
-              suggestedQuestions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description:
-                  'Danh sách 3-4 câu hỏi gợi ý tiếp theo liên quan đến phòng trống, tiện ích hoặc phí dịch vụ.',
-              },
-            },
-            required: ['reply', 'suggestedMaPhongList', 'suggestedQuestions'],
-          },
-        },
-      });
+      // 3. GENERATION: Tự động thử danh sách Model + Tự động dò ListModels nếu gặp lỗi 404
+      let candidateModels = getCandidateModels();
+      let response = null;
+      let lastError = null;
 
-      const rawText = response.text || '{}';
-      const parsed = JSON.parse(rawText);
+      const tryGenerateWithModels = async (modelsToTry) => {
+        for (const modelName of modelsToTry) {
+          try {
+            const res = await ai.models.generateContent({
+              model: modelName,
+              contents,
+              config: {
+                systemInstruction,
+                temperature: 0.25,
+                responseMimeType: 'application/json',
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    reply: {
+                      type: Type.STRING,
+                      description:
+                        'Câu trả lời tư vấn chi tiết cho khách tìm phòng dựa trên dữ liệu thực tế.',
+                    },
+                    suggestedMaPhongList: {
+                      type: Type.ARRAY,
+                      items: { type: Type.INTEGER },
+                      description:
+                        'Danh sách MaPhong của các phòng trống liên quan trực tiếp đến câu trả lời.',
+                    },
+                    suggestedQuestions: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description:
+                        'Danh sách 3-4 câu hỏi gợi ý tiếp theo liên quan đến phòng trống, tiện ích hoặc phí dịch vụ.',
+                    },
+                  },
+                  required: [
+                    'reply',
+                    'suggestedMaPhongList',
+                    'suggestedQuestions',
+                  ],
+                },
+              },
+            });
+
+            cachedWorkingModel = modelName;
+            return res;
+          } catch (err) {
+            lastError = err;
+            const errMsg = String(err?.message || '');
+            const isModelNotFound =
+              err?.status === 404 ||
+              errMsg.includes('404') ||
+              errMsg.includes('NOT_FOUND') ||
+              errMsg.includes('not found') ||
+              errMsg.includes('no longer available');
+
+            if (isModelNotFound) {
+              console.warn(
+                `[AI Chat] Model "${modelName}" không khả dụng (404), đang chuyển sang model dự phòng...`
+              );
+              continue;
+            }
+            throw err;
+          }
+        }
+        return null;
+      };
+
+      response = await tryGenerateWithModels(candidateModels);
+
+      // Nếu tất cả tên mặc định đều 404, tự động hỏi Google API danh sách model thực tế
+      if (!response) {
+        const discovered = await discoverAvailableModelsFromApi(
+          env.gemini.apiKey
+        );
+        const remainingModels = discovered.filter(
+          (m) => !candidateModels.includes(m)
+        );
+        if (remainingModels.length > 0) {
+          response = await tryGenerateWithModels(remainingModels);
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error('Không tìm thấy model Gemini khả dụng');
+      }
+
+      const cleanJsonText = String(response.text || '{}')
+        .replace(/^```json\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+      const parsed = JSON.parse(cleanJsonText);
 
       const aiReply =
         parsed.reply ||
@@ -266,7 +422,7 @@ ${dichVuContextText}
         suggestedQuestions,
       };
     } catch (error) {
-      console.error('Lỗi khi gọi Gemini 2.5 Flash API:', error);
+      console.error('Lỗi khi gọi Gemini Flash API:', error);
       return AiChatService.buildFallbackResponse(
         userQuestion,
         phongTrongDaDangList,
@@ -279,9 +435,6 @@ ${dichVuContextText}
     }
   },
 
-  /**
-   * Chế độ dự phòng thông minh: Trả lời đầy đủ Tiện ích, Phí dịch vụ, Phòng trống và Câu hỏi động
-   */
   buildFallbackResponse: (
     userQuestion,
     phongTrongDaDangList,
@@ -299,7 +452,6 @@ ${dichVuContextText}
       phiDichVuList
     );
 
-    // 1. Khi khách hỏi về Tiện ích (máy lạnh, gác lửng, quạt, máy giặt, tiện ích...)
     if (
       q.includes('tiện ích') ||
       q.includes('máy lạnh') ||
@@ -347,7 +499,6 @@ ${dichVuContextText}
       };
     }
 
-    // 2. Khi khách hỏi về Phí dịch vụ, Điện, Nước, Wifi, Rác, Giữ xe
     if (
       q.includes('điện') ||
       q.includes('nước') ||
@@ -370,8 +521,12 @@ ${dichVuContextText}
       return {
         reply:
           `Bảng giá điện, nước IoT và các khoản phí dịch vụ hàng tháng tại hệ thống:\n` +
-          `• Giá điện: ${formatVND(giaDienNuoc?.GiaDien || 3500)} / kWh (Đo tự động qua đồng hồ IoT)\n` +
-          `• Giá nước: ${formatVND(giaDienNuoc?.GiaNuoc || 15000)} / m³ (Đo tự động qua đồng hồ IoT)\n` +
+          `• Giá điện: ${formatVND(
+            giaDienNuoc?.GiaDien || 3500
+          )} / kWh (Đo tự động qua đồng hồ IoT)\n` +
+          `• Giá nước: ${formatVND(
+            giaDienNuoc?.GiaNuoc || 15000
+          )} / m³ (Đo tự động qua đồng hồ IoT)\n` +
           `${dvLines}\n\n` +
           `• Liên hệ Chủ trọ (hỗ trợ mọi cơ sở): ${chuTroInfo.TenChuTro} (${
             chuTroInfo.SDTChuTro || 'Đang cập nhật'
@@ -381,12 +536,13 @@ ${dichVuContextText}
       };
     }
 
-    // 3. Khi khách hỏi về Phòng trống / Tư vấn phòng
     if (phongTrongDaDangList.length === 0) {
       return {
         reply:
           `Hiện tại hệ thống chưa có phòng trống nào đang mở đăng tin cho thuê. ` +
-          `Bạn có thể liên hệ trực tiếp Chủ trọ ${chuTroInfo.TenChuTro} qua SĐT/Zalo: ${
+          `Bạn có thể liên hệ trực tiếp Chủ trọ ${
+            chuTroInfo.TenChuTro
+          } qua SĐT/Zalo: ${
             chuTroInfo.SDTChuTro || 'Đang cập nhật'
           } để được hỗ trợ báo phòng sớm nhất nhé!`,
         suggestedRooms: [],
@@ -398,11 +554,13 @@ ${dichVuContextText}
     const roomLines = topRooms
       .map(
         (p) =>
-          `• Phòng ${p.TenPhong} (${p.TenKhu}): ${formatVND(p.Gia)}/tháng - ${p.DienTich}m²\n` +
+          `• Phòng ${p.TenPhong} (${p.TenKhu}): ${formatVND(
+            p.Gia
+          )}/tháng - ${p.DienTich}m²\n` +
           `  Tiện ích: ${p.DanhSachTienIch}\n` +
-          `  Quản lý cơ sở: ${p.TenQuanLy} (${p.SDTQuanLy || 'Đang cập nhật'}) | Chủ trọ: ${p.TenChuTro} (${
-            p.SDTChuTro || 'Đang cập nhật'
-          })`
+          `  Quản lý cơ sở: ${p.TenQuanLy} (${
+            p.SDTQuanLy || 'Đang cập nhật'
+          }) | Chủ trọ: ${p.TenChuTro} (${chuTroInfo.SDTChuTro || 'Đang cập nhật'})`
       )
       .join('\n\n');
 
