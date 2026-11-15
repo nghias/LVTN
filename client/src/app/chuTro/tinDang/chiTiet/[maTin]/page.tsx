@@ -209,7 +209,7 @@ export default function ChiTietTinDangPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Chi Tiết Tin Đăng #{maTin}
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Xem đầy đủ nội dung bài viết và thông tin phòng trọ đang liên
                   kết
                 </p>

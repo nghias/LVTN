@@ -238,7 +238,7 @@ export default function QuanLyHoaDonPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Quản Lý Hóa Đơn Hàng Tháng
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   {user.Quyen === 'ChuTro'
                     ? 'Quản lý hóa đơn tiền phòng, điện nước, dịch vụ và phí phát sinh của tất cả cơ sở.'
                     : 'Quản lý hóa đơn tiền phòng, điện nước, dịch vụ và phí phát sinh thuộc cơ sở của bạn.'}
@@ -250,7 +250,7 @@ export default function QuanLyHoaDonPage() {
                   href={`/chuTro/hoaDon/tao?thangNam=${thangNam || getCurrentMonth()}`}
                   className="flex-1 sm:flex-initial text-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition no-underline"
                 >
-                  + Tạo Hóa Đơn Hàng Tháng
+                  Tạo Hóa Đơn Hàng Tháng
                 </Link>
               </div>
             </div>
@@ -291,7 +291,7 @@ export default function QuanLyHoaDonPage() {
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    {formatShortKhu(khu.TenKhu, khu.MaKhu)}
+                    {khu.TenKhu}
                   </button>
                 ))}
               </div>
@@ -348,7 +348,7 @@ export default function QuanLyHoaDonPage() {
                       setThangNam(safeMonth);
                       fetchDanhSach({ thangNam: safeMonth });
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
 
@@ -363,7 +363,7 @@ export default function QuanLyHoaDonPage() {
                       setSelectedMaPhong(val);
                       fetchDanhSach({ maPhong: val });
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   >
                     <option value={0}>-- Tất cả phòng --</option>
                     {filteredPhongOptions.map((p) => (
@@ -385,7 +385,7 @@ export default function QuanLyHoaDonPage() {
                       setTrangThaiTT(val);
                       fetchDanhSach({ trangThaiTT: val });
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   >
                     <option value="">-- Tất cả trạng thái --</option>
                     <option value="ChuaThanhToan">Chưa thanh toán</option>
@@ -403,7 +403,7 @@ export default function QuanLyHoaDonPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Nhập tên phòng, mã HĐ..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
               </div>
@@ -411,21 +411,21 @@ export default function QuanLyHoaDonPage() {
               <div className="flex items-center gap-2.5 shrink-0">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold cursor-pointer transition whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer transition whitespace-nowrap"
                 >
                   Lọc dữ liệu
                 </button>
                 <button
                   type="button"
                   onClick={handleResetToLatestMonth}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer transition whitespace-nowrap"
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer transition whitespace-nowrap"
                 >
                   Kỳ mới nhất
                 </button>
                 <button
                   type="button"
                   onClick={handleViewAllHistory}
-                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold cursor-pointer transition whitespace-nowrap"
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer transition whitespace-nowrap"
                 >
                   Xem hết
                 </button>
@@ -456,7 +456,7 @@ export default function QuanLyHoaDonPage() {
                     }`}
                     className="inline-block px-5 py-2.5 rounded-full bg-[#00FFCC] text-slate-900 text-xs font-bold no-underline"
                   >
-                    + Tạo hóa đơn cho kỳ này ngay
+                    Tạo hóa đơn cho kỳ này ngay
                   </Link>
                 </div>
               </div>
@@ -465,9 +465,6 @@ export default function QuanLyHoaDonPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                      <th className="py-3.5 px-3 font-bold whitespace-nowrap">
-                        Mã HĐ
-                      </th>
                       <th className="py-3.5 px-3 font-bold whitespace-nowrap">
                         Phòng / Cơ Sở
                       </th>
@@ -508,13 +505,6 @@ export default function QuanLyHoaDonPage() {
                           key={item.MaHD}
                           className="hover:bg-slate-50/80 transition"
                         >
-                          {/* Mã HĐ */}
-                          <td className="py-3.5 px-3 font-bold text-slate-900 whitespace-nowrap">
-                            #{item.MaHD}
-                            <div className="text-[11px] font-semibold text-slate-500">
-                              {formatDateVN(item.NgayTinh)}
-                            </div>
-                          </td>
 
                           {/* Phòng & Cơ sở rút gọn trên 1 dòng, không nhảy chữ */}
                           <td className="py-3.5 px-3 whitespace-nowrap">

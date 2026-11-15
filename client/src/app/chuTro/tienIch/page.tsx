@@ -78,7 +78,7 @@ export default function QuanLyTienIchPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Quản Lý Danh Mục Tiện Ích
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Thiết lập các tiện ích phòng trọ.
                 </p>
               </div>
@@ -102,7 +102,7 @@ export default function QuanLyTienIchPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Tìm theo tên tiện ích, mô tả hoặc mã..."
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 />
                 <button
                   type="submit"
@@ -165,7 +165,7 @@ export default function QuanLyTienIchPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-200 text-xs">
                       {danhSach.map((item) => (
                         <tr key={item.MaTI} className="hover:bg-slate-50/80 transition">
                           <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">

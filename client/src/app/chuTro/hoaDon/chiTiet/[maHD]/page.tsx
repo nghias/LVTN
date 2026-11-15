@@ -75,7 +75,7 @@ export default function ChiTietHoaDonPage() {
                   ← Quay lại danh sách Hóa đơn
                 </Link>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
-                  Chi Tiết Hóa Đơn #{maHD}
+                  Chi Tiết Hóa Đơn
                 </h1>
               </div>
 
@@ -143,7 +143,7 @@ export default function ChiTietHoaDonPage() {
                 {/* 2. Tiền điện & nước */}
                 <div className="space-y-3 pb-4 border-b border-slate-100">
                   <p className="text-sm font-bold text-slate-900">
-                    2. Chi tiết Điện & Nước tiêu thụ (Mã CS #{detail.MaCS})
+                    2. Chi tiết Điện & Nước tiêu thụ
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 flex items-center justify-between">

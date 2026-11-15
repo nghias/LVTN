@@ -75,9 +75,7 @@ export default function DanhSachHopDongSidebar({
             >
               {/* Hàng badge phía trên */}
               <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                  Hợp đồng #{hd.MaHDT}
-                </span>
+                
                 {renderTrangThaiPill(hd.TrangThai)}
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
                   {hd.VaiTroCuaToi === 'DaiDien' ? 'Đại diện HĐ' : 'Thành viên'}

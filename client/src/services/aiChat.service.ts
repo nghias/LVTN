@@ -35,7 +35,7 @@ export interface SharedChatState {
 const DEFAULT_WELCOME_MESSAGE: ChatMessage = {
   id: "welcome-ai",
   sender: "ai",
-  text: "Xin chào! Tôi là Trợ lý ảo AI của hệ thống Xóm Trọ (ứng dụng Gemini 2.5 Flash). Bạn cần tìm phòng trống theo mức giá, hỏi chi tiết tiện ích đi kèm, bảng phí dịch vụ hàng tháng hay đơn giá điện nước IoT?",
+  text: "Xin chào! Tôi là Trợ lý ảo AI của hệ thống Xóm Trọ. Bạn cần tìm phòng trống theo mức giá, hỏi chi tiết tiện ích đi kèm, bảng phí dịch vụ hàng tháng hay đơn giá điện nước?",
   time: "Bây giờ",
 };
 

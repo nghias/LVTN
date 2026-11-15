@@ -67,8 +67,8 @@ export default function YeuCauHuyHopDongModal({
             <span className="text-[11px] font-bold uppercase text-rose-600">
               Thông báo chấm dứt thuê phòng
             </span>
-            <h3 className="text-base sm:text-lg font-extrabold text-[#0F172A]">
-              Yêu cầu hủy Hợp đồng #{chiTiet.MaHDT}
+            <h3 className="text:xs font-bold text-slate-900">
+              Yêu cầu hủy Hợp đồng
             </h3>
           </div>
           <button
@@ -173,7 +173,7 @@ export default function YeuCauHuyHopDongModal({
             />
             <span className="text-xs leading-relaxed text-slate-700">
               Tôi xác nhận gửi thông báo yêu cầu chấm dứt Hợp đồng{' '}
-              <strong>#{chiTiet.MaHDT}</strong> (Phòng{' '}
+              (Phòng{' '}
               <strong>{chuanHoaNFC(chiTiet.TenPhong)}</strong>) tới Quản lý khu trọ và
               Chủ trọ.
             </span>
@@ -190,7 +190,7 @@ export default function YeuCauHuyHopDongModal({
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-xl bg-[#00F5C4] hover:bg-[#00E0B0] disabled:opacity-50 px-5 py-2.5 text-xs font-extrabold text-[#0F172A] shadow-2xs cursor-pointer"
+              className="rounded-xl bg-[#00F5C4] hover:bg-[#00E0B0] disabled:opacity-50 px-5 py-2.5 text-xs font-bold text-slate-900 shadow-2xs cursor-pointer"
             >
               {submitting ? 'Đang gửi thông báo...' : 'Gửi yêu cầu tới Ban quản lý'}
             </button>

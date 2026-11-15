@@ -143,7 +143,7 @@ export default function DoiMatKhauPage() {
                   Đổi Mật Khẩu
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Cập nhật mật khẩu định kỳ để bảo vệ tài khoản @{user.TenTK}
+                  Cập nhật mật khẩu định kỳ để bảo vệ tài khoản của bạn.
                 </p>
               </div>
 

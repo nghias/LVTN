@@ -173,7 +173,7 @@ function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1.5">
-              Tên tài khoản đăng nhập (TenTK)
+              Tên tài khoản đăng nhập
             </label>
             <input
               type="text"
@@ -186,7 +186,7 @@ function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
 
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1.5">
-              Phân quyền hệ thống (Quyen)
+              Phân quyền hệ thống
             </label>
             <div className="h-[42px] flex items-center">
               <span className="inline-flex items-center px-4 py-2 rounded-full bg-[#00FFCC]/30 border border-teal-300 text-slate-900 font-bold text-xs">

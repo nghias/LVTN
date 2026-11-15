@@ -336,7 +336,7 @@ export default function AiChatbotWidget({
       <button
         type="button"
         onClick={handleToggleChat}
-        className="pointer-events-auto flex items-center gap-2 px-3 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 shadow-lg shadow-[#00FFCC]/30 transition cursor-pointer"
+        className="pointer-events-auto flex items-center gap-2 px-3 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 shadow border border-green-500 shrink-0 transition cursor-pointer"
       >
         <span className="w-7 h-7 rounded-full bg-white text-slate-900 border border-teal-300 font-bold text-xs flex items-center justify-center shadow-2xs">
           AI

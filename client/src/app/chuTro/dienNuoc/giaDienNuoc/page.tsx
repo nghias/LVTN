@@ -144,8 +144,8 @@ export default function CapNhatGiaDienNuocPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tracking-tight">
                 Cập Nhật Đơn Giá Điện Nước
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Thiết lập mức giá điện (VNĐ/kWh) và giá nước (VNĐ/m³) theo ngày áp dụng để bảo toàn lịch sử hóa đơn các kỳ trước.
+              <p className="text-xs text-slate-500 mt-1">
+                Thiết lập mức giá điện và giá nước.
               </p>
             </div>
 
@@ -222,8 +222,8 @@ export default function CapNhatGiaDienNuocPage() {
                   {submitting
                     ? 'Đang lưu...'
                     : editingId
-                    ? 'Lưu Chỉnh Sửa Mốc Giá'
-                    : '+ Lưu & Áp Dụng Giá Mới'}
+                    ? 'Lưu Thay Đổi'
+                    : 'Áp Dụng'}
                 </button>
               </div>
             </form>
@@ -243,7 +243,6 @@ export default function CapNhatGiaDienNuocPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                        <th className="py-3.5 px-4 font-bold">Mã Giá</th>
                         <th className="py-3.5 px-4 font-bold">Đơn Giá Điện</th>
                         <th className="py-3.5 px-4 font-bold">Đơn Giá Nước</th>
                         <th className="py-3.5 px-4 font-bold">Ngày Áp Dụng</th>
@@ -251,12 +250,9 @@ export default function CapNhatGiaDienNuocPage() {
                         <th className="py-3.5 px-4 font-bold text-right">Thao Tác</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-200 text-xs">
                       {lichSuGia.map((item, idx) => (
                         <tr key={item.MaGia} className="hover:bg-slate-50/80 transition">
-                          <td className="py-4 px-4 font-bold text-slate-900">
-                            #{item.MaGia}
-                          </td>
                           <td className="py-4 px-4 font-bold text-amber-700">
                             {formatVND(item.GiaDien)} / kWh
                           </td>

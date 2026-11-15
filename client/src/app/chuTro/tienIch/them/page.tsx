@@ -129,7 +129,7 @@ export default function ThemTienIchPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
                 Thêm Tiện Ích Mới
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 {user.Quyen === 'ChuTro'
                   ? 'Thiết lập thông tin tiện ích và gán cho các phòng thuộc tất cả các cơ sở.'
                   : 'Thiết lập thông tin tiện ích và gán cho các phòng thuộc cơ sở do mình quản lý.'}

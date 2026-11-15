@@ -148,10 +148,10 @@ export default function SuaTienIchPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
                 Chỉnh Sửa Tiện Ích 
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 {user.Quyen === 'ChuTro'
                   ? 'Quản lý thông tin tiện ích và gán phòng áp dụng trên toàn bộ các cơ sở.'
-                  : 'Cập nhật phòng áp dụng trong cơ sở bạn quản lý (dữ liệu phòng ở cơ sở khác được giữ nguyên).'}
+                  : 'Cập nhật phòng áp dụng trong cơ sở bạn quản lý.'}
               </p>
             </div>
 

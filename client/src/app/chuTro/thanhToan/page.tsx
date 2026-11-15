@@ -245,11 +245,11 @@ export default function QuanLyThanhToanPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                  Quản Lý Thanh Toán & Đối Soát Tự Động
+                  Quản Lý Thanh Toán
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
                   {user.Quyen === 'ChuTro'
-                    ? 'Chủ trọ thiết lập tài khoản ngân hàng, đối soát QR PayOS tự động và xác nhận thu tiền mặt.'
+                    ? 'Chủ trọ thiết lập, đối soát và xác nhận thanh toán.'
                     : 'Quản lý cơ sở theo dõi lịch sử thanh toán và xác nhận thu tiền mặt của các phòng phụ trách.'}
                 </p>
               </div>
@@ -260,7 +260,7 @@ export default function QuanLyThanhToanPage() {
                     href="/chuTro/thanhToan/thietLap"
                     className="flex-1 sm:flex-initial text-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition no-underline whitespace-nowrap"
                   >
-                    + Thiết Lập Ngân Hàng
+                    Thiết Lập Ngân Hàng
                   </Link>
                 )}
               </div>
@@ -352,20 +352,20 @@ export default function QuanLyThanhToanPage() {
               <div className="space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                    Ngân hàng thụ hưởng: {thongTinNH?.TenNganHang || 'MB Bank'}
+                    Ngân hàng thụ hưởng: {thongTinNH?.TenNganHang}
                   </h2>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold whitespace-nowrap bg-[#00FFCC]/40 text-slate-900">
-                    Chủ TK: {thongTinNH?.ChuTaiKhoan || 'TRAN TUAN NGHIA'}
+                    Chủ Tài Khoản: {thongTinNH?.ChuTaiKhoan}
                   </span>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold whitespace-nowrap bg-white text-teal-800 border border-teal-200">
-                    STK: {thongTinNH?.STK || '0931493785'}
+                    STK: {thongTinNH?.STK}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600">
                   <strong className="font-bold text-slate-800">
                     Trạng thái kênh thanh toán:
                   </strong>{' '}
-                  Đã kích hoạt xác thực tự động qua cổng PayOS VietQR. Hệ thống tự động sinh mã QR theo từng hợp đồng/hóa đơn và gạch nợ ngay khi người thuê chuyển khoản thành công.
+                  Đã kích hoạt xác thực tự động. Hệ thống tự động sinh mã QR theo từnghóa đơn và gạch nợ ngay khi chuyển khoản thành công.
                 </p>
               </div>
 
@@ -375,7 +375,7 @@ export default function QuanLyThanhToanPage() {
                     href="/chuTro/thanhToan/thietLap"
                     className="inline-flex items-center px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold whitespace-nowrap transition no-underline"
                   >
-                    Sửa thông tin TT
+                    Sửa thông tin
                   </Link>
                 ) : (
                   <span className="inline-flex items-center px-3.5 py-2 rounded-xl bg-white text-slate-500 border border-slate-200 text-xs font-bold whitespace-nowrap">
@@ -530,9 +530,7 @@ export default function QuanLyThanhToanPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                        <th className="py-3.5 px-4 font-bold whitespace-nowrap">
-                          Mã GD
-                        </th>
+                        
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap">
                           Phòng / Cơ Sở
                         </th>
@@ -562,9 +560,6 @@ export default function QuanLyThanhToanPage() {
                           key={item.MaTT}
                           className="hover:bg-slate-50/80 transition"
                         >
-                          <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                            #{item.MaTT}
-                          </td>
                           <td className="py-3.5 px-4 whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               <span className="font-bold text-slate-900">
@@ -573,9 +568,6 @@ export default function QuanLyThanhToanPage() {
                               <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-bold">
                                 {formatShortKhu(item.TenKhu, item.MaKhu)}
                               </span>
-                            </div>
-                            <div className="text-[11px] font-semibold text-slate-500">
-                              HĐ #{item.MaHD}
                             </div>
                           </td>
                           <td className="py-3.5 px-4 font-bold text-slate-800 whitespace-nowrap">
@@ -651,7 +643,7 @@ export default function QuanLyThanhToanPage() {
                               </span>
                             </div>
                             <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                              HĐ #{hd.MaHD} • Kỳ {formatDateVN(hd.NgayTinh)}
+                              Kỳ {formatDateVN(hd.NgayTinh)}
                             </p>
                           </div>
 

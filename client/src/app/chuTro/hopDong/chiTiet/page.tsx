@@ -251,7 +251,7 @@ function NoiDungChiTietHopDong() {
                   <button
                     type="button"
                     onClick={() => router.back()}
-                    className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                    className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full text-nowrap border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
                   >
                     ← Quay lại
                   </button>
@@ -260,16 +260,12 @@ function NoiDungChiTietHopDong() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <h1 className="text-base font-abold text-slate-900 sm:text-xl">
-                          Hợp Đồng Thuê Phòng #{hopDong.MaHDT}
+                          Hợp Đồng Thuê Phòng
                         </h1>
                         <span className="rounded-full border border-[#00FFCC] bg-[#00FFCC]/30 px-2.5 py-0.5 text-[11px] font-bold text-slate-900">
                           {nfc(hopDong.TenPhong)} • {nfc(hopDong.TenKhu)}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-[11px] text-slate-500 sm:text-xs">
-                        Chuẩn mẫu Hợp đồng & Phụ lục khổ giấy A4 — Tự động điền
-                        thông tin hai bên
-                      </p>
                     </div>
                   )}
                 </div>

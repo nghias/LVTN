@@ -194,10 +194,10 @@ export default function SuaHoaDonPage() {
                 ← Quay lại danh sách Hóa đơn
               </Link>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mt-2 tracking-tight">
-                Sửa Hóa Đơn #{maHD}{' '}
+                Sửa Hóa Đơn {' '}
                 {detail ? `— ${detail.TenPhong} (${detail.TenKhu})` : ''}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 Sửa nhanh chỉ số điện/nước mới hoặc thêm/bỏ các khoản phí phát sinh. Tổng tiền sẽ được hệ thống tính lại tự động.
               </p>
             </div>
@@ -215,7 +215,7 @@ export default function SuaHoaDonPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                      🔒 Phòng & Cơ sở
+                      Phòng & Cơ sở
                     </label>
                     <input
                       type="text"
@@ -228,7 +228,7 @@ export default function SuaHoaDonPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                      🔒 Tiền phòng & Phí dịch vụ cố định
+                      Tiền phòng & Phí dịch vụ cố định
                     </label>
                     <input
                       type="text"
@@ -259,7 +259,7 @@ export default function SuaHoaDonPage() {
                   <div className="p-5 rounded-2xl bg-amber-50/60 border border-amber-200 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-bold text-amber-900">
-                        1. Sửa Nhanh Chỉ Số Điện ({formatVND(giaDien)}/kWh)
+                        1. Chỉ Số Điện ({formatVND(giaDien)}/kWh)
                       </h3>
                       <span className="text-xs font-bold text-amber-800">
                         +{dienTieuThu} kWh = {formatVND(tienDienMoi)}
@@ -269,7 +269,7 @@ export default function SuaHoaDonPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">
-                          🔒 Số điện cũ
+                          Số điện cũ
                         </label>
                         <input
                           type="text"
@@ -302,7 +302,7 @@ export default function SuaHoaDonPage() {
                   <div className="p-5 rounded-2xl bg-sky-50/60 border border-sky-200 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-bold text-sky-900">
-                        2. Sửa Nhanh Chỉ Số Nước ({formatVND(giaNuoc)}/m³)
+                        2. Chỉ Số Nước ({formatVND(giaNuoc)}/m³)
                       </h3>
                       <span className="text-xs font-bold text-sky-800">
                         +{nuocTieuThu} m³ = {formatVND(tienNuocMoi)}
@@ -312,7 +312,7 @@ export default function SuaHoaDonPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1">
-                          🔒 Số nước cũ
+                          Số nước cũ
                         </label>
                         <input
                           type="text"
@@ -389,7 +389,7 @@ export default function SuaHoaDonPage() {
                                 )
                               }
                               placeholder="VD: Thay khóa cửa, Phạt..."
-                              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold"
+                              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-bold"
                               required
                             />
                           </div>
@@ -423,7 +423,7 @@ export default function SuaHoaDonPage() {
                                 )
                               }
                               placeholder="Ghi chú chi tiết..."
-                              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold"
+                              className="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-xs font-bold"
                             />
                           </div>
 

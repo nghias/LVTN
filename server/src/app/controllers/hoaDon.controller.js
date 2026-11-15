@@ -226,7 +226,7 @@ const HoaDonController = {
 
     if (hoaDonDaTao) {
       trangThaiTao = 'DA_TAO';
-      lyDoKhongTheTao = `Đã lập hóa đơn #${hoaDonDaTao.MaHD} trong kỳ ${thangNam}`;
+      lyDoKhongTheTao = `Đã lập hóa đơn trong kỳ ${thangNam}`;
     } else if (!chiSoThang) {
       trangThaiTao = 'CHUA_CO_CHI_SO';
       lyDoKhongTheTao = `Chưa ghi chỉ số điện nước kỳ ${thangNam}`;

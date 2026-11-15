@@ -6,6 +6,7 @@ const { verifyToken } = require('../middlewares/auth.middleware');
 // Public routes (Ai cũng gọi được)
 router.post('/login', AuthController.login);
 router.post('/logout', AuthController.logout);
+router.get('/support-contacts', AuthController.getSupportContacts);
 
 router.post('/forgot-password/send-otp', AuthController.sendForgotPasswordOtp);
 router.post('/forgot-password/verify-otp', AuthController.verifyForgotPasswordOtp);

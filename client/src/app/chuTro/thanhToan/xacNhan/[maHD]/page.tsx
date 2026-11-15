@@ -215,8 +215,8 @@ export default function XacNhanTraTienPage() {
               </h1>
               {hoaDon && (
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  {hoaDon.TenKhu} • Hóa đơn #{hoaDon.MaHD} (Kỳ {hoaDon.NgayTinh})
-                  {hoaDon.MaHDT ? ` • Hợp đồng #${hoaDon.MaHDT}` : ''} • Khách đại
+                  {hoaDon.TenKhu} • Kỳ {hoaDon.NgayTinh}
+                   • Khách đại
                   diện: <strong>{hoaDon.TenKhachThue}</strong>
                 </p>
               )}
@@ -262,7 +262,7 @@ export default function XacNhanTraTienPage() {
                         Hóa đơn này đã được thanh toán hoàn tất!
                       </p>
                       <p className="text-xs text-emerald-700">
-                        Toàn bộ số tiền đã được xác thực và gạch nợ vào hóa đơn #{hoaDon.MaHD}.
+                        Toàn bộ số tiền đã được xác thực và gạch nợ vào hóa đơn.
                       </p>
                     </div>
                   ) : (
@@ -273,7 +273,7 @@ export default function XacNhanTraTienPage() {
                             Mã QR PayOS Tự Động Xác Thực
                           </span>
                           <p className="text-xs text-slate-600 pt-1">
-                            Đã gắn sẵn số tiền & mã đơn hàng #{qrData?.orderCode}. Tự động gạch nợ sau khi quét mã
+                            Đã gắn sẵn số tiền. Tự động gạch nợ sau khi quét mã
                           </p>
                         </div>
 
@@ -401,7 +401,7 @@ export default function XacNhanTraTienPage() {
 
                 <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-4">
                   <h2 className="text-base font-bold text-slate-900">
-                    Lịch Sử Giao Dịch Của Hóa Đơn #{hoaDon.MaHD}
+                    Lịch Sử Giao Dịch Của Hóa Đơn
                   </h2>
 
                   {lichSu.length === 0 ? (
