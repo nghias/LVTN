@@ -1,190 +1,608 @@
 // client/src/app/chuTro/thongBao/page.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import {
-  CreateThongBaoPayload,
-  ThongBaoItem,
-  ThongBaoMetadata,
-} from "../../../types/thongBao.type";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { thongBaoService } from "@/services/thongBao.service";
-import { connectSocket } from "@/utils/socket.until";
-import ProtectedRoute from "@/components/common/ProtectedRoute";
 import QuanLyHeader from "@/components/layout/QuanLyHeader";
-import { UserProfile } from "@/types/auth.type";
-import ThongBaoHeader from "@/components/features/thongBao/ThongBaoHeader";
-import ThongBaoSearchBar from "@/components/features/thongBao/ThongBaoSearchBar";
-import ThongBaoList from "@/components/features/thongBao/ThongBaoList";
-import ThongBaoFormModal from "@/components/features/thongBao/ThongBaoFormModal";
-import ThongBaoRealtimeToast from "@/components/features/thongBao/ThongBaoRealtimeToast";
+import ProtectedRoute from "@/components/common/ProtectedRoute";
+import {
+  KhuTroItem,
+  LoaiThongBao,
+  ThongBaoItem,
+  ThongBaoReplyItem,
+} from "@/types/thongBao.type";
 
-function ThongBaoContent({ user }: { user: UserProfile }) {
-  const [metadata, setMetadata] = useState<ThongBaoMetadata | null>(null);
-  const [danhSach, setDanhSach] = useState<ThongBaoItem[]>([]);
+import {
+  formatTimeAgo,
+  getBaseTitle,
+  getRoleBadge,
+  getSharedSocket,
+  resolveCurrentMaND,
+} from "./chiTiet/page";
+import { DeleteTarget, ThongBaoXoaModal } from "./xoa/page";
+
+// ============================================================================
+// 1. HEADER COMPONENT
+// ============================================================================
+export interface ThongBaoHeaderProps {
+  isSupremeLandlord: boolean;
+  khuTroList: KhuTroItem[];
+  socketConnected: boolean;
+  currentUserId?: number;
+}
+
+export function ThongBaoHeader({
+  isSupremeLandlord,
+  khuTroList,
+  socketConnected,
+  currentUserId,
+}: ThongBaoHeaderProps) {
+  const defaultKhuQuery =
+    !isSupremeLandlord && khuTroList.length === 1
+      ? `?maKhu=${khuTroList[0].MaKhu}`
+      : "";
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900">
+            {isSupremeLandlord
+              ? "Quyền Chủ Trọ • Toàn Hệ Thống (3 Khu Trọ)"
+              : `Quyền Quản Lý • ${khuTroList.map((k) => k.TenKhu).join(", ")}`}
+          </span>
+
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border ${
+              socketConnected
+                ? "text-teal-700 bg-teal-50 border-teal-200"
+                : "text-amber-700 bg-amber-50 border-amber-200"
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                socketConnected ? "bg-teal-500 animate-pulse" : "bg-amber-500"
+              }`}
+            />
+            {socketConnected ? "WebSocket Trực Tiếp" : "Đang kết nối lại..."}
+          </span>
+        </div>
+
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+          Quản Lý & Phát Thông Báo Thời Gian Thực
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500">
+          {isSupremeLandlord
+            ? "Bạn có thể gửi thông báo tới toàn bộ hệ thống (bao gồm cả 3 quản lý và khách thuê) hoặc từng khu trọ riêng biệt."
+            : "Bạn chỉ có thể gửi thông báo cho khách thuê đang cư trú tại khu trọ thuộc quyền quản lý của mình."}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <Link
+          href="/chuTro/thongBao/guiTin"
+          className="px-4 py-3 rounded-2xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs sm:text-sm font-bold transition"
+        >
+          Trả Lời Phản hồi
+        </Link>
+
+        <Link
+          href={`/chuTro/thongBao/them/${currentUserId || 0}${defaultKhuQuery}`}
+          className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold transition shadow-xs"
+        >
+          + Soạn Thông Báo Mới
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 2. SEARCH BAR COMPONENT
+// ============================================================================
+export interface ThongBaoSearchBarProps {
+  keyword: string;
+  maLTB: string;
+  activeTab: "da_gui" | "da_nhan";
+  loaiThongBaoList: LoaiThongBao[];
+  onKeywordChange: (val: string) => void;
+  onMaLTBChange: (val: string) => void;
+  onTabChange: (tab: "da_gui" | "da_nhan") => void;
+}
+
+export function ThongBaoSearchBar({
+  keyword,
+  maLTB,
+  activeTab,
+  loaiThongBaoList,
+  onKeywordChange,
+  onMaLTBChange,
+  onTabChange,
+}: ThongBaoSearchBarProps) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-xs space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="inline-flex p-1 rounded-2xl bg-slate-100 border border-slate-200 w-fit">
+          <button
+            type="button"
+            onClick={() => onTabChange("da_gui")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeTab === "da_gui"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Thông báo đã gửi
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange("da_nhan")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeTab === "da_nhan"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            Hộp thư nhận
+          </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 max-w-2xl">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => onKeywordChange(e.target.value)}
+              placeholder="Tìm theo tiêu đề, nội dung hoặc người gửi..."
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-teal-600 focus:bg-white transition"
+            />
+            {keyword && (
+              <button
+                type="button"
+                onClick={() => onKeywordChange("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <select
+            value={maLTB}
+            onChange={(e) => onMaLTBChange(e.target.value)}
+            className="px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-700 focus:outline-none focus:border-teal-600"
+          >
+            <option value="">Tất cả loại thông báo</option>
+            {loaiThongBaoList.map((ltb) => (
+              <option key={ltb.MaLTB} value={ltb.MaLTB}>
+                {ltb.TenLTB}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// 3. REALTIME TOAST COMPONENT
+// ============================================================================
+export interface ThongBaoRealtimeToastProps {
+  notification: ThongBaoItem | null;
+  onClose: () => void;
+}
+
+export function ThongBaoRealtimeToast({
+  notification,
+  onClose,
+}: ThongBaoRealtimeToastProps) {
+  if (!notification) return null;
+
+  return (
+    <div className="fixed bottom-5 right-5 z-50 max-w-sm w-full bg-slate-900 text-white border border-teal-400/40 rounded-3xl p-5 shadow-2xl space-y-2 animate-bounce">
+      <div className="flex items-center justify-between gap-2">
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#00FFCC] text-slate-900">
+          🔔 Thông báo mới • {notification.TenLTB}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-slate-400 hover:text-white"
+        >
+          ✕
+        </button>
+      </div>
+      <h4 className="text-sm font-bold text-white">{notification.TieuDe}</h4>
+      <p className="text-xs text-slate-300 line-clamp-2">
+        {notification.NoiDung}
+      </p>
+      <p className="text-[10px] text-teal-300 font-semibold">
+        Từ: {notification.TenNguoiGui}
+      </p>
+    </div>
+  );
+}
+
+// ============================================================================
+// 4. DANH SÁCH THÔNG BÁO TOÀN CHIỀU RỘNG (HIỂN THỊ CHI TIẾT TRỰC TIẾP)
+// ============================================================================
+export interface ThongBaoListProps {
+  items: ThongBaoItem[];
+  loading: boolean;
+  currentUserId?: number;
+  isSupremeLandlord?: boolean;
+  onDelete: (maTB: number, tieuDe: string) => Promise<void> | void;
+}
+
+type MergedThongBaoItem = ThongBaoItem & {
+  mergedUnreadIds?: number[];
+};
+
+const isReplyItem = (item: ThongBaoItem) => {
+  const raw = item as ThongBaoItem & {
+    MaTBCha?: number | null;
+    MaTBGoc?: number | null;
+  };
+  if (raw.MaTBCha || raw.MaTBGoc) return true;
+  return /^Phản hồi:\s*/i.test((item.TieuDe || "").trim());
+};
+
+export function ThongBaoList({
+  items,
+  loading,
+  currentUserId,
+  onDelete,
+}: ThongBaoListProps) {
+  const router = useRouter();
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [replyCountMap, setReplyCountMap] = useState<Record<number, number>>(
+    {},
+  );
+  const [readMap, setReadMap] = useState<Record<number, boolean>>({});
+
+  const filteredItems = useMemo<MergedThongBaoItem[]>(() => {
+    const groupMap = new Map<string, MergedThongBaoItem>();
+
+    for (const item of items) {
+      const baseTitle = getBaseTitle(item.TieuDe).toLowerCase();
+      const groupKey = `${item.MaLTB ?? item.TenLTB}::${baseTitle}`;
+      const existing = groupMap.get(groupKey);
+
+      if (!existing) {
+        groupMap.set(groupKey, {
+          ...item,
+          mergedUnreadIds: item.TrangThai === "ChuaDoc" ? [item.MaTB] : [],
+        });
+        continue;
+      }
+
+      const existingIsReply = isReplyItem(existing);
+      const currentIsReply = isReplyItem(item);
+
+      const mergedUnreadIds = [
+        ...(existing.mergedUnreadIds || []),
+        ...(item.TrangThai === "ChuaDoc" ? [item.MaTB] : []),
+      ];
+
+      const mergedTrangThai =
+        existing.TrangThai === "ChuaDoc" || item.TrangThai === "ChuaDoc"
+          ? "ChuaDoc"
+          : "DaDoc";
+
+      const mergedSoPhanHoi = Math.max(
+        existing.SoPhanHoi ?? 0,
+        item.SoPhanHoi ?? 0,
+      );
+
+      if (existingIsReply && !currentIsReply) {
+        groupMap.set(groupKey, {
+          ...item,
+          TrangThai: mergedTrangThai,
+          SoPhanHoi: mergedSoPhanHoi,
+          mergedUnreadIds,
+        });
+      } else {
+        groupMap.set(groupKey, {
+          ...existing,
+          TrangThai: mergedTrangThai,
+          SoPhanHoi: mergedSoPhanHoi,
+          mergedUnreadIds,
+        });
+      }
+    }
+
+    return Array.from(groupMap.values());
+  }, [items]);
+
+  // Cập nhật số lượng phản hồi Real-time
+  useEffect(() => {
+    const socket = getSharedSocket(currentUserId);
+
+    const handleNewReply = (payload: {
+      rootMaTB: number;
+      phanHoi: ThongBaoReplyItem;
+    }) => {
+      const rootId = Number(payload.rootMaTB);
+      setReplyCountMap((prev) => {
+        const baseItem = filteredItems.find((i) => i.MaTB === rootId);
+        const currentCount = prev[rootId] ?? baseItem?.SoPhanHoi ?? 0;
+        return {
+          ...prev,
+          [rootId]: currentCount + 1,
+        };
+      });
+    };
+
+    socket.on("phan_hoi_thong_bao", handleNewReply);
+    return () => {
+      socket.off("phan_hoi_thong_bao", handleNewReply);
+    };
+  }, [currentUserId, filteredItems]);
+
+  // Chuyển sang trang gửi tin nhắn và đánh dấu đã đọc
+  const handleGoToChat = (item: MergedThongBaoItem) => {
+    if (item.TrangThai === "ChuaDoc") {
+      setReadMap((prev) => ({ ...prev, [item.MaTB]: true }));
+      thongBaoService.danhDauDaDoc(item.MaTB).catch(() => {});
+    }
+    router.push(`/chuTro/thongBao/guiTin?maTB=${item.MaTB}`);
+  };
+
+  const handleConfirmDelete = async (maTB: number, tieuDe: string) => {
+    await onDelete(maTB, tieuDe);
+  };
+
+  return (
+    <>
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <span className="text-xs sm:text-sm font-bold text-slate-800">
+            Danh sách thông báo ({filteredItems.length})
+          </span>
+        </div>
+
+        <div className="divide-y divide-slate-200">
+          {loading ? (
+            <div className="p-10 text-center text-xs sm:text-sm text-slate-400">
+              Đang tải danh sách thông báo...
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="p-10 text-center text-xs sm:text-sm text-slate-400">
+              Không có thông báo nào phù hợp.
+            </div>
+          ) : (
+            filteredItems.map((item) => {
+              const isUnread =
+                item.TrangThai === "ChuaDoc" && !readMap[item.MaTB];
+              const replyCount =
+                replyCountMap[item.MaTB] ?? item.SoPhanHoi ?? 0;
+
+              return (
+                <div
+                  key={item.MaTB}
+                  className={`p-5 sm:p-6 transition ${
+                    isUnread ? "bg-[#00FFCC]/10" : "bg-white hover:bg-slate-50/60"
+                  }`}
+                >
+                  {/* Hàng 1: Badges + Nút thao tác */}
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900">
+                        {item.TenLTB}
+                      </span>
+                      {item.SoNguoiNhan !== undefined && (
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                          Đã gửi {item.SoNguoiNhan} người
+                        </span>
+                      )}
+                      {replyCount > 0 && (
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                          {replyCount} phản hồi
+                        </span>
+                      )}
+                      {isUnread && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-600 text-white">
+                          Mới
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleGoToChat(item)}
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition cursor-pointer"
+                      >
+                        💬 Nhắn tin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDeleteTarget({
+                            MaTB: item.MaTB,
+                            TieuDe: item.TieuDe,
+                          })
+                        }
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Hàng 2: Tiêu đề đầy đủ */}
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900 mt-3">
+                    {getBaseTitle(item.TieuDe)}
+                  </h3>
+
+                  {/* Hàng 3: Thông tin người gửi & Thời gian */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap mt-1.5 text-xs text-slate-500">
+                    <div className="flex items-center gap-2">
+                      <span>
+                        Người gửi:{" "}
+                        <strong className="text-slate-800">
+                          {item.TenNguoiGui}
+                        </strong>
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {getRoleBadge(item.QuyenNguoiGui)}
+                      </span>
+                    </div>
+                    <span>Ngày gửi: {formatTimeAgo(item.NgayGui)}</span>
+                  </div>
+
+                  {/* Hàng 4: Nội dung chi tiết thông báo hiển thị trực tiếp */}
+                  <div className="mt-3.5 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                    <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                      {item.NoiDung}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <ThongBaoXoaModal
+        target={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+      />
+    </>
+  );
+}
+
+// ============================================================================
+// 5. TRANG CHÍNH QUẢN LÝ THÔNG BÁO (DEFAULT EXPORT)
+// ============================================================================
+export default function ThongBaoPage() {
+  const [items, setItems] = useState<ThongBaoItem[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [activeTab, setActiveTab] = useState<"da_gui" | "da_nhan">("da_gui");
   const [keyword, setKeyword] = useState("");
   const [maLTB, setMaLTB] = useState("");
-  const [activeTab, setActiveTab] = useState<"da_gui" | "da_nhan">("da_gui");
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSupremeLandlord, setIsSupremeLandlord] = useState(false);
+  const [khuTroList, setKhuTroList] = useState<KhuTroItem[]>([]);
+  const [loaiThongBaoList, setLoaiThongBaoList] = useState<LoaiThongBao[]>([]);
+
   const [socketConnected, setSocketConnected] = useState(false);
   const [realtimeToast, setRealtimeToast] = useState<ThongBaoItem | null>(null);
 
-  // State Xóa thông báo
-  const [deleteTarget, setDeleteTarget] = useState<ThongBaoItem | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
+  const currentUserId = resolveCurrentMaND();
 
-  // Lấy MaND hiện tại từ localStorage (hoặc AuthContext của bạn)
-  const currentUserId =
-    typeof window !== "undefined"
-      ? Number(JSON.parse(localStorage.getItem("user") || "{}")?.MaND || 1)
-      : 1;
-
-  const fetchDanhSach = useCallback(async () => {
-    setLoading(true);
+  const fetchMetadata = useCallback(async () => {
     try {
-      const list = await thongBaoService.getDanhSach({
-        keyword,
-        maLTB,
-        tab: activeTab,
-      });
-      setDanhSach(list);
+      const meta = await thongBaoService.getMetadata();
+      setIsSupremeLandlord(Boolean(meta.isSupremeLandlord));
+      setKhuTroList(meta.khuTroList || []);
+      setLoaiThongBaoList(meta.loaiThongBaoList || []);
     } catch (error) {
-      console.error(error);
+      console.error("Lỗi tải metadata thông báo:", error);
+    }
+  }, []);
+
+  const fetchList = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await thongBaoService.getDanhSach({
+        tab: activeTab,
+        keyword: keyword.trim() || undefined,
+        maLTB: maLTB || undefined,
+      });
+      setItems(data);
+    } catch (error) {
+      console.error("Lỗi tải danh sách thông báo:", error);
     } finally {
       setLoading(false);
     }
-  }, [keyword, maLTB, activeTab]);
+  }, [activeTab, keyword, maLTB]);
 
-  // 1. Tải cấu hình phân quyền KhuTrọ & Loại Thông Báo
   useEffect(() => {
-    thongBaoService
-      .getMetadata()
-      .then(setMetadata)
-      .catch((err) => console.error("Lỗi metadata:", err));
-  }, []);
+    fetchMetadata();
+  }, [fetchMetadata]);
 
-  // 2. Tìm kiếm thông báo (có debounce 300ms)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchDanhSach();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [fetchDanhSach]);
+    fetchList();
+  }, [fetchList]);
 
-  // 3. Khởi tạo kết nối WebSocket thời gian thực
   useEffect(() => {
-    if (!currentUserId) return;
-    const socket = connectSocket(currentUserId);
+    const socket = getSharedSocket(currentUserId);
+    setSocketConnected(socket.connected);
 
     const onConnect = () => setSocketConnected(true);
     const onDisconnect = () => setSocketConnected(false);
 
-    // Khi nhận thông báo trực tiếp từ Chủ trọ hoặc hệ thống
-    const onNewNotification = (newTb: ThongBaoItem) => {
-      setRealtimeToast(newTb);
-      if (activeTab === "da_nhan") {
-        setDanhSach((prev) => [newTb, ...prev]);
-      }
+    const onNewNotification = (newNoti: ThongBaoItem) => {
+      setRealtimeToast(newNoti);
+      fetchList();
     };
 
-    // Khi có thông báo bị xóa
-    const onDeleteNotification = ({ MaTB }: { MaTB: number }) => {
-      setDanhSach((prev) => prev.filter((item) => item.MaTB !== Number(MaTB)));
+    const onDeletedNotification = ({ MaTB }: { MaTB: number }) => {
+      setItems((prev) => prev.filter((item) => item.MaTB !== Number(MaTB)));
     };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
-    socket.on("NEW_NOTIFICATION", onNewNotification);
-    socket.on("DELETE_NOTIFICATION", onDeleteNotification);
-
-    if (socket.connected) setSocketConnected(true);
+    socket.on("thong_bao_moi", onNewNotification);
+    socket.on("xoa_thong_bao", onDeletedNotification);
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
-      socket.off("NEW_NOTIFICATION", onNewNotification);
-      socket.off("DELETE_NOTIFICATION", onDeleteNotification);
+      socket.off("thong_bao_moi", onNewNotification);
+      socket.off("xoa_thong_bao", onDeletedNotification);
     };
-  }, [currentUserId, activeTab]);
+  }, [currentUserId, fetchList]);
 
-  
-
-  // Xử lý gửi thông báo mới
-  const handleCreateThongBao = async (payload: CreateThongBaoPayload) => {
-    const res = await thongBaoService.taoThongBao(payload);
-    if (activeTab === "da_gui") {
-      setDanhSach((prev) => [res.data, ...prev]);
-    }
+  const handleDeleteThongBao = async (maTB: number) => {
+    await thongBaoService.xoaThongBao(maTB);
+    setItems((prev) => prev.filter((item) => item.MaTB !== maTB));
   };
 
-  // Xử lý xóa thông báo
-  const handleDeleteThongBao = async (maTB: number, tieuDe: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa thông báo "${tieuDe}"?`)) {
-      return;
-    }
-    try {
-      await thongBaoService.xoaThongBao(maTB);
-      setDanhSach((prev) => prev.filter((item) => item.MaTB !== maTB));
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Xóa thất bại");
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
-      <QuanLyHeader user={user} />
-
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        <ThongBaoHeader
-          isSupremeLandlord={metadata?.isSupremeLandlord ?? false}
-          khuTroList={metadata?.khuTroList ?? []}
-          socketConnected={socketConnected}
-          onOpenModal={() => setIsModalOpen(true)}
-        />
-
-        <ThongBaoSearchBar
-          keyword={keyword}
-          maLTB={maLTB}
-          activeTab={activeTab}
-          loaiThongBaoList={metadata?.loaiThongBaoList ?? []}
-          onKeywordChange={setKeyword}
-          onMaLTBChange={setMaLTB}
-          onTabChange={setActiveTab}
-        />
-
-        <ThongBaoList
-          items={danhSach}
-          loading={loading}
-          currentUserId={currentUserId}
-          isSupremeLandlord={metadata?.isSupremeLandlord ?? false}
-          onDelete={handleDeleteThongBao}
-        />
-
-        <ThongBaoFormModal
-          isOpen={isModalOpen}
-          isSupremeLandlord={metadata?.isSupremeLandlord ?? false}
-          khuTroList={metadata?.khuTroList ?? []}
-          phongList={metadata?.phongList ?? []}
-          loaiThongBaoList={metadata?.loaiThongBaoList ?? []}
-          onClose={() => setIsModalOpen(false)}
-          onSubmit={handleCreateThongBao}
-        />
-
-        <ThongBaoRealtimeToast
-          notification={realtimeToast}
-          onClose={() => setRealtimeToast(null)}
-        />
-      </main>
-    </div>
-  );
-}
-export default function QuanLyThongBaoPage() {
   return (
     <ProtectedRoute allowedRoles={["ChuTro", "QuanLy"]}>
-      {(user) => <ThongBaoContent user={user} />}
+      {(user) => (
+        <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
+          <QuanLyHeader user={user} />
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+            <ThongBaoHeader
+              isSupremeLandlord={isSupremeLandlord}
+              khuTroList={khuTroList}
+              socketConnected={socketConnected}
+              currentUserId={currentUserId || user?.MaND}
+            />
+
+            <ThongBaoSearchBar
+              keyword={keyword}
+              maLTB={maLTB}
+              activeTab={activeTab}
+              loaiThongBaoList={loaiThongBaoList}
+              onKeywordChange={setKeyword}
+              onMaLTBChange={setMaLTB}
+              onTabChange={setActiveTab}
+            />
+
+            <ThongBaoList
+              items={items}
+              loading={loading}
+              currentUserId={currentUserId || user?.MaND}
+              isSupremeLandlord={isSupremeLandlord}
+              onDelete={handleDeleteThongBao}
+            />
+          </main>
+
+          <ThongBaoRealtimeToast
+            notification={realtimeToast}
+            onClose={() => setRealtimeToast(null)}
+          />
+        </div>
+      )}
     </ProtectedRoute>
   );
 }
