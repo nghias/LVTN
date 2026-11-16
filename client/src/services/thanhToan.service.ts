@@ -19,6 +19,10 @@ export interface ThongTinThanhToan {
   TenNganHang: string;
   STK: string;
   ChuTaiKhoan: string;
+  PayosClientId?: string | null;
+  PayosApiKey?: string | null;
+  PayosChecksumKey?: string | null;
+  hasCustomPayosKeys?: boolean;
 }
 
 export interface GiaoDichThanhToan {
@@ -102,7 +106,7 @@ const buildQueryString = (params?: Record<string, any>): string => {
   return query ? `?${query}` : '';
 };
 
-// Hàm gọi API dùng chung bằng fetch kèm Cookie xác thực (đồng bộ với hoaDon.service.ts)
+// Hàm gọi API dùng chung bằng fetch kèm Cookie xác thực
 const requestThanhToan = async <T = any>(
   endpoint: string,
   options: RequestInit = {}
@@ -147,12 +151,15 @@ export const thanhToanService = {
     });
   },
 
-  // 2. Cập nhật thông tin tài khoản nhận thanh toán (Chỉ Chủ trọ mới có quyền)
+  // 2. Cập nhật thông tin tài khoản nhận thanh toán & cấu hình khóa PayOS (Chỉ Chủ trọ mới có quyền)
   updateThongTinThanhToan: async (payload: {
     MaTT?: number;
     TenNganHang: string;
     STK: string;
     ChuTaiKhoan: string;
+    PayosClientId?: string;
+    PayosApiKey?: string;
+    PayosChecksumKey?: string;
   }) => {
     return requestThanhToan<ThongTinThanhToan>('/thong-tin', {
       method: 'PUT',

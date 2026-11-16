@@ -16,12 +16,16 @@ export default function ThietLapThongTinThanhToanPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [canEdit, setCanEdit] = useState<boolean>(false);
+  const [showSecrets, setShowSecrets] = useState<boolean>(false);
 
   const [formData, setFormData] = useState({
     MaTT: 1,
     TenNganHang: 'MB Bank',
     STK: '0931493785',
     ChuTaiKhoan: 'TRAN TUAN NGHIA',
+    PayosClientId: '',
+    PayosApiKey: '',
+    PayosChecksumKey: '',
   });
 
   useEffect(() => {
@@ -37,6 +41,9 @@ export default function ThietLapThongTinThanhToanPage() {
               TenNganHang: res.data.TenNganHang || '',
               STK: res.data.STK || '',
               ChuTaiKhoan: res.data.ChuTaiKhoan || '',
+              PayosClientId: res.data.PayosClientId || '',
+              PayosApiKey: res.data.PayosApiKey || '',
+              PayosChecksumKey: res.data.PayosChecksumKey || '',
             });
           }
         }
@@ -56,16 +63,34 @@ export default function ThietLapThongTinThanhToanPage() {
       return;
     }
 
+    const cId = formData.PayosClientId.trim();
+    const aKey = formData.PayosApiKey.trim();
+    const csKey = formData.PayosChecksumKey.trim();
+    const hasAnyKey = Boolean(cId || aKey || csKey);
+    const hasAllKeys = Boolean(cId && aKey && csKey);
+
+    if (hasAnyKey && !hasAllKeys) {
+      showError(
+        'Nếu cập nhật khóa kết nối PayOS, vui lòng nhập đầy đủ cả 3 khóa: Client ID, API Key và Checksum Key (hoặc xóa trống cả 3 để dùng khóa mặc định của hệ thống)!'
+      );
+      return;
+    }
+
     showConfirm(
       `Xác nhận cập nhật tài khoản nhận thanh toán sang ${formData.TenNganHang} - STK ${formData.STK} (${formData.ChuTaiKhoan})?`,
       'Xác nhận lưu thông tin thanh toán',
       async () => {
         try {
           setSaving(true);
-          const res = await thanhToanService.updateThongTinThanhToan(formData);
+          const res = await thanhToanService.updateThongTinThanhToan({
+            ...formData,
+            PayosClientId: cId,
+            PayosApiKey: aKey,
+            PayosChecksumKey: csKey,
+          });
           if (res.success) {
             showSuccess(
-              'Đã cập nhật thông tin tài khoản nhận thanh toán thành công!',
+              'Đã cập nhật thông tin tài khoản ngân hàng và cấu hình PayOS thành công!',
               'Thành công',
               2,
               () => {
@@ -104,7 +129,7 @@ export default function ThietLapThongTinThanhToanPage() {
                 Thiết Lập Thông Tin Thanh Toán
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Cập nhật tài khoản ngân hàng thụ hưởng liên kết với cổng xác thực tự động PayOS
+                Cập nhật tài khoản ngân hàng thụ hưởng và khóa kết nối cổng xác thực tự động PayOS
               </p>
             </div>
 
@@ -132,58 +157,155 @@ export default function ThietLapThongTinThanhToanPage() {
               </div>
             ) : (
               <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Ngân hàng thụ hưởng *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.TenNganHang}
-                        onChange={(e) =>
-                          setFormData({ ...formData, TenNganHang: e.target.value })
-                        }
-                        placeholder="VD: MB Bank, Vietcombank..."
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                      />
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* PHẦN 1: THÔNG TIN TÀI KHOẢN NGÂN HÀNG HIỂN THỊ */}
+                  <div className="space-y-4">
+                    <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                      1. Thông tin tài khoản ngân hàng thụ hưởng
+                    </h2>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Ngân hàng thụ hưởng *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.TenNganHang}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              TenNganHang: e.target.value,
+                            })
+                          }
+                          placeholder="VD: MB Bank, Vietcombank, BIDV..."
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Số tài khoản nhận tiền *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.STK}
+                          onChange={(e) =>
+                            setFormData({ ...formData, STK: e.target.value })
+                          }
+                          placeholder="VD: 0931493785"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                        />
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        Số tài khoản nhận tiền *
+                        Tên chủ tài khoản (In hoa không dấu) *
                       </label>
                       <input
                         type="text"
                         required
-                        value={formData.STK}
+                        value={formData.ChuTaiKhoan}
                         onChange={(e) =>
-                          setFormData({ ...formData, STK: e.target.value })
+                          setFormData({
+                            ...formData,
+                            ChuTaiKhoan: e.target.value.toUpperCase(),
+                          })
                         }
-                        placeholder="VD: 0931493785"
-                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                        placeholder="VD: TRAN TUAN NGHIA"
+                        className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm uppercase font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Tên chủ tài khoản (In hoa không dấu) *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.ChuTaiKhoan}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          ChuTaiKhoan: e.target.value.toUpperCase(),
-                        })
-                      }
-                      placeholder="VD: TRAN TUAN NGHIA"
-                      className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-sm uppercase font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                    />
+                  {/* PHẦN 2: BỘ 3 KHÓA KẾT NỐI CỔNG PAYOS */}
+                  <div className="pt-5 border-t border-slate-200 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                          2. Cấu hình khóa kết nối cổng PayOS
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Khi đổi sang tài khoản ngân hàng mới, hãy liên kết ngân hàng đó trên{' '}
+                          <a
+                            href="https://my.payos.vn"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-teal-700 font-bold underline"
+                          >
+                            my.payos.vn
+                          </a>{' '}
+                          và dán bộ 3 khóa Kênh thanh toán vào dưới đây để hệ thống tự động sinh QR và gạch nợ sang tài khoản mới.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowSecrets(!showSecrets)}
+                        className="px-3.5 py-1.5 rounded-full border border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer transition"
+                      >
+                        {showSecrets ? 'Ẩn mã khóa' : 'Hiện mã khóa'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-3.5 bg-slate-50/80 p-4 rounded-2xl border border-slate-200">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          PayOS Client ID
+                        </label>
+                        <input
+                          type={showSecrets ? 'text' : 'password'}
+                          value={formData.PayosClientId}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              PayosClientId: e.target.value,
+                            })
+                          }
+                          placeholder="Để trống nếu dùng khóa mặc định của hệ thống"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          PayOS API Key
+                        </label>
+                        <input
+                          type={showSecrets ? 'text' : 'password'}
+                          value={formData.PayosApiKey}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              PayosApiKey: e.target.value,
+                            })
+                          }
+                          placeholder="Để trống nếu dùng khóa mặc định của hệ thống"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          PayOS Checksum Key
+                        </label>
+                        <input
+                          type={showSecrets ? 'text' : 'password'}
+                          value={formData.PayosChecksumKey}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              PayosChecksumKey: e.target.value,
+                            })
+                          }
+                          placeholder="Để trống nếu dùng khóa mặc định của hệ thống"
+                          className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">

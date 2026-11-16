@@ -174,9 +174,9 @@ export default function XacNhanTraTienPage() {
   };
 
   const bankBin = qrData?.bin || '970422';
-  const stk = qrData?.accountNumber || thongTinNH?.STK || '0931493785';
+  const stk = qrData?.accountNumber || thongTinNH?.STK;
   const chuTK =
-    qrData?.accountName || thongTinNH?.ChuTaiKhoan || 'TRAN TUAN NGHIA';
+    qrData?.accountName || thongTinNH?.ChuTaiKhoan;
   const noiDungCK =
     qrData?.description ||
     (hoaDon?.MaHDT
@@ -301,7 +301,7 @@ export default function XacNhanTraTienPage() {
                           <div className="flex justify-between">
                             <span className="text-slate-500">Ngân hàng:</span>
                             <strong className="text-slate-900">
-                              {thongTinNH?.TenNganHang || 'MB Bank'}
+                              {thongTinNH?.TenNganHang || 'Chưa liên kết ngân hàng'}
                             </strong>
                           </div>
                           <div className="flex justify-between">

@@ -5,17 +5,49 @@ const HoaDonModel = require('../models/hoaDon.model');
 const ThanhToanModel = require('../models/thanhToan.model');
 const ThongTinThanhToanModel = require('../models/thongTinThanhToan.model');
 
-// Khóa cấu hình PayOS (Lấy từ biến môi trường trên Render)
-const PAYOS_CLIENT_ID = (
-  process.env.PAYOS_CLIENT_ID || '8355a8cb-4e14-4b30-b467-0083dc9e73cd'
-).trim();
-const PAYOS_API_KEY = (
-  process.env.PAYOS_API_KEY || '3d8a9833-d1eb-4fc1-805c-7ad441e82e7f'
-).trim();
-const PAYOS_CHECKSUM_KEY = (
-  process.env.PAYOS_CHECKSUM_KEY ||
-  'b434d4727cf7878f62d483190670ab1efe77a6d2e'
-).trim();
+// Hàm lấy bộ khóa PayOS đang hoạt động: Ưu tiên đọc từ DB (ThongTinThanhToan) -> Fallback về .env
+function resolvePayOSCredentials(thongTinNH) {
+  const clientId = (
+    thongTinNH?.PayosClientId || process.env.PAYOS_CLIENT_ID
+  ).trim();
+  const apiKey = (
+    thongTinNH?.PayosApiKey || process.env.PAYOS_API_KEY
+  ).trim();
+  const checksumKey = (
+    thongTinNH?.PayosChecksumKey || process.env.PAYOS_CHECKSUM_KEY
+  ).trim();
+
+  return { clientId, apiKey, checksumKey };
+}
+
+// Ẩn khóa bí mật PayOS khi trả dữ liệu về cho Khách thuê hoặc Quản lý (Chỉ Chủ trọ mới xem được khóa)
+function sanitizeThongTinNH(info, includeSecrets = false) {
+  if (!info) return null;
+  const hasCustomPayosKeys = Boolean(
+    info.PayosClientId && info.PayosApiKey && info.PayosChecksumKey
+  );
+
+  if (includeSecrets) {
+    return {
+      ...info,
+      PayosClientId: info.PayosClientId || '',
+      PayosApiKey: info.PayosApiKey || '',
+      PayosChecksumKey: info.PayosChecksumKey || '',
+      hasCustomPayosKeys,
+    };
+  }
+
+  const {
+    PayosClientId,
+    PayosApiKey,
+    PayosChecksumKey,
+    ...publicFields
+  } = info;
+  return {
+    ...publicFields,
+    hasCustomPayosKeys,
+  };
+}
 
 // Hàm lấy MaND đang đăng nhập
 function extractCurrentMaND(req) {
@@ -97,23 +129,23 @@ async function getAccessibleRoomsAndKhu(user) {
   };
 }
 
-// Hàm tạo chữ ký HMAC-SHA256 cho PayOS Create Payment Link
-function createPayOSSignature({
-  amount,
-  cancelUrl,
-  description,
-  orderCode,
-  returnUrl,
-}) {
+// Hàm tạo chữ ký HMAC-SHA256 cho PayOS Create Payment Link (Nhận checksumKey động)
+function createPayOSSignature(
+  { amount, cancelUrl, description, orderCode, returnUrl },
+  checksumKey = ENV_PAYOS_CHECKSUM_KEY
+) {
   const dataStr = `amount=${amount}&cancelUrl=${cancelUrl}&description=${description}&orderCode=${orderCode}&returnUrl=${returnUrl}`;
   return crypto
-    .createHmac('sha256', PAYOS_CHECKSUM_KEY)
+    .createHmac('sha256', checksumKey)
     .update(dataStr)
     .digest('hex');
 }
 
-// Hàm xác thực chữ ký Webhook từ PayOS gửi về
-function verifyPayOSWebhookSignature(webhookBody) {
+// Hàm xác thực chữ ký Webhook từ PayOS gửi về (Nhận checksumKey động)
+function verifyPayOSWebhookSignature(
+  webhookBody,
+  checksumKey = ENV_PAYOS_CHECKSUM_KEY
+) {
   if (!webhookBody || !webhookBody.data || !webhookBody.signature) return false;
   const dataObj = webhookBody.data;
   const sortedKeys = Object.keys(dataObj).sort();
@@ -135,14 +167,14 @@ function verifyPayOSWebhookSignature(webhookBody) {
     .join('&');
 
   const computedSig = crypto
-    .createHmac('sha256', PAYOS_CHECKSUM_KEY)
+    .createHmac('sha256', checksumKey)
     .update(queryString)
     .digest('hex');
 
   return computedSig === webhookBody.signature;
 }
 
-// Hàm đồng bộ lại cột TienDaTra trong bảng HoaDon an toàn (Không gây lỗi 500 kể cả khi thiếu hàm trong HoaDonModel)
+// Hàm đồng bộ lại cột TienDaTra trong bảng HoaDon an toàn
 async function syncHoaDonTienDaTra(maHD) {
   const hoaDon = await HoaDonModel.getById(maHD);
   if (!hoaDon) return null;
@@ -164,8 +196,10 @@ async function syncHoaDonTienDaTra(maHD) {
     }
   }
 
-  // Nếu hóa đơn đã trả đủ tiền -> Tự động xóa các giao dịch QR ChoXacNhan dư thừa của hóa đơn này
-  if (Number(totalPaid) >= Number(hoaDon.TongTien) && Number(hoaDon.TongTien) > 0) {
+  if (
+    Number(totalPaid) >= Number(hoaDon.TongTien) &&
+    Number(hoaDon.TongTien) > 0
+  ) {
     await ThanhToanModel.cleanupDuplicatePendingPayOS(maHD, null);
   }
 
@@ -197,14 +231,15 @@ const ThanhToanController = {
   getThongTinThanhToan: async (req, res) => {
     try {
       const currentUser = await getCurrentUserFromDB(req);
+      const canEdit = isLandlordRole(currentUser);
       const primary = await ThongTinThanhToanModel.getPrimary();
       const allList = await ThongTinThanhToanModel.getAll();
 
       return res.status(200).json({
         success: true,
-        data: primary,
-        list: allList,
-        canEdit: isLandlordRole(currentUser),
+        data: sanitizeThongTinNH(primary, canEdit),
+        list: allList.map((item) => sanitizeThongTinNH(item, canEdit)),
+        canEdit,
       });
     } catch (error) {
       console.error('Lỗi getThongTinThanhToan:', error);
@@ -215,7 +250,7 @@ const ThanhToanController = {
     }
   },
 
-  // 2. PUT /api/thanh-toan/thong-tin
+  // 2. PUT /api/thanh-toan/thong-tin (Hỗ trợ cập nhật cả STK lẫn bộ 3 khóa PayOS)
   updateThongTinThanhToan: async (req, res) => {
     try {
       const currentUser = await getCurrentUserFromDB(req);
@@ -227,12 +262,37 @@ const ThanhToanController = {
         });
       }
 
-      const { MaTT, TenNganHang, STK, ChuTaiKhoan } = req.body;
+      const {
+        MaTT,
+        TenNganHang,
+        STK,
+        ChuTaiKhoan,
+        PayosClientId,
+        PayosApiKey,
+        PayosChecksumKey,
+      } = req.body;
+
       if (!TenNganHang || !STK || !ChuTaiKhoan) {
         return res.status(400).json({
           success: false,
           message:
             'Vui lòng nhập đầy đủ Tên ngân hàng, Số tài khoản và Chủ tài khoản',
+        });
+      }
+
+      // Kiểm tra nếu Chủ trọ có nhập khóa PayOS thì phải nhập đủ cả 3 khóa
+      const cId = PayosClientId !== undefined ? String(PayosClientId).trim() : undefined;
+      const aKey = PayosApiKey !== undefined ? String(PayosApiKey).trim() : undefined;
+      const csKey = PayosChecksumKey !== undefined ? String(PayosChecksumKey).trim() : undefined;
+
+      const hasAnyKey = Boolean(cId || aKey || csKey);
+      const hasAllKeys = Boolean(cId && aKey && csKey);
+
+      if (hasAnyKey && !hasAllKeys) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Nếu cấu hình liên kết PayOS mới, vui lòng nhập đầy đủ cả 3 khóa: Client ID, API Key và Checksum Key (hoặc để trống cả 3 để dùng cấu hình mặc định)!',
         });
       }
 
@@ -245,6 +305,9 @@ const ThanhToanController = {
           TenNganHang,
           STK,
           ChuTaiKhoan,
+          PayosClientId: cId,
+          PayosApiKey: aKey,
+          PayosChecksumKey: csKey,
         });
       } else {
         await ThongTinThanhToanModel.create({
@@ -252,14 +315,27 @@ const ThanhToanController = {
           TenNganHang,
           STK,
           ChuTaiKhoan,
+          PayosClientId: cId || null,
+          PayosApiKey: aKey || null,
+          PayosChecksumKey: csKey || null,
         });
+      }
+
+      // Xóa các giao dịch QR ChoXacNhan cũ để lần tạo QR kế tiếp dùng ngay tài khoản/khóa PayOS mới
+      try {
+        await db.execute(
+          `DELETE FROM ThanhToan WHERE PhuongThuc = 'ChuyenKhoan' AND TrangThai = 'ChoXacNhan'`
+        );
+      } catch {
+        // Bỏ qua nếu bảng không có bản ghi ChoXacNhan
       }
 
       const updated = await ThongTinThanhToanModel.getPrimary();
       return res.status(200).json({
         success: true,
-        message: 'Cập nhật thông tin tài khoản nhận thanh toán thành công!',
-        data: updated,
+        message:
+          'Cập nhật thông tin tài khoản nhận thanh toán & cấu hình PayOS thành công!',
+        data: sanitizeThongTinNH(updated, true),
       });
     } catch (error) {
       console.error('Lỗi updateThongTinThanhToan:', error);
@@ -283,8 +359,9 @@ const ThanhToanController = {
 
       const { allowedRoomIds, allRooms, allKhu } =
         await getAccessibleRoomsAndKhu(currentUser);
-      const thongTinNH = await ThongTinThanhToanModel.getPrimary();
+      const rawThongTinNH = await ThongTinThanhToanModel.getPrimary();
       const canEditPaymentInfo = isLandlordRole(currentUser);
+      const thongTinNH = sanitizeThongTinNH(rawThongTinNH, false);
 
       if (allowedRoomIds.length === 0) {
         return res.status(200).json({
@@ -465,10 +542,11 @@ const ThanhToanController = {
       );
       const hopDongInfo = hdRows[0] || null;
 
-      const [lichSu, thongTinNH] = await Promise.all([
+      const [lichSu, rawThongTinNH] = await Promise.all([
         ThanhToanModel.getByMaHD(maHD),
         ThongTinThanhToanModel.getPrimary(),
       ]);
+      const thongTinNH = sanitizeThongTinNH(rawThongTinNH, false);
 
       const tongTien = Number(hoaDon.TongTien) || 0;
       const tienDaTra = Number(hoaDon.TienDaTra) || 0;
@@ -578,7 +656,10 @@ const ThanhToanController = {
         : `HD${hoaDon.MaHD} ${tenPhong}`;
       const description = rawDesc.replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 25);
 
-      const thongTinNH = await ThongTinThanhToanModel.getPrimary();
+      const rawThongTinNH = await ThongTinThanhToanModel.getPrimary();
+      const { clientId, apiKey, checksumKey } =
+        resolvePayOSCredentials(rawThongTinNH);
+      const thongTinNH = sanitizeThongTinNH(rawThongTinNH, false);
 
       // Bước 1: Kiểm tra giao dịch ChuyenKhoan ChoXacNhan hiện có của hóa đơn này
       const existingList = await ThanhToanModel.getByMaHD(hoaDon.MaHD);
@@ -594,7 +675,6 @@ const ThanhToanController = {
         const latestPending = pendingPayOSList[0];
         reusableMaTT = latestPending.MaTT;
 
-        // Dọn dẹp ngay các dòng ChoXacNhan bị sinh trùng trước đó (chỉ giữ lại dòng mới nhất)
         if (pendingPayOSList.length > 1) {
           await ThanhToanModel.cleanupDuplicatePendingPayOS(
             hoaDon.MaHD,
@@ -608,15 +688,19 @@ const ThanhToanController = {
           latestPending.MinhChung
         );
 
-        if (!forceNew && existingOrderCode && Number(latestPending.SoTien) === soTienThanhToan) {
+        if (
+          !forceNew &&
+          existingOrderCode &&
+          Number(latestPending.SoTien) === soTienThanhToan
+        ) {
           try {
             const checkRes = await fetch(
               `https://api-merchant.payos.vn/v2/payment-requests/${existingOrderCode}`,
               {
                 method: 'GET',
                 headers: {
-                  'x-client-id': PAYOS_CLIENT_ID,
-                  'x-api-key': PAYOS_API_KEY,
+                  'x-client-id': clientId,
+                  'x-api-key': apiKey,
                 },
               }
             );
@@ -663,8 +747,6 @@ const ThanhToanController = {
             console.error('Lỗi kiểm tra đơn PayOS cũ:', err.message);
           }
 
-          // QUAN TRỌNG: Nếu đơn cũ chưa tồn tại trên PayOS nhưng vừa mới tạo (< 60 giây) và không ép tạo mới,
-          // trả về luôn bản ghi hiện tại để KHÔNG sinh orderCode mới liên tục!
           if (!forceNew) {
             const createdTime = latestPending.NgayTT
               ? new Date(latestPending.NgayTT).getTime()
@@ -689,7 +771,7 @@ const ThanhToanController = {
                   thongTinNganHang: thongTinNH,
                   payosCreated: false,
                   payosNote:
-                    'Đơn hàng chưa tạo được trên PayOS (Kiểm tra lại PAYOS_CHECKSUM_KEY đủ 64 ký tự trên Render).',
+                    'Đơn hàng chưa tạo được trên PayOS (Kiểm tra lại bộ khóa PayOS trong mục Thiết lập thanh toán).',
                 },
               });
             }
@@ -697,15 +779,15 @@ const ThanhToanController = {
         }
       }
 
-      // Bước 2: Sinh orderCode mới (Số nguyên an toàn 9 chữ số)
+      // Bước 2: Sinh orderCode mới
       const orderCode = Number(
         `${hoaDon.MaHD}${Date.now().toString().slice(-7)}`
       );
-      const clientUrl = process.env.CLIENT_URL || 'https://thexomtro.vercel.app';
+      const clientUrl =
+        process.env.CLIENT_URL || 'https://thexomtro.vercel.app';
       const returnUrl = `${clientUrl}/chuTro/thanhToan/xacNhan/${hoaDon.MaHD}?payos=success&orderCode=${orderCode}`;
       const cancelUrl = `${clientUrl}/chuTro/thanhToan/xacNhan/${hoaDon.MaHD}?payos=cancel`;
 
-      // Tái sử dụng dòng ChoXacNhan cũ (nếu có) thay vì INSERT dòng mới gây rác DB
       let maTT = reusableMaTT;
       if (maTT) {
         await ThanhToanModel.updateStatus(maTT, {
@@ -727,14 +809,17 @@ const ThanhToanController = {
         });
       }
 
-      // Bước 3: Gọi API tạo Payment Link của PayOS
-      const signature = createPayOSSignature({
-        amount: soTienThanhToan,
-        cancelUrl,
-        description,
-        orderCode,
-        returnUrl,
-      });
+      // Bước 3: Gọi API tạo Payment Link của PayOS bằng khóa động từ DB
+      const signature = createPayOSSignature(
+        {
+          amount: soTienThanhToan,
+          cancelUrl,
+          description,
+          orderCode,
+          returnUrl,
+        },
+        checksumKey
+      );
 
       const response = await fetch(
         'https://api-merchant.payos.vn/v2/payment-requests',
@@ -742,8 +827,8 @@ const ThanhToanController = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-client-id': PAYOS_CLIENT_ID,
-            'x-api-key': PAYOS_API_KEY,
+            'x-client-id': clientId,
+            'x-api-key': apiKey,
           },
           body: JSON.stringify({
             orderCode,
@@ -773,7 +858,9 @@ const ThanhToanController = {
             checkoutUrl: payosResult.data.checkoutUrl,
             qrCode: payosResult.data.qrCode,
             accountNumber:
-              payosResult.data.accountNumber || thongTinNH?.STK || '0931493785',
+              payosResult.data.accountNumber ||
+              thongTinNH?.STK ||
+              '0931493785',
             accountName:
               payosResult.data.accountName ||
               thongTinNH?.ChuTaiKhoan ||
@@ -807,7 +894,7 @@ const ThanhToanController = {
           payosCreated: false,
           payosNote:
             payosResult?.desc ||
-            'PayOS từ chối tạo đơn (Vui lòng kiểm tra lại PAYOS_CHECKSUM_KEY 64 ký tự)',
+            'PayOS từ chối tạo đơn (Vui lòng kiểm tra lại Client ID, API Key và Checksum Key trong mục Thiết lập thanh toán)',
         },
       });
     } catch (error) {
@@ -824,7 +911,6 @@ const ThanhToanController = {
     try {
       const body = req.body || {};
 
-      // Trả về 200 OK ngay cho gói tin test Webhook từ PayOS (orderCode = 123 / VQRIO123)
       if (
         !body.data ||
         Number(body.data.orderCode) === 123 ||
@@ -843,7 +929,14 @@ const ThanhToanController = {
         return res.status(200).json({ error: 0, success: true });
       }
 
-      let isVerified = verifyPayOSWebhookSignature(body) && body.code === '00';
+      const rawThongTinNH = await ThongTinThanhToanModel.getPrimary();
+      const { clientId, apiKey, checksumKey } =
+        resolvePayOSCredentials(rawThongTinNH);
+
+      let isVerified =
+        (verifyPayOSWebhookSignature(body, checksumKey) ||
+          verifyPayOSWebhookSignature(body, ENV_PAYOS_CHECKSUM_KEY)) &&
+        body.code === '00';
 
       if (!isVerified) {
         try {
@@ -852,8 +945,8 @@ const ThanhToanController = {
             {
               method: 'GET',
               headers: {
-                'x-client-id': PAYOS_CLIENT_ID,
-                'x-api-key': PAYOS_API_KEY,
+                'x-client-id': clientId,
+                'x-api-key': apiKey,
               },
             }
           );
@@ -945,13 +1038,16 @@ const ThanhToanController = {
         });
       }
 
+      const rawThongTinNH = await ThongTinThanhToanModel.getPrimary();
+      const { clientId, apiKey } = resolvePayOSCredentials(rawThongTinNH);
+
       const response = await fetch(
         `https://api-merchant.payos.vn/v2/payment-requests/${orderCode}`,
         {
           method: 'GET',
           headers: {
-            'x-client-id': PAYOS_CLIENT_ID,
-            'x-api-key': PAYOS_API_KEY,
+            'x-client-id': clientId,
+            'x-api-key': apiKey,
           },
         }
       );
