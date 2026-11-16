@@ -29,7 +29,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
   const { showConfirm, showSuccess, showError } = useAlertModal();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const roleLabel = user.Quyen === 'ChuTro' ? 'Chủ trọ' : 'Quản lý cơ sở';
+  const roleLabel = user.Quyen === 'ChuTro' ? 'Quản Lý Hệ Thống' : 'Quản Lý Cơ Sở';
 
   // Các cụm menu đã được gom nhóm gọn gàng cho giao diện Máy tính
   const navGroups: NavGroup[] = [

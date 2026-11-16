@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import QuanLyHeader from '@/components/layout/QuanLyHeader';
 import { useAlertModal } from '@/components/common/AlertModalProvider';
+import { FormError, inputErrorClass } from '@/utils/formValidation';
 import {
   dienNuocService,
   KhuTroOption,
@@ -34,19 +35,21 @@ export default function ThemChiSoDienNuocPage() {
   const [ngayGhi, setNgayGhi] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
+  const [ngayGhiError, setNgayGhiError] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'CHUA_GHI' | 'DANG_THUE' | 'TAT_CA'>(
     'CHUA_GHI'
   );
   const [searchRoom, setSearchRoom] = useState<string>('');
 
   const [inputsByRoom, setInputsByRoom] = useState<Record<number, RoomInputState>>({});
+  const [attemptedSubmit, setAttemptedSubmit] = useState<boolean>(false);
+  const [globalTableError, setGlobalTableError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const initializedKhuRef = useRef<boolean>(false);
   const thangNam = ngayGhi ? ngayGhi.slice(0, 7) : '';
 
-  // Chỉ gọi API khi tháng/năm (thangNam) thay đổi, tránh vòng lặp re-render
   useEffect(() => {
     let isMounted = true;
 
@@ -95,6 +98,7 @@ export default function ThemChiSoDienNuocPage() {
     value: string
   ) => {
     const cleanVal = value.replace(/\D/g, '');
+    setGlobalTableError(null);
     setInputsByRoom((prev) => ({
       ...prev,
       [maPhong]: {
@@ -106,11 +110,12 @@ export default function ThemChiSoDienNuocPage() {
   };
 
   const handleKeepSameAsOld = (room: PhongDienNuocOption) => {
+    setGlobalTableError(null);
     setInputsByRoom((prev) => ({
       ...prev,
       [room.MaPhong]: {
-        soDienMoi: String(room.SoDienGoiY),
-        soNuocMoi: String(room.SoNuocGoiY),
+        soDienMoi: String(room.SoDienGoiY ?? 0),
+        soNuocMoi: String(room.SoNuocGoiY ?? 0),
       },
     }));
   };
@@ -163,40 +168,61 @@ export default function ThemChiSoDienNuocPage() {
     return true;
   });
 
-  const filledRoomEntries = phongList.filter((room) => {
+  // Các phòng có gõ ít nhất 1 trong 2 ô (điện hoặc nước)
+  const touchedRoomEntries = phongList.filter((room) => {
     if (room.DaGhiThangNay) return false;
+    const entry = inputsByRoom[room.MaPhong];
+    return entry && (entry.soDienMoi !== '' || entry.soNuocMoi !== '');
+  });
+
+  // Các phòng đã điền đầy đủ cả 2 ô
+  const filledRoomEntries = touchedRoomEntries.filter((room) => {
     const entry = inputsByRoom[room.MaPhong];
     return entry && entry.soDienMoi !== '' && entry.soNuocMoi !== '';
   });
 
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAttemptedSubmit(true);
 
-    if (filledRoomEntries.length === 0) {
-      showError(
-        'Vui lòng nhập đầy đủ cả Số điện mới và Số nước mới cho ít nhất 1 phòng!'
+    if (!ngayGhi) {
+      setNgayGhiError('Vui lòng chọn ngày ghi sổ.');
+      return;
+    }
+    setNgayGhiError(null);
+
+    if (touchedRoomEntries.length === 0) {
+      setGlobalTableError(
+        'Vui lòng nhập đầy đủ Số điện mới và Số nước mới cho ít nhất 1 phòng trước khi lưu!'
       );
       return;
     }
 
-    for (const room of filledRoomEntries) {
+    // Kiểm tra xem có phòng nào nhập dở dang (chỉ nhập Điện mà quên nhập Nước hoặc ngược lại) hoặc nhỏ hơn số cũ không
+    let hasValidationError = false;
+    for (const room of touchedRoomEntries) {
       const entry = inputsByRoom[room.MaPhong];
-      const dienMoi = Number(entry.soDienMoi);
-      const nuocMoi = Number(entry.soNuocMoi);
-
       const dienCu = room.SoDienGoiY ?? 0;
-      if (dienMoi < dienCu) {
-        showError(
-          `${room.TenPhong}: Số điện mới (${dienMoi}) không được nhỏ hơn số điện cũ (${dienCu})!`
-        );
-      }
       const nuocCu = room.SoNuocGoiY ?? 0;
-      if (nuocMoi < nuocCu) {
-        showError(
-          `${room.TenPhong}: Số nước mới (${nuocMoi}) không được nhỏ hơn số nước cũ (${nuocCu})!`
-        );
+
+      if (entry.soDienMoi === '' || entry.soNuocMoi === '') {
+        hasValidationError = true;
+        continue;
+      }
+
+      if (Number(entry.soDienMoi) < dienCu || Number(entry.soNuocMoi) < nuocCu) {
+        hasValidationError = true;
       }
     }
+
+    if (hasValidationError) {
+      setGlobalTableError(
+        'Một số phòng đang nhập thiếu hoặc có chỉ số mới nhỏ hơn chỉ số cũ. Vui lòng kiểm tra các ô báo đỏ bên dưới!'
+      );
+      return;
+    }
+
+    setGlobalTableError(null);
 
     try {
       setSubmitting(true);
@@ -263,7 +289,7 @@ export default function ThemChiSoDienNuocPage() {
                 <button
                   type="button"
                   onClick={handleBulkSubmit}
-                  disabled={submitting || filledRoomEntries.length === 0}
+                  disabled={submitting}
                   className="px-6 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap"
                 >
                   {submitting
@@ -315,10 +341,15 @@ export default function ThemChiSoDienNuocPage() {
                   <input
                     type="date"
                     value={ngayGhi}
-                    onChange={(e) => setNgayGhi(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-xs font-bold bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                    required
+                    onChange={(e) => {
+                      setNgayGhi(e.target.value);
+                      if (e.target.value) setNgayGhiError(null);
+                    }}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-xs font-bold text-slate-900 focus:outline-none ${inputErrorClass(
+                      ngayGhiError
+                    )}`}
                   />
+                  <FormError message={ngayGhiError} />
                 </div>
 
                 {/* Cột 2: Chế độ hiển thị phòng */}
@@ -360,7 +391,7 @@ export default function ThemChiSoDienNuocPage() {
                 </div>
               </div>
 
-              {/* Cụm thống kê tiến độ nằm ngang gọn gàng bên phải */}
+              {/* Cụm thống kê tiến độ */}
               <div className="flex items-center gap-2.5 shrink-0 pt-1 lg:pt-0">
                 <div className="px-4 py-2.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-bold whitespace-nowrap">
                   Đã ghi: {soPhongDaGhiKhu}/{roomsInKhu.length} phòng
@@ -370,6 +401,13 @@ export default function ThemChiSoDienNuocPage() {
                 </div>
               </div>
             </div>
+
+            {/* Cảnh báo chung bằng thẻ <small> nếu người dùng bấm Lưu khi chưa nhập hoặc có ô lỗi */}
+            {globalTableError && (
+              <div className="mt-3 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
+                <FormError message={globalTableError} />
+              </div>
+            )}
 
             {/* Bảng nhập chỉ số nhanh */}
             {loading ? (
@@ -393,7 +431,7 @@ export default function ThemChiSoDienNuocPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleBulkSubmit} className="mt-5">
+              <form onSubmit={handleBulkSubmit} noValidate className="mt-5">
                 <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -404,13 +442,13 @@ export default function ThemChiSoDienNuocPage() {
                         <th className="py-3.5 px-3 font-bold whitespace-nowrap w-36 bg-slate-200/70">
                           Điện Cũ (kWh)
                         </th>
-                        <th className="py-3.5 px-3 font-bold whitespace-nowrap w-44 bg-amber-50">
+                        <th className="py-3.5 px-3 font-bold whitespace-nowrap w-48 bg-amber-50">
                           Điện Mới (kWh) *
                         </th>
                         <th className="py-3.5 px-3 font-bold whitespace-nowrap w-36 bg-slate-200/70">
                           Nước Cũ (m³)
                         </th>
-                        <th className="py-3.5 px-3 font-bold whitespace-nowrap w-44 bg-sky-50">
+                        <th className="py-3.5 px-3 font-bold whitespace-nowrap w-48 bg-sky-50">
                           Nước Mới (m³) *
                         </th>
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap">
@@ -437,19 +475,34 @@ export default function ThemChiSoDienNuocPage() {
                         const dienMoiNum = Number(entry.soDienMoi);
                         const nuocMoiNum = Number(entry.soNuocMoi);
 
-                        const errDien = hasDienMoi && dienMoiNum < dienCu;
-                        const errNuoc = hasNuocMoi && nuocMoiNum < nuocCu;
+                        // Phát hiện lỗi từng ô: Nhỏ hơn số cũ HOẶC nhập dở 1 bên khi đã bấm Lưu
+                        let dienErrorMsg: string | null = null;
+                        if (hasDienMoi && dienMoiNum < dienCu) {
+                          dienErrorMsg = `Nhỏ hơn số cũ (${dienCu})!`;
+                        } else if (attemptedSubmit && !hasDienMoi && hasNuocMoi) {
+                          dienErrorMsg = 'Vui lòng nhập số điện mới!';
+                        }
+
+                        let nuocErrorMsg: string | null = null;
+                        if (hasNuocMoi && nuocMoiNum < nuocCu) {
+                          nuocErrorMsg = `Nhỏ hơn số cũ (${nuocCu})!`;
+                        } else if (attemptedSubmit && !hasNuocMoi && hasDienMoi) {
+                          nuocErrorMsg = 'Vui lòng nhập số nước mới!';
+                        }
 
                         const dienTieuThu =
-                          hasDienMoi && !errDien ? dienMoiNum - dienCu : 0;
+                          hasDienMoi && !dienErrorMsg ? dienMoiNum - dienCu : 0;
                         const nuocTieuThu =
-                          hasNuocMoi && !errNuoc ? nuocMoiNum - nuocCu : 0;
+                          hasNuocMoi && !nuocErrorMsg ? nuocMoiNum - nuocCu : 0;
                         const tamTinh =
                           dienTieuThu * Number(giaHienTai.GiaDien) +
                           nuocTieuThu * Number(giaHienTai.GiaNuoc);
 
                         const isRowFilled =
-                          hasDienMoi && hasNuocMoi && !errDien && !errNuoc;
+                          hasDienMoi &&
+                          hasNuocMoi &&
+                          !dienErrorMsg &&
+                          !nuocErrorMsg;
 
                         return (
                           <tr
@@ -463,7 +516,7 @@ export default function ThemChiSoDienNuocPage() {
                             }`}
                           >
                             {/* Tên phòng & Trạng thái */}
-                            <td className="py-3 px-4 whitespace-nowrap">
+                            <td className="py-3 px-4 whitespace-nowrap align-top">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-900 text-sm">
                                   {room.TenPhong}
@@ -475,7 +528,9 @@ export default function ThemChiSoDienNuocPage() {
                                       : 'bg-slate-200 text-slate-700'
                                   }`}
                                 >
-                                  {room.TrangThai === 'DangThue' ? 'Đang thuê' : 'Trống'}
+                                  {room.TrangThai === 'DangThue'
+                                    ? 'Đang thuê'
+                                    : 'Trống'}
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-500 mt-0.5">
@@ -484,7 +539,7 @@ export default function ThemChiSoDienNuocPage() {
                             </td>
 
                             {/* Ô Số Điện Cũ - KHÓA CỨNG */}
-                            <td className="py-3 px-3 bg-slate-100/80 whitespace-nowrap">
+                            <td className="py-3 px-3 bg-slate-100/80 whitespace-nowrap align-top">
                               <input
                                 type="text"
                                 value={
@@ -499,8 +554,8 @@ export default function ThemChiSoDienNuocPage() {
                               />
                             </td>
 
-                            {/* Ô Số Điện Mới */}
-                            <td className="py-3 px-3 whitespace-nowrap">
+                            {/* Ô Số Điện Mới + Thẻ <small> báo lỗi */}
+                            <td className="py-3 px-3 whitespace-nowrap align-top">
                               {isRecorded && room.ChiSoThangNay ? (
                                 <input
                                   type="text"
@@ -532,23 +587,17 @@ export default function ThemChiSoDienNuocPage() {
                                       )
                                     }
                                     placeholder={`>= ${dienCu}`}
-                                    className={`w-full px-3 py-2 rounded-xl border text-sm font-bold bg-white focus:outline-none focus:ring-2 ${
-                                      errDien
-                                        ? 'border-red-500 text-red-600 focus:ring-red-300'
-                                        : 'border-slate-300 text-slate-900 focus:ring-[#00FFCC]'
-                                    }`}
+                                    className={`w-full px-3 py-2 rounded-xl border text-sm font-bold focus:outline-none transition ${inputErrorClass(
+                                      dienErrorMsg
+                                    )}`}
                                   />
-                                  {errDien && (
-                                    <span className="block text-[10px] font-bold text-red-600 mt-0.5">
-                                      Nhỏ hơn số cũ ({dienCu})!
-                                    </span>
-                                  )}
+                                  <FormError message={dienErrorMsg} />
                                 </div>
                               )}
                             </td>
 
                             {/* Ô Số Nước Cũ - KHÓA CỨNG */}
-                            <td className="py-3 px-3 bg-slate-100/80 whitespace-nowrap">
+                            <td className="py-3 px-3 bg-slate-100/80 whitespace-nowrap align-top">
                               <input
                                 type="text"
                                 value={
@@ -563,8 +612,8 @@ export default function ThemChiSoDienNuocPage() {
                               />
                             </td>
 
-                            {/* Ô Số Nước Mới */}
-                            <td className="py-3 px-3 whitespace-nowrap">
+                            {/* Ô Số Nước Mới + Thẻ <small> báo lỗi */}
+                            <td className="py-3 px-3 whitespace-nowrap align-top">
                               {isRecorded && room.ChiSoThangNay ? (
                                 <input
                                   type="text"
@@ -596,23 +645,17 @@ export default function ThemChiSoDienNuocPage() {
                                       )
                                     }
                                     placeholder={`>= ${nuocCu}`}
-                                    className={`w-full px-3 py-2 rounded-xl border text-sm font-bold bg-white focus:outline-none focus:ring-2 ${
-                                      errNuoc
-                                        ? 'border-red-500 text-red-600 focus:ring-red-300'
-                                        : 'border-slate-300 text-slate-900 focus:ring-[#00FFCC]'
-                                    }`}
+                                    className={`w-full px-3 py-2 rounded-xl border text-sm font-bold focus:outline-none transition ${inputErrorClass(
+                                      nuocErrorMsg
+                                    )}`}
                                   />
-                                  {errNuoc && (
-                                    <span className="block text-[10px] font-bold text-red-600 mt-0.5">
-                                      Nhỏ hơn số cũ ({nuocCu})!
-                                    </span>
-                                  )}
+                                  <FormError message={nuocErrorMsg} />
                                 </div>
                               )}
                             </td>
 
                             {/* Tiêu thụ & Thành tiền tạm tính */}
-                            <td className="py-3 px-4 whitespace-nowrap">
+                            <td className="py-3 px-4 whitespace-nowrap align-top">
                               {isRecorded && room.ChiSoThangNay ? (
                                 <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
                                   ✓ Đã ghi kỳ này
@@ -640,7 +683,7 @@ export default function ThemChiSoDienNuocPage() {
                             </td>
 
                             {/* Thao tác nhanh */}
-                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                            <td className="py-3 px-4 text-right whitespace-nowrap align-top">
                               {isRecorded && room.ChiSoThangNay ? (
                                 <button
                                   type="button"
@@ -702,7 +745,7 @@ export default function ThemChiSoDienNuocPage() {
                     </button>
                     <button
                       type="submit"
-                      disabled={submitting || filledRoomEntries.length === 0}
+                      disabled={submitting}
                       className="px-8 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
                     >
                       {submitting

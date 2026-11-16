@@ -18,7 +18,7 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
   const { showConfirm, showSuccess, showError } = useAlertModal();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const roleLabel = 'Khách thuê phòng';
+  const roleLabel = 'Khách Thuê Phòng';
 
   // Danh sách các trang khớp với cấu trúc thư mục trong /nguoiThue
   const navItems = [

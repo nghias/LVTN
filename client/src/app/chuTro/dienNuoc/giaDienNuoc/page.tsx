@@ -1,18 +1,30 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, FormEvent } from 'react';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import QuanLyHeader from '@/components/layout/QuanLyHeader';
 import CurrencyInput from '@/components/common/CurrencyInput';
+import { FormField } from '@/components/common/FormPrimitives';
 import { useAlertModal } from '@/components/common/AlertModalProvider';
 import { dienNuocService, GiaDienNuocItem } from '@/services/dienNuoc.service';
+import {
+  Validators,
+  useFormValidation,
+  inputErrorClass,
+} from '@/utils/formValidation';
 
 const cleanDecimal = (val: unknown): string => {
   if (val === null || val === undefined || val === '') return '';
   const num = Math.round(Number(val));
   return Number.isNaN(num) ? '' : String(num);
 };
+
+interface GiaDienNuocFormValues {
+  giaDien: string;
+  giaNuoc: string;
+  ngayApDung: string;
+}
 
 export default function CapNhatGiaDienNuocPage() {
   const { showSuccess, showError, showConfirm } = useAlertModal();
@@ -27,6 +39,25 @@ export default function CapNhatGiaDienNuocPage() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Khai báo bộ luật validation cho Đơn giá Điện, Nước và Ngày áp dụng
+  const validationRules = useMemo(
+    () => ({
+      giaDien: [
+        Validators.required('đơn giá điện (VNĐ/kWh)'),
+        Validators.positiveNumber('Đơn giá điện', 1000),
+      ],
+      giaNuoc: [
+        Validators.required('đơn giá nước (VNĐ/m³)'),
+        Validators.positiveNumber('Đơn giá nước', 1000),
+      ],
+      ngayApDung: [Validators.required('ngày bắt đầu áp dụng')],
+    }),
+    []
+  );
+
+  const { errors, setErrors, validateField, validateAll } =
+    useFormValidation<GiaDienNuocFormValues>(validationRules);
 
   const formatVND = (val: number | string) => {
     const num = Math.round(Number(val) || 0);
@@ -64,11 +95,11 @@ export default function CapNhatGiaDienNuocPage() {
     fetchGia();
   }, [fetchGia]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!giaDien || !giaNuoc || !ngayApDung) {
-      showError('Vui lòng nhập đầy đủ Đơn giá điện, Đơn giá nước và Ngày áp dụng!');
+    // Kiểm tra toàn bộ các ô input và hiển thị thẻ <small> dưới từng ô nếu có lỗi
+    if (!validateAll({ giaDien, giaNuoc, ngayApDung })) {
       return;
     }
 
@@ -87,6 +118,7 @@ export default function CapNhatGiaDienNuocPage() {
       if (res.success) {
         showSuccess(res.message || 'Cập nhật đơn giá điện nước thành công!');
         setEditingId(null);
+        setErrors({});
         fetchGia();
       } else {
         showError(res.message || 'Không thể lưu đơn giá điện nước');
@@ -103,11 +135,14 @@ export default function CapNhatGiaDienNuocPage() {
     setGiaDien(cleanDecimal(item.GiaDien));
     setGiaNuoc(cleanDecimal(item.GiaNuoc));
     setNgayApDung(item.NgayApDung);
+    setErrors({});
   };
 
   const handleDeleteItem = (item: GiaDienNuocItem) => {
     showConfirm(
-      `Bạn có chắc chắn muốn xóa mốc giá áp dụng ngày ${formatDateVN(item.NgayApDung)} không?`,
+      `Bạn có chắc chắn muốn xóa mốc giá áp dụng ngày ${formatDateVN(
+        item.NgayApDung
+      )} không?`,
       'Xác nhận xóa mốc giá',
       async () => {
         try {
@@ -152,6 +187,7 @@ export default function CapNhatGiaDienNuocPage() {
             {/* Biểu mẫu Cập nhật / Thêm mốc giá mới */}
             <form
               onSubmit={handleSubmit}
+              noValidate
               className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 shadow-xs space-y-5"
             >
               <div className="flex items-center justify-between">
@@ -165,6 +201,7 @@ export default function CapNhatGiaDienNuocPage() {
                     type="button"
                     onClick={() => {
                       setEditingId(null);
+                      setErrors({});
                       setNgayApDung(new Date().toISOString().split('T')[0]);
                     }}
                     className="text-xs font-bold text-slate-500 hover:text-slate-900 cursor-pointer"
@@ -175,42 +212,66 @@ export default function CapNhatGiaDienNuocPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Đơn giá Điện (VNĐ/kWh) <span className="text-red-500">*</span>
-                  </label>
+                <FormField
+                  label="Đơn giá Điện (VNĐ/kWh)"
+                  required
+                  error={errors.giaDien}
+                >
                   <CurrencyInput
                     value={giaDien}
-                    onChange={setGiaDien}
+                    onChange={(val) => {
+                      setGiaDien(val);
+                      validateField('giaDien', val);
+                    }}
                     placeholder="VD: 3.800"
                     suffix="đ/kWh"
+                    className={
+                      errors.giaDien
+                        ? 'border-red-500 bg-red-50/30 focus:ring-red-300'
+                        : ''
+                    }
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Đơn giá Nước (VNĐ/m³) <span className="text-red-500">*</span>
-                  </label>
+                <FormField
+                  label="Đơn giá Nước (VNĐ/m³)"
+                  required
+                  error={errors.giaNuoc}
+                >
                   <CurrencyInput
                     value={giaNuoc}
-                    onChange={setGiaNuoc}
+                    onChange={(val) => {
+                      setGiaNuoc(val);
+                      validateField('giaNuoc', val);
+                    }}
                     placeholder="VD: 18.000"
                     suffix="đ/m³"
+                    className={
+                      errors.giaNuoc
+                        ? 'border-red-500 bg-red-50/30 focus:ring-red-300'
+                        : ''
+                    }
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Ngày bắt đầu áp dụng <span className="text-red-500">*</span>
-                  </label>
+                <FormField
+                  label="Ngày bắt đầu áp dụng"
+                  required
+                  error={errors.ngayApDung}
+                >
                   <input
                     type="date"
                     value={ngayApDung}
-                    onChange={(e) => setNgayApDung(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                    required
+                    onChange={(e) => {
+                      setNgayApDung(e.target.value);
+                      validateField('ngayApDung', e.target.value);
+                    }}
+                    onBlur={() => validateField('ngayApDung', ngayApDung)}
+                    className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none transition ${inputErrorClass(
+                      errors.ngayApDung
+                    )}`}
                   />
-                </div>
+                </FormField>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -252,7 +313,10 @@ export default function CapNhatGiaDienNuocPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-xs">
                       {lichSuGia.map((item, idx) => (
-                        <tr key={item.MaGia} className="hover:bg-slate-50/80 transition">
+                        <tr
+                          key={item.MaGia}
+                          className="hover:bg-slate-50/80 transition"
+                        >
                           <td className="py-4 px-4 font-bold text-amber-700">
                             {formatVND(item.GiaDien)} / kWh
                           </td>

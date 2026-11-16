@@ -5,19 +5,17 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/common/ProtectedRoute';
 import QuanLyHeader from '@/components/layout/QuanLyHeader';
-import CurrencyInput from '@/components/common/CurrencyInput';
+import PhatSinhRowsEditor, {
+  PhatSinhDraftItem,
+  validatePhatSinhRow,
+} from '@/components/hoaDon/PhatSinhRowsEditor';
 import { useAlertModal } from '@/components/common/AlertModalProvider';
+import { FormError, inputErrorClass } from '@/utils/formValidation';
 import {
   hoaDonService,
   KhuTroOption,
   PhongTinhHoaDonPreview,
 } from '@/services/hoaDon.service';
-
-interface DraftPhatSinh {
-  TenPS: string;
-  Gia: string;
-  GhiChu: string;
-}
 
 function TaoHoaDonThangContent() {
   const router = useRouter();
@@ -30,15 +28,20 @@ function TaoHoaDonThangContent() {
   const [ngayTinh, setNgayTinh] = useState<string>(() =>
     new Date().toISOString().slice(0, 10)
   );
+  const [thangNamError, setThangNamError] = useState<string | null>(null);
+  const [ngayTinhError, setNgayTinhError] = useState<string | null>(null);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+  const [attemptedSubmit, setAttemptedSubmit] = useState<boolean>(false);
+
   const [selectedMaKhu, setSelectedMaKhu] = useState<number>(0);
 
   const [khuTroList, setKhuTroList] = useState<KhuTroOption[]>([]);
   const [danhSachPhong, setDanhSachPhong] = useState<PhongTinhHoaDonPreview[]>([]);
   const [selectedRoomIds, setSelectedRoomIds] = useState<number[]>([]);
 
-  // Lưu danh sách phí phát sinh thêm nhanh theo từng phòng: { [MaPhong]: DraftPhatSinh[] }
+  // Lưu danh sách phí phát sinh thêm nhanh theo từng phòng: { [MaPhong]: PhatSinhDraftItem[] }
   const [phatSinhByRoom, setPhatSinhByRoom] = useState<
-    Record<number, DraftPhatSinh[]>
+    Record<number, PhatSinhDraftItem[]>
   >({});
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -51,6 +54,7 @@ function TaoHoaDonThangContent() {
 
   const fetchPreview = useCallback(
     async (kyThang: string, maKhu: number) => {
+      if (!kyThang) return;
       try {
         setLoading(true);
         const res = await hoaDonService.getDuLieuTaoThang({
@@ -64,7 +68,6 @@ function TaoHoaDonThangContent() {
           setDanhSachPhong(rooms);
           setKhuTroList(khus);
 
-          // Tự động chọn tất cả các phòng ĐỦ ĐIỀU KIỆN tạo hóa đơn
           const eligibleIds = rooms
             .filter((r) => r.TrangThaiTao === 'DU_DIEU_KIEN')
             .map((r) => r.MaPhong);
@@ -88,6 +91,7 @@ function TaoHoaDonThangContent() {
   }, [thangNam, selectedMaKhu, fetchPreview]);
 
   const toggleSelectRoom = (maPhong: number) => {
+    setGlobalError(null);
     setSelectedRoomIds((prev) =>
       prev.includes(maPhong)
         ? prev.filter((id) => id !== maPhong)
@@ -108,9 +112,10 @@ function TaoHoaDonThangContent() {
   const updatePhatSinhRow = (
     maPhong: number,
     index: number,
-    field: keyof DraftPhatSinh,
+    field: keyof PhatSinhDraftItem,
     value: string
   ) => {
+    setGlobalError(null);
     setPhatSinhByRoom((prev) => {
       const list = [...(prev[maPhong] || [])];
       list[index] = { ...list[index], [field]: value };
@@ -119,6 +124,7 @@ function TaoHoaDonThangContent() {
   };
 
   const removePhatSinhRow = (maPhong: number, index: number) => {
+    setGlobalError(null);
     setPhatSinhByRoom((prev) => {
       const list = [...(prev[maPhong] || [])];
       list.splice(index, 1);
@@ -128,16 +134,54 @@ function TaoHoaDonThangContent() {
 
   const getRoomPhatSinhTotal = (maPhong: number) => {
     const list = phatSinhByRoom[maPhong] || [];
-    return list.reduce((sum, item) => sum + (Math.round(Number(item.Gia)) || 0), 0);
+    return list.reduce(
+      (sum, item) => sum + (Math.round(Number(item.Gia)) || 0),
+      0
+    );
   };
 
   const handleCreateInvoices = async (singleRoomId?: number) => {
+    setAttemptedSubmit(true);
+
+    if (!thangNam) {
+      setThangNamError('Vui lòng chọn kỳ tính hóa đơn (Tháng/Năm).');
+      return;
+    }
+    setThangNamError(null);
+
+    if (!ngayTinh) {
+      setNgayTinhError('Vui lòng chọn ngày lập hóa đơn.');
+      return;
+    }
+    setNgayTinhError(null);
+
     const targetIds = singleRoomId ? [singleRoomId] : selectedRoomIds;
 
     if (targetIds.length === 0) {
-      showError('Vui lòng chọn ít nhất 1 phòng đủ điều kiện để tạo hóa đơn!');
+      setGlobalError(
+        'Vui lòng tích chọn ít nhất 1 phòng đủ điều kiện để tạo hóa đơn!'
+      );
       return;
     }
+
+    // Kiểm tra các dòng phí phát sinh của những phòng được chọn tạo hóa đơn
+    for (const maPhong of targetIds) {
+      const psList = phatSinhByRoom[maPhong] || [];
+      for (const ps of psList) {
+        const { hasError } = validatePhatSinhRow(ps, true);
+        if (hasError) {
+          const roomObj = danhSachPhong.find((r) => r.MaPhong === maPhong);
+          setGlobalError(
+            `${
+              roomObj?.TenPhong || `Phòng #${maPhong}`
+            }: Khoản phí phát sinh chưa nhập đầy đủ Tên hoặc Số tiền (>= 1.000 VNĐ). Hãy kiểm tra các ô báo đỏ bên dưới hoặc bấm "Bỏ" nếu không dùng!`
+          );
+          return;
+        }
+      }
+    }
+
+    setGlobalError(null);
 
     const payloadRooms = targetIds.map((maPhong) => {
       const psList = (phatSinhByRoom[maPhong] || [])
@@ -163,6 +207,7 @@ function TaoHoaDonThangContent() {
       });
 
       if (res.success) {
+        setAttemptedSubmit(false);
         showSuccess(
           res.message || 'Tạo hóa đơn hàng tháng thành công!',
           'Thành công',
@@ -192,7 +237,8 @@ function TaoHoaDonThangContent() {
     (r) => r.TrangThaiTao === 'DA_TAO'
   );
   const missingIndexRooms = danhSachPhong.filter(
-    (r) => r.TrangThaiTao === 'CHUA_CO_CHI_SO' || r.TrangThaiTao === 'CHI_SO_LOI'
+    (r) =>
+      r.TrangThaiTao === 'CHUA_CO_CHI_SO' || r.TrangThaiTao === 'CHI_SO_LOI'
   );
 
   return (
@@ -221,7 +267,7 @@ function TaoHoaDonThangContent() {
 
               <button
                 type="button"
-                disabled={submitting || selectedRoomIds.length === 0}
+                disabled={submitting}
                 onClick={() => handleCreateInvoices()}
                 className="px-6 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 transition"
               >
@@ -240,9 +286,15 @@ function TaoHoaDonThangContent() {
                 <input
                   type="month"
                   value={thangNam}
-                  onChange={(e) => setThangNam(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  onChange={(e) => {
+                    setThangNam(e.target.value);
+                    if (e.target.value) setThangNamError(null);
+                  }}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-bold focus:outline-none transition ${inputErrorClass(
+                    thangNamError
+                  )}`}
                 />
+                <FormError message={thangNamError} />
               </div>
 
               <div>
@@ -252,9 +304,15 @@ function TaoHoaDonThangContent() {
                 <input
                   type="date"
                   value={ngayTinh}
-                  onChange={(e) => setNgayTinh(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  onChange={(e) => {
+                    setNgayTinh(e.target.value);
+                    if (e.target.value) setNgayTinhError(null);
+                  }}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-bold focus:outline-none transition ${inputErrorClass(
+                    ngayTinhError
+                  )}`}
                 />
+                <FormError message={ngayTinhError} />
               </div>
 
               <div>
@@ -277,6 +335,13 @@ function TaoHoaDonThangContent() {
                 </select>
               </div>
             </div>
+
+            {/* Cảnh báo chung bằng thẻ <small> nếu chưa chọn phòng hoặc nhập thiếu phí phát sinh */}
+            {globalError && (
+              <div className="px-4 py-3 rounded-2xl bg-red-50 border border-red-200">
+                <FormError message={globalError} />
+              </div>
+            )}
 
             {/* Thống kê điều kiện tạo hóa đơn trong tháng */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -333,9 +398,12 @@ function TaoHoaDonThangContent() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() =>
-                          setSelectedRoomIds(eligibleRooms.map((r) => r.MaPhong))
-                        }
+                        onClick={() => {
+                          setGlobalError(null);
+                          setSelectedRoomIds(
+                            eligibleRooms.map((r) => r.MaPhong)
+                          );
+                        }}
                         className="px-3 py-1.5 rounded-lg bg-[#00FFCC]/30 text-slate-900 text-xs font-bold cursor-pointer"
                       >
                         Chọn tất cả phòng đủ điều kiện
@@ -371,6 +439,14 @@ function TaoHoaDonThangContent() {
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
+                          {isEligible && (
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleSelectRoom(room.MaPhong)}
+                              className="w-5 h-5 accent-teal-600 cursor-pointer"
+                            />
+                          )}
 
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
@@ -410,7 +486,7 @@ function TaoHoaDonThangContent() {
                                 onClick={() => addPhatSinhRow(room.MaPhong)}
                                 className="px-3.5 py-1.5 rounded-full border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold cursor-pointer"
                               >
-                                Thêm phí phát sinh
+                                + Thêm phí phát sinh
                               </button>
                               <button
                                 type="button"
@@ -449,7 +525,9 @@ function TaoHoaDonThangContent() {
                       {room.TrangThaiTao !== 'CHUA_CO_CHI_SO' && (
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2 border-t border-slate-100 text-xs">
                           <div className="p-3 rounded-2xl bg-slate-50">
-                            <p className="font-bold text-slate-500">1. Tiền phòng</p>
+                            <p className="font-bold text-slate-500">
+                              1. Tiền phòng
+                            </p>
                             <p className="text-sm font-bold text-slate-900 mt-1">
                               {formatVND(room.TienPhong)}
                             </p>
@@ -499,77 +577,22 @@ function TaoHoaDonThangContent() {
                         </div>
                       )}
 
-                      {/* Khu vực thêm nhanh Phí phát sinh khi tạo */}
+                      {/* Khu vực thêm nhanh Phí phát sinh khi tạo (Tái sử dụng PhatSinhRowsEditor) */}
                       {isEligible && psList.length > 0 && (
                         <div className="pt-3 border-t border-slate-200 space-y-2">
                           <p className="text-xs font-bold text-slate-700">
                             Khoản phí phát sinh kèm theo ({psList.length}):
                           </p>
-                          {psList.map((ps, idx) => (
-                            <div
-                              key={idx}
-                              className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
-                            >
-                              <div className="sm:col-span-4">
-                                <input
-                                  type="text"
-                                  value={ps.TenPS}
-                                  onChange={(e) =>
-                                    updatePhatSinhRow(
-                                      room.MaPhong,
-                                      idx,
-                                      'TenPS',
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Tên khoản phát sinh (VD: Sửa bóng đèn...)"
-                                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold"
-                                />
-                              </div>
-                              <div className="sm:col-span-3">
-                                <CurrencyInput
-                                  value={ps.Gia}
-                                  onChange={(val) =>
-                                    updatePhatSinhRow(
-                                      room.MaPhong,
-                                      idx,
-                                      'Gia',
-                                      val
-                                    )
-                                  }
-                                  placeholder="Số tiền"
-                                  suffix="VNĐ"
-                                />
-                              </div>
-                              <div className="sm:col-span-4">
-                                <input
-                                  type="text"
-                                  value={ps.GhiChu}
-                                  onChange={(e) =>
-                                    updatePhatSinhRow(
-                                      room.MaPhong,
-                                      idx,
-                                      'GhiChu',
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Ghi chú thêm..."
-                                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold"
-                                />
-                              </div>
-                              <div className="sm:col-span-1 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    removePhatSinhRow(room.MaPhong, idx)
-                                  }
-                                  className="px-2.5 py-2 rounded-xl bg-red-100 text-red-700 text-xs font-bold cursor-pointer"
-                                >
-                                  Bỏ
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                          <PhatSinhRowsEditor
+                            items={psList}
+                            showValidation={attemptedSubmit}
+                            onChange={(idx, field, val) =>
+                              updatePhatSinhRow(room.MaPhong, idx, field, val)
+                            }
+                            onRemove={(idx) =>
+                              removePhatSinhRow(room.MaPhong, idx)
+                            }
+                          />
                         </div>
                       )}
                     </div>

@@ -25,9 +25,8 @@ function NoiDungChiTietHopDong() {
     (params?.id as string);
   const maHDT = rawId ? Number(rawId) : null;
 
-  // Ref dùng riêng cho việc xuất file PDF chuẩn khổ A4 (không bị ảnh hưởng bởi scale trên điện thoại)
+  // Ref dùng riêng cho việc xuất file PDF chuẩn khổ A4
   const pdfExportRef = useRef<HTMLDivElement>(null);
-  // Ref đo chiều cao thực tế của tờ giấy A4 để co giãn khung bao ngoài trên điện thoại
   const paperContentRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
@@ -35,10 +34,10 @@ function NoiDungChiTietHopDong() {
   const [dangTaiDuLieu, setDangTaiDuLieu] = useState<boolean>(true);
 
   const [tabHienThi, setTabHienThi] = useState<"HOP_DONG" | "HOA_DON">(
-    "HOP_DONG",
+    "HOP_DONG"
   );
   const [cheDoXem, setCheDoXem] = useState<"TRUC_TIEP" | "PDF_EMBED">(
-    "TRUC_TIEP",
+    "TRUC_TIEP"
   );
   const [laManHinhNho, setLaManHinhNho] = useState<boolean>(false);
   const [tyLeThuPhong, setTyLeThuPhong] = useState<number>(1);
@@ -79,7 +78,7 @@ function NoiDungChiTietHopDong() {
         router.back();
       })
       .finally(() => setDangTaiDuLieu(false));
-  }, [maHDT]);
+  }, [maHDT, router]);
 
   // 2. Tính toán tỷ lệ co giãn tờ giấy A4 trên màn hình điện thoại
   useEffect(() => {
@@ -88,7 +87,6 @@ function NoiDungChiTietHopDong() {
       const isMobile = width < 850;
       setLaManHinhNho(isMobile);
 
-      // Trên điện thoại luôn ưu tiên xem trực tiếp vì trình duyệt mobile chặn iframe PDF blob
       if (isMobile) {
         setCheDoXem("TRUC_TIEP");
       }
@@ -98,7 +96,10 @@ function NoiDungChiTietHopDong() {
         previewContainerRef.current?.clientWidth || width - 16;
 
       if (isMobile && cheDoPhongToMobile === "VUA_MAN_HINH") {
-        const scale = Math.min(1, Math.max(0.38, (containerWidth - 16) / A4_WIDTH_PX));
+        const scale = Math.min(
+          1,
+          Math.max(0.38, (containerWidth - 16) / A4_WIDTH_PX)
+        );
         setTyLeThuPhong(scale);
       } else {
         setTyLeThuPhong(1);
@@ -114,7 +115,6 @@ function NoiDungChiTietHopDong() {
     return () => window.removeEventListener("resize", capNhatKichThuocManHinh);
   }, [hopDong, tabHienThi, maNDDungTen, cheDoPhongToMobile, cheDoXem]);
 
-  // Cập nhật lại chiều cao giấy sau khi dữ liệu render xong
   useEffect(() => {
     if (!paperContentRef.current) return;
     const timer = setTimeout(() => {
@@ -166,14 +166,13 @@ function NoiDungChiTietHopDong() {
     },
   });
 
-  // 3. Tạo bản xem trước PDF khi người dùng ở máy tính và bật tab PDF Viewer
   const taoPdfPreview = async () => {
     if (!pdfExportRef.current || !hopDong || laManHinhNho) return;
     setDangTaoPdf(true);
     try {
       const html2pdfModule = (await import("html2pdf.js")).default;
       const opt = layCauHinhHtml2Pdf(
-        `HopDong_${hopDong.TenPhong}_HD${hopDong.MaHDT}.pdf`,
+        `HopDong_${hopDong.TenPhong}_HD${hopDong.MaHDT}.pdf`
       );
 
       const pdfBlob = await html2pdfModule()
@@ -213,7 +212,6 @@ function NoiDungChiTietHopDong() {
     tatCaThanhVien.find((tv) => tv.VaiTro === "DaiDien") ||
     tatCaThanhVien[0];
 
-  // 4. Tải file PDF A4 về máy (hoạt động trên cả điện thoại và máy tính)
   const xuLyTaiFilePdf = async () => {
     if (!pdfExportRef.current || !hopDong) return;
     setDangTaiVe(true);
@@ -221,7 +219,9 @@ function NoiDungChiTietHopDong() {
       const html2pdfModule = (await import("html2pdf.js")).default;
       const tenFile =
         tabHienThi === "HOP_DONG"
-          ? `HopDong_${hopDong.TenPhong}_${nguoiDaiDien?.HoTen || "HD" + hopDong.MaHDT}.pdf`
+          ? `HopDong_${hopDong.TenPhong}_${
+              nguoiDaiDien?.HoTen || "HD" + hopDong.MaHDT
+            }.pdf`
           : `HoaDon_${hopDong.TenPhong}_HD${hopDong.MaHDT}.pdf`;
 
       await html2pdfModule()
@@ -246,12 +246,11 @@ function NoiDungChiTietHopDong() {
             {/* Thanh điều hướng & công cụ trên cùng */}
             <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs sm:p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {/* Cột trái: Nút quay lại & Tiêu đề */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
                   <button
                     type="button"
                     onClick={() => router.back()}
-                    className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full text-nowrap border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                    className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 whitespace-nowrap"
                   >
                     ← Quay lại
                   </button>
@@ -259,21 +258,19 @@ function NoiDungChiTietHopDong() {
                   {hopDong && (
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-base font-abold text-slate-900 sm:text-xl">
+                        <h1 className="text-base font-bold text-slate-900 sm:text-xl">
                           Hợp Đồng Thuê Phòng
                         </h1>
                         <span className="rounded-full border border-[#00FFCC] bg-[#00FFCC]/30 px-2.5 py-0.5 text-[11px] font-bold text-slate-900">
-                          {nfc(hopDong.TenPhong)} • {nfc(hopDong.TenKhu)}
+                          {nfc(hopDong.TenPhong)} {nfc(hopDong.TenKhu)}
                         </span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Cột phải: Các nút thao tác */}
                 {hopDong && (
                   <div className="flex flex-wrap items-center gap-2">
-                    {/* Chọn người đứng tên nếu phòng có nhiều thành viên */}
                     {tatCaThanhVien.length > 1 && (
                       <div className="flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:w-auto">
                         <span className="font-semibold text-slate-600">
@@ -299,7 +296,6 @@ function NoiDungChiTietHopDong() {
                       </div>
                     )}
 
-                    {/* Chuyển đổi Mẫu Hợp đồng / Mẫu Hóa đơn */}
                     <div className="flex w-full rounded-xl bg-slate-100 p-1 text-xs sm:w-auto">
                       <button
                         type="button"
@@ -325,7 +321,6 @@ function NoiDungChiTietHopDong() {
                       </button>
                     </div>
 
-                    {/* Nút thu phóng dành riêng cho Điện thoại */}
                     {laManHinhNho ? (
                       <button
                         type="button"
@@ -333,7 +328,7 @@ function NoiDungChiTietHopDong() {
                           setCheDoPhongToMobile(
                             cheDoPhongToMobile === "VUA_MAN_HINH"
                               ? "GOC_100"
-                              : "VUA_MAN_HINH",
+                              : "VUA_MAN_HINH"
                           )
                         }
                         className="cursor-pointer rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
@@ -343,14 +338,13 @@ function NoiDungChiTietHopDong() {
                           : "📱 Thu vừa màn hình"}
                       </button>
                     ) : (
-                      /* Nút chuyển chế độ xem trên Máy tính */
                       <button
                         type="button"
                         onClick={() =>
                           setCheDoXem(
                             cheDoXem === "PDF_EMBED"
                               ? "TRUC_TIEP"
-                              : "PDF_EMBED",
+                              : "PDF_EMBED"
                           )
                         }
                         className="cursor-pointer rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-200"
@@ -361,16 +355,13 @@ function NoiDungChiTietHopDong() {
                       </button>
                     )}
 
-                    {/* Nút tải PDF */}
                     <button
                       type="button"
                       onClick={xuLyTaiFilePdf}
                       disabled={dangTaiVe}
                       className="flex-1 cursor-pointer rounded-xl bg-[#00F5C4] px-4 py-2 text-center text-xs font-bold text-[#0F172A] shadow-2xs transition hover:bg-[#00E0B0] disabled:opacity-60 sm:flex-initial"
                     >
-                      {dangTaiVe
-                        ? "Đang tạo PDF..."
-                        : "⬇ Tải hợp đồng (PDF A4)"}
+                      {dangTaiVe ? "Đang tạo PDF..." : "⬇ Tải hợp đồng (PDF A4)"}
                     </button>
                   </div>
                 )}
@@ -390,7 +381,6 @@ function NoiDungChiTietHopDong() {
                 ref={previewContainerRef}
                 className="relative w-full overflow-x-auto rounded-2xl"
               >
-                {/* Chế độ 1: PDF Viewer (Chỉ dùng trên màn hình lớn) */}
                 {cheDoXem === "PDF_EMBED" && !laManHinhNho ? (
                   <div className="h-[82vh] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                     {dangTaoPdf ? (
@@ -409,7 +399,6 @@ function NoiDungChiTietHopDong() {
                     ) : null}
                   </div>
                 ) : (
-                  /* Chế độ 2: Trang A4 trực tiếp (Tự động co giãn vừa khít màn hình điện thoại) */
                   <div
                     className="mx-auto flex justify-center overflow-x-auto py-2 sm:py-4"
                     style={{
@@ -441,7 +430,7 @@ function NoiDungChiTietHopDong() {
                   </div>
                 )}
 
-                {/* Khung A4 ẩn chuẩn kích thước 177mm dùng riêng cho html2pdf khi bấm Tải PDF */}
+                {/* Khung A4 ẩn chuẩn kích thước dùng riêng cho html2pdf khi bấm Tải PDF */}
                 <div className="pointer-events-none fixed top-0 -left-[9999px] w-[177mm] bg-white text-black">
                   <HopDongA4View
                     hopDong={hopDong}

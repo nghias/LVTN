@@ -1,13 +1,17 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import ProtectedRoute from '@/components/common/ProtectedRoute';
-import QuanLyHeader from '@/components/layout/QuanLyHeader';
+import FormPageLayout from '@/components/common/FormPageLayout';
+import { FormField, FormActions } from '@/components/common/FormPrimitives';
 import CurrencyInput from '@/components/common/CurrencyInput';
 import { useAlertModal } from '@/components/common/AlertModalProvider';
 import { dichVuService } from '@/services/dichVu.service';
+import {
+  Validators,
+  useFormValidation,
+  inputErrorClass,
+} from '@/utils/formValidation';
 
 // Làm sạch đuôi thập phân .00 từ kiểu DECIMAL(18,2) của MySQL
 const cleanDecimalString = (val: unknown): string => {
@@ -15,6 +19,13 @@ const cleanDecimalString = (val: unknown): string => {
   const num = Math.round(Number(val));
   return Number.isNaN(num) ? '' : String(num);
 };
+
+interface SuaPhiDichVuFormValues {
+  tenDV: string;
+  donGia: string;
+  donViTinh: string;
+  moTa: string;
+}
 
 export default function SuaPhiDichVuPage() {
   const params = useParams();
@@ -30,6 +41,30 @@ export default function SuaPhiDichVuPage() {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Khai báo bộ luật validation đồng bộ với trang Thêm Phí Dịch Vụ
+  const validationRules = useMemo(
+    () => ({
+      tenDV: [
+        Validators.required('tên phí dịch vụ'),
+        Validators.minLength('Tên phí dịch vụ', 2),
+        Validators.maxLength('Tên phí dịch vụ', 100),
+      ],
+      donGia: [
+        Validators.required('đơn giá dịch vụ (VNĐ)'),
+        Validators.positiveNumber('Đơn giá dịch vụ', 1000),
+      ],
+      donViTinh: [
+        Validators.required('đơn vị tính (VD: Tháng, Xe/Tháng...)'),
+        Validators.maxLength('Đơn vị tính', 50),
+      ],
+      moTa: [Validators.maxLength('Mô tả chi tiết', 500)],
+    }),
+    []
+  );
+
+  const { errors, validateField, validateAll } =
+    useFormValidation<SuaPhiDichVuFormValues>(validationRules);
 
   useEffect(() => {
     if (!maDV) return;
@@ -59,11 +94,11 @@ export default function SuaPhiDichVuPage() {
     fetchDetail();
   }, [maDV, router, showError]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!tenDV.trim() || !donGia || !donViTinh.trim()) {
-      showError('Vui lòng nhập đầy đủ Tên dịch vụ, Đơn giá và Đơn vị tính!');
+    // Kiểm tra toàn bộ các trường input và hiển thị thẻ <small> dưới từng ô nếu có lỗi
+    if (!validateAll({ tenDV, donGia, donViTinh, moTa })) {
       return;
     }
 
@@ -96,124 +131,129 @@ export default function SuaPhiDichVuPage() {
   };
 
   return (
-    <ProtectedRoute allowedRoles={['ChuTro', 'QuanLy']}>
-      {(user) => (
-        <div className="min-h-screen flex flex-col bg-white text-slate-900">
-          <QuanLyHeader user={user} />
+    <FormPageLayout
+      allowedRoles={['ChuTro', 'QuanLy']}
+      backHref="/chuTro/phiDichVu"
+      backLabel="Quay lại danh sách Phí dịch vụ"
+      title="Chỉnh Sửa Phí Dịch Vụ"
+      subtitle="Cập nhật tên, đơn giá, đơn vị tính hoặc mô tả cho khoản phí dịch vụ này."
+      maxWidth="max-w-3xl"
+      loading={loading}
+      loadingText="Đang tải thông tin phí dịch vụ..."
+    >
+      {() => (
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 shadow-xs space-y-6"
+        >
+          {/* Huy hiệu thông báo số hợp đồng đang áp dụng */}
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <span className="text-xs font-bold text-slate-600">
+              Mã dịch vụ: #{maDV}
+            </span>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC]/30 text-slate-900 border border-[#00FFCC]">
+              Đang áp dụng cho {soHopDongApDung} hợp đồng
+            </span>
+          </div>
 
-          <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-            <div className="mb-6">
-              <Link
-                href="/chuTro/phiDichVu"
-                className="text-xs font-bold text-slate-600 hover:text-slate-900 no-underline"
-              >
-                ← Quay lại danh sách Phí dịch vụ
-              </Link>
-              <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                  Chỉnh Sửa Phí Dịch Vụ
-                </h1>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC]/30 text-slate-900 border border-[#00FFCC]">
-                  Đang áp dụng cho {soHopDongApDung} hợp đồng
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Cập nhật tên, đơn giá, đơn vị tính hoặc mô tả cho khoản phí dịch vụ này.
-              </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-1">
+              <FormField label="Tên phí dịch vụ" required error={errors.tenDV}>
+                <input
+                  type="text"
+                  value={tenDV}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTenDV(val);
+                    if (errors.tenDV) validateField('tenDV', val);
+                  }}
+                  onBlur={() => validateField('tenDV', tenDV)}
+                  placeholder="VD: WiFi tốc độ cao, Giữ xe máy..."
+                  className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none transition ${inputErrorClass(
+                    errors.tenDV
+                  )}`}
+                />
+              </FormField>
             </div>
 
-            {loading ? (
-              <div className="py-16 text-center text-slate-500 text-sm font-medium">
-                Đang tải thông tin phí dịch vụ...
-              </div>
-            ) : (
-              <form
-                onSubmit={handleSubmit}
-                className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 shadow-xs space-y-6"
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="sm:col-span-1">
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Tên phí dịch vụ <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={tenDV}
-                      onChange={(e) => setTenDV(e.target.value)}
-                      placeholder="VD: WiFi tốc độ cao, Giữ xe máy..."
-                      className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                      required
-                    />
-                  </div>
+            <div>
+              <FormField label="Đơn giá (VNĐ)" required error={errors.donGia}>
+                <CurrencyInput
+                  value={donGia}
+                  onChange={(val) => {
+                    setDonGia(val);
+                    validateField('donGia', val);
+                  }}
+                  placeholder="VD: 100.000"
+                  suffix="VNĐ"
+                  className={
+                    errors.donGia
+                      ? 'border-red-500 bg-red-50/30 focus:ring-red-300'
+                      : ''
+                  }
+                />
+              </FormField>
+            </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Đơn giá (VNĐ) <span className="text-red-500">*</span>
-                    </label>
-                    <CurrencyInput
-                      value={donGia}
-                      onChange={setDonGia}
-                      placeholder="VD: 100.000"
-                      suffix="VNĐ"
-                    />
-                  </div>
+            <div>
+              <FormField label="Đơn vị tính" required error={errors.donViTinh}>
+                <input
+                  type="text"
+                  list="donViTinhOptions"
+                  value={donViTinh}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDonViTinh(val);
+                    if (errors.donViTinh) validateField('donViTinh', val);
+                  }}
+                  onBlur={() => validateField('donViTinh', donViTinh)}
+                  placeholder="VD: Tháng, Xe/Tháng..."
+                  className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none transition ${inputErrorClass(
+                    errors.donViTinh
+                  )}`}
+                />
+                <datalist id="donViTinhOptions">
+                  <option value="Tháng" />
+                  <option value="Xe/Tháng" />
+                  <option value="Người/Tháng" />
+                  <option value="Phòng/Tháng" />
+                </datalist>
+              </FormField>
+            </div>
+          </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      Đơn vị tính <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      list="donViTinhOptions"
-                      value={donViTinh}
-                      onChange={(e) => setDonViTinh(e.target.value)}
-                      placeholder="VD: Tháng, Xe/Tháng..."
-                      className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                      required
-                    />
-                    <datalist id="donViTinhOptions">
-                      <option value="Tháng" />
-                      <option value="Xe/Tháng" />
-                      <option value="Người/Tháng" />
-                      <option value="Phòng/Tháng" />
-                    </datalist>
-                  </div>
-                </div>
+          <FormField
+            label="Mô tả chi tiết"
+            rightText={`${moTa.length}/500 ký tự`}
+            error={errors.moTa}
+          >
+            <textarea
+              rows={4}
+              value={moTa}
+              onChange={(e) => {
+                const val = e.target.value;
+                setMoTa(val);
+                if (errors.moTa || val.length > 500) {
+                  validateField('moTa', val);
+                }
+              }}
+              onBlur={() => validateField('moTa', moTa)}
+              placeholder="VD: Bãi để xe tầng trệt có camera an ninh..."
+              className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none transition ${inputErrorClass(
+                errors.moTa
+              )}`}
+            />
+          </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Mô tả chi tiết
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={moTa}
-                    onChange={(e) => setMoTa(e.target.value)}
-                    placeholder="VD: Bãi để xe tầng trệt có camera an ninh..."
-                    className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
-                  />
-                </div>
-
-                {/* Nút Lưu / Hủy */}
-                <div className="pt-4 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
-                  <Link
-                    href="/chuTro/phiDichVu"
-                    className="w-full sm:w-auto text-center px-6 py-3 rounded-full border border-slate-300 text-slate-700 text-xs font-bold no-underline hover:bg-slate-100"
-                  >
-                    Hủy
-                  </Link>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full sm:w-auto px-8 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
-                  >
-                    {submitting ? 'Đang cập nhật...' : 'Lưu Thay Đổi'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </main>
-        </div>
+          <FormActions
+            cancelHref="/chuTro/phiDichVu"
+            submitLabel="Lưu Thay Đổi"
+            submittingLabel="Đang cập nhật..."
+            submitting={submitting}
+          />
+        </form>
       )}
-    </ProtectedRoute>
+    </FormPageLayout>
   );
 }

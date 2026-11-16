@@ -82,8 +82,10 @@ const AuthController = {
   // 1. [POST] /api/auth/login
   login: async (req, res, next) => {
     try {
-      const taiKhoan = req.body?.TenTK || req.body?.taiKhoan || req.body?.identifier || '';
-      const matKhau = req.body?.MatKhau || req.body?.matKhau || req.body?.password || '';
+      const taiKhoan =
+        req.body?.TenTK || req.body?.taiKhoan || req.body?.identifier || '';
+      const matKhau =
+        req.body?.MatKhau || req.body?.matKhau || req.body?.password || '';
 
       if (!taiKhoan || !matKhau) {
         return errorResponse(
@@ -135,8 +137,7 @@ const AuthController = {
       res.clearCookie('refreshToken', clearOptions);
 
       return successResponse(res, 'Đăng xuất thành công!', null);
-    } catch (error) {
-      // Luôn trả về thành công khi đăng xuất để Frontend thoát phiên an toàn
+    } catch {
       return successResponse(res, 'Đăng xuất thành công!', null);
     }
   },
@@ -180,46 +181,46 @@ const AuthController = {
   },
 
   getSupportContacts: async (req, res) => {
-  try {
-    const db = require('../../database/db');
+    try {
+      const db = require('../../database/db');
 
-    const [[chuTroRows], [khuTroRows]] = await Promise.all([
-      db.execute(`
-        SELECT COALESCE(tt.HoTen, nd.TenTK) AS HoTen, tt.SDT
-        FROM NguoiDung nd
-        LEFT JOIN ThongTinCaNhan tt ON nd.MaND = tt.MaND
-        WHERE nd.Quyen = 'ChuTro'
-        ORDER BY nd.MaND ASC
-        LIMIT 1
-      `),
-      db.execute(`
-        SELECT 
-          k.MaKhu,
-          k.TenKhu,
-          COALESCE(tt.HoTen, nd.TenTK) AS TenQuanLy,
-          tt.SDT AS SDTQuanLy
-        FROM KhuTro k
-        LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
-        LEFT JOIN ThongTinCaNhan tt ON nd.MaND = tt.MaND
-        ORDER BY k.MaKhu ASC
-      `),
-    ]);
+      const [[chuTroRows], [khuTroRows]] = await Promise.all([
+        db.execute(`
+          SELECT COALESCE(tt.HoTen, nd.TenTK) AS HoTen, tt.SDT
+          FROM NguoiDung nd
+          LEFT JOIN ThongTinCaNhan tt ON nd.MaND = tt.MaND
+          WHERE nd.Quyen = 'ChuTro'
+          ORDER BY nd.MaND ASC
+          LIMIT 1
+        `),
+        db.execute(`
+          SELECT 
+            k.MaKhu,
+            k.TenKhu,
+            COALESCE(tt.HoTen, nd.TenTK) AS TenQuanLy,
+            tt.SDT AS SDTQuanLy
+          FROM KhuTro k
+          LEFT JOIN NguoiDung nd ON k.MaND = nd.MaND
+          LEFT JOIN ThongTinCaNhan tt ON nd.MaND = tt.MaND
+          ORDER BY k.MaKhu ASC
+        `),
+      ]);
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        chuTro: chuTroRows[0] || null,
-        khuTroList: khuTroRows || [],
-      },
-    });
-  } catch (error) {
-    console.error('Lỗi lấy thông tin liên hệ hỗ trợ:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Không thể lấy thông tin liên hệ hỗ trợ',
-    });
-  }
-},
+      return res.status(200).json({
+        success: true,
+        data: {
+          chuTro: chuTroRows[0] || null,
+          khuTroList: khuTroRows || [],
+        },
+      });
+    } catch (error) {
+      console.error('Lỗi lấy thông tin liên hệ hỗ trợ:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Không thể lấy thông tin liên hệ hỗ trợ',
+      });
+    }
+  },
 
   // Bí danh nếu auth.router.js gọi AuthController.refresh
   refresh: async (req, res, next) => {
@@ -318,17 +319,25 @@ const AuthController = {
         HoTen: String(HoTen).trim(),
         GioiTinh: GioiTinh || currentProfile?.GioiTinh || 'Nam',
         NamSinh: NamSinh ? Number(NamSinh) : currentProfile?.NamSinh || null,
-        CCCD: CCCD !== undefined ? String(CCCD).trim() : currentProfile?.CCCD || null,
-        NgayCap: NgayCap !== undefined ? NgayCap : currentProfile?.NgayCap || null,
+        CCCD:
+          CCCD !== undefined
+            ? String(CCCD).trim()
+            : currentProfile?.CCCD || null,
+        NgayCap:
+          NgayCap !== undefined ? NgayCap : currentProfile?.NgayCap || null,
         NoiCap:
           NoiCap !== undefined
             ? String(NoiCap).trim()
             : currentProfile?.NoiCap || 'Cục Cảnh sát QLHC về TTXH',
         SDT: String(SDT).trim(),
         Email:
-          Email !== undefined ? String(Email).trim() : currentProfile?.Email || null,
+          Email !== undefined
+            ? String(Email).trim()
+            : currentProfile?.Email || null,
         DiaChi:
-          DiaChi !== undefined ? String(DiaChi).trim() : currentProfile?.DiaChi || null,
+          DiaChi !== undefined
+            ? String(DiaChi).trim()
+            : currentProfile?.DiaChi || null,
         NgheNghiep:
           NgheNghiep !== undefined
             ? String(NgheNghiep).trim()
@@ -365,7 +374,7 @@ const AuthController = {
     }
   },
 
-  // 8. [POST] /api/auth/forgot-password/send-otp
+  // 8. [POST] /api/auth/forgot-password/send-otp (Chỉ lấy theo trường Email trong ThongTinCaNhan)
   sendForgotPasswordOtp: async (req, res) => {
     try {
       const email = String(req.body?.email || '')
@@ -375,23 +384,25 @@ const AuthController = {
         return errorResponse(res, 'Vui lòng nhập địa chỉ Email hợp lệ!', 400);
       }
 
-      // Tìm trong bảng ThongTinCaNhan hoặc NguoiDung (nếu TenTK là email)
-      let profile = await ThongTinCaNhanModel.findByEmailOrSDT(email);
-      let account = null;
-
-      if (profile) {
-        account = await NguoiDungModel.findById(profile.MaND);
-      } else {
-        account = await NguoiDungModel.findByTenTK(email);
-        if (account) {
-          profile = await ThongTinCaNhanModel.getByMaND(account.MaND);
-        }
-      }
-
-      if (!account) {
+      // Chỉ kiểm tra trường Email trong bảng ThongTinCaNhan (không tìm theo TenTK)
+      const profile = await ThongTinCaNhanModel.findByEmailOrSDT(email);
+      if (
+        !profile ||
+        !profile.Email ||
+        String(profile.Email).trim().toLowerCase() !== email
+      ) {
         return errorResponse(
           res,
           'Email này chưa được đăng ký trong hệ thống!',
+          404
+        );
+      }
+
+      const account = await NguoiDungModel.findById(profile.MaND);
+      if (!account) {
+        return errorResponse(
+          res,
+          'Không tìm thấy tài khoản người dùng liên kết với Email này!',
           404
         );
       }
@@ -407,8 +418,8 @@ const AuthController = {
         verified: false,
       });
 
-      const targetEmail = profile?.Email || email;
-      const hoTen = profile?.HoTen || account.TenTK;
+      const targetEmail = String(profile.Email).trim();
+      const hoTen = profile.HoTen || 'Người dùng';
 
       await sendResetOtpEmail(targetEmail, hoTen, otpCode);
 

@@ -1,3 +1,4 @@
+// client/src/app/chuTro/hopDong/page.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -10,7 +11,6 @@ import { HopDongItem, PhiDichVuItem } from "@/types/hopDong.type";
 import { dinhDangNgayVN, dinhDangTienVN } from "@/utils/soThanhChu.util";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 
-import SuaHopDongModal from "@/components/features/hopDong/SuaHopDong";
 import XoaHopDongModal from "@/components/features/hopDong/XoaHopDong";
 import XemPdfHopDongModal from "@/components/features/hopDong/XemPdfHopDong";
 import XuatBanCungModal from "@/components/features/hopDong/XuatBanCung";
@@ -27,9 +27,7 @@ export default function QuanLyHopDongPage() {
   const pathname = usePathname();
 
   const [user, setUser] = useState<UserProfile>(DEFAULT_USER);
-  const [danhSachHopDongGoc, setDanhSachHopDongGoc] = useState<HopDongItem[]>(
-    [],
-  );
+  const [danhSachHopDongGoc, setDanhSachHopDongGoc] = useState<HopDongItem[]>([]);
   const [danhSachHopDong, setDanhSachHopDong] = useState<HopDongItem[]>([]);
   const [dangTai, setDangTai] = useState<boolean>(true);
 
@@ -39,16 +37,10 @@ export default function QuanLyHopDongPage() {
   const [maKhuLoc, setMaKhuLoc] = useState<string>("");
   const [maPhongLoc, setMaPhongLoc] = useState<string>("");
 
-  // Dữ liệu danh mục dùng cho Bộ lọc & Modal Tạo mới
+  // Dữ liệu danh mục dùng cho Bộ lọc
   const [danhSachPhong, setDanhSachPhong] = useState<any[]>([]);
-  const [danhSachKhachThue, setDanhSachKhachThue] = useState<any[]>([]);
-  const [danhSachPhiDichVu, setDanhSachPhiDichVu] = useState<PhiDichVuItem[]>(
-    [],
-  );
-  const [danhSachHopDongCu, setDanhSachHopDongCu] = useState<any[]>([]);
 
-  // State điều khiển các Modal
-  const [moModalTaoMoi, setMoModalTaoMoi] = useState<boolean>(false);
+  // State điều khiển các Modal (Đã loại bỏ moModalTaoMoi)
   const [hopDongCanXoa, setHopDongCanXoa] = useState<HopDongItem | null>(null);
   const [maHDTXemPdf, setMaHDTXemPdf] = useState<number | null>(null);
   const [maHDTXuatBanCung, setMaHDTXuatBanCung] = useState<number | null>(null);
@@ -130,9 +122,6 @@ export default function QuanLyHopDongPage() {
     try {
       const data = await hopDongService.layDuLieuTaoMoi();
       setDanhSachPhong(data.danhSachPhong || []);
-      setDanhSachKhachThue(data.danhSachKhachThue || []);
-      setDanhSachPhiDichVu(data.danhSachPhiDichVu || []);
-      setDanhSachHopDongCu(data.danhSachHopDongCu || []);
     } catch (error) {
       console.error("Lỗi tải dữ liệu danh mục:", error);
     }
@@ -144,13 +133,11 @@ export default function QuanLyHopDongPage() {
     taiDuLieuDanhMuc();
   }, []);
 
-  // Lọc danh sách phòng trong dropdown theo Khu trọ đang chọn
   const danhSachPhongTheoKhu = useMemo(() => {
     if (!maKhuLoc) return danhSachPhong;
     return danhSachPhong.filter((p) => String(p.MaKhu) === String(maKhuLoc));
   }, [danhSachPhong, maKhuLoc]);
 
-  // Xử lý khi chọn Phòng
   const xuLyChonPhong = (maPhongMoi: string) => {
     setMaPhongLoc(maPhongMoi);
     taiDanhSachHopDong({
@@ -161,7 +148,6 @@ export default function QuanLyHopDongPage() {
     });
   };
 
-  // Xử lý khi chọn Trạng thái
   const xuLyChonTrangThai = (trangThaiMoi: string) => {
     setTrangThaiLoc(trangThaiMoi);
     taiDanhSachHopDong({
@@ -172,7 +158,6 @@ export default function QuanLyHopDongPage() {
     });
   };
 
-  // Đặt lại toàn bộ bộ lọc
   const datLaiBoLoc = () => {
     setTuKhoa("");
     setTrangThaiLoc("");
@@ -187,14 +172,14 @@ export default function QuanLyHopDongPage() {
   };
 
   const coBoLocDangBat = Boolean(
-    tuKhoa.trim() || trangThaiLoc || maKhuLoc || maPhongLoc,
+    tuKhoa.trim() || trangThaiLoc || maKhuLoc || maPhongLoc
   );
 
+  // Chuyển hướng sang trang Thêm Hợp Đồng mới
   const moFormTaoMoi = () => {
-    setMoModalTaoMoi(true);
+    router.push(`${pathname}/them`);
   };
 
-  // Chuyển sang trang Sửa hợp đồng riêng khi nhấn nút "Sửa"
   const chuyenTrangSua = (maHDT: number) => {
     router.push(`${pathname}/sua?id=${maHDT}`);
   };
@@ -206,12 +191,11 @@ export default function QuanLyHopDongPage() {
     taiDuLieuDanhMuc();
   };
 
-  // Đếm số lượng theo trạng thái
   const soConHieuLuc = danhSachHopDong.filter(
-    (h) => h.TrangThai === "ConHieuLuc",
+    (h) => h.TrangThai === "ConHieuLuc"
   ).length;
   const soHetHan = danhSachHopDong.filter(
-    (h) => h.TrangThai === "HetHan",
+    (h) => h.TrangThai === "HetHan"
   ).length;
   const soDaHuy = danhSachHopDong.filter((h) => h.TrangThai === "DaHuy").length;
 
@@ -219,19 +203,16 @@ export default function QuanLyHopDongPage() {
     <ProtectedRoute allowedRoles={["ChuTro", "QuanLy"]}>
       {(user) => (
         <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
-          {/* Thanh Header Quản Lý trên cùng */}
           <QuanLyHeader user={user} />
 
           <main className="mx-auto max-w-360 px-3 py-6 sm:px-5 lg:px-6">
-            {/* 1. Tiêu đề trang & Nút Thêm Hợp Đồng */}
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                   Quản Lý Hợp Đồng Thuê Phòng
                 </h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  Thiết lập tạo mới, chỉnh sửa, tra cứu, xem PDF và xuất hợp
-                  đồng bản cứng tự động điền thông tin.
+                  Thiết lập tạo mới, chỉnh sửa, tra cứu, xem PDF và xuất hợp đồng bản cứng tự động điền thông tin.
                 </p>
               </div>
               <button
@@ -242,7 +223,7 @@ export default function QuanLyHopDongPage() {
               </button>
             </div>
 
-            {/* 2. Khung Tìm kiếm & Bộ lọc */}
+            {/* Khung Tìm kiếm & Bộ lọc */}
             <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs">
               <div className="grid grid-cols-1 gap-2.5 md:grid-cols-12 md:items-center">
                 <div className="relative md:col-span-7">
@@ -270,7 +251,6 @@ export default function QuanLyHopDongPage() {
                   )}
                 </div>
 
-                {/* Lọc theo phòng */}
                 <div className="md:col-span-2">
                   <select
                     value={maPhongLoc}
@@ -287,7 +267,6 @@ export default function QuanLyHopDongPage() {
                   </select>
                 </div>
 
-                {/* Lọc theo trạng thái */}
                 <div className="md:col-span-2">
                   <select
                     value={trangThaiLoc}
@@ -301,7 +280,6 @@ export default function QuanLyHopDongPage() {
                   </select>
                 </div>
 
-                {/* Nút tìm kiếm và đặt lại */}
                 <div className="flex items-center justify-end gap-2 md:col-span-1">
                   <button
                     type="button"
@@ -325,7 +303,7 @@ export default function QuanLyHopDongPage() {
               </div>
             </div>
 
-            {/* 3. Thanh Tổng cộng kiêm Nút lọc nhanh theo trạng thái */}
+            {/* Thanh Lọc nhanh trạng thái */}
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-slate-600">
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -347,7 +325,7 @@ export default function QuanLyHopDongPage() {
                   type="button"
                   onClick={() =>
                     xuLyChonTrangThai(
-                      trangThaiLoc === "ConHieuLuc" ? "" : "ConHieuLuc",
+                      trangThaiLoc === "ConHieuLuc" ? "" : "ConHieuLuc"
                     )
                   }
                   className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold transition ${
@@ -408,7 +386,7 @@ export default function QuanLyHopDongPage() {
               </div>
             </div>
 
-            {/* 4. Bảng Danh sách hợp đồng */}
+            {/* Bảng Danh sách hợp đồng */}
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-xs sm:text-[13px]">
@@ -549,15 +527,15 @@ export default function QuanLyHopDongPage() {
                                 hd.TrangThai === "ConHieuLuc"
                                   ? "bg-[#00FFCC]/30 text-slate-900"
                                   : hd.TrangThai === "HetHan"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : "bg-rose-100 text-rose-700"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-rose-100 text-rose-700"
                               }`}
                             >
                               {hd.TrangThai === "ConHieuLuc"
                                 ? "Còn hiệu lực"
                                 : hd.TrangThai === "HetHan"
-                                  ? "Hết hạn"
-                                  : "Đã hủy"}
+                                ? "Hết hạn"
+                                : "Đã hủy"}
                             </span>
                           </td>
 
@@ -598,32 +576,20 @@ export default function QuanLyHopDongPage() {
             </div>
           </main>
 
-          {/* 1. Modal Tạo mới hợp đồng */}
-          <SuaHopDongModal
-            moModal={moModalTaoMoi}
-            maHDTSua={null}
-            danhSachPhong={danhSachPhong}
-            danhSachKhachThue={danhSachKhachThue}
-            danhSachPhiDichVu={danhSachPhiDichVu}
-            danhSachHopDongCu={danhSachHopDongCu}
-            onClose={() => setMoModalTaoMoi(false)}
-            onSuccess={lamMoiDuLieu}
-          />
-
-          {/* 2. Modal Xóa hợp đồng */}
+          {/* Modal Xóa hợp đồng */}
           <XoaHopDongModal
             hopDongCanXoa={hopDongCanXoa}
             onClose={() => setHopDongCanXoa(null)}
             onSuccess={lamMoiDuLieu}
           />
 
-          {/* 3. Modal Xem PDF */}
+          {/* Modal Xem PDF */}
           <XemPdfHopDongModal
             maHDT={maHDTXemPdf}
             onClose={() => setMaHDTXemPdf(null)}
           />
 
-          {/* 4. Modal Xuất bản cứng */}
+          {/* Modal Xuất bản cứng */}
           <XuatBanCungModal
             maHDT={maHDTXuatBanCung}
             onClose={() => setMaHDTXuatBanCung(null)}
