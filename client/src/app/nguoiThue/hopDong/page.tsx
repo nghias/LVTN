@@ -269,7 +269,7 @@ export default function NguoiThueHopDongPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Hợp Đồng Thuê Phòng Của Tôi
                 </h1>
-                <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                <p className="mt-1 text-xs text-slate-500">
                   Theo dõi thông tin hợp đồng, danh sách thành viên tạm trú và các dịch vụ đăng ký của phòng bạn.
                 </p>
               </div>
