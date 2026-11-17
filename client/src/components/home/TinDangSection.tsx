@@ -7,7 +7,7 @@ import {
   resolveRoomImageUrl,
   DEFAULT_ROOM_FALLBACK_IMAGE,
 } from "@/services/phongTro.service";
-import { TienIchItem, isAvailablePublicTinDang } from "@/services/home.service";
+import { TienIchItem } from "@/services/home.service";
 import {
   TinDangItem,
   KhuTroWithContact,
@@ -36,6 +36,46 @@ interface TinDangSectionProps {
   onChangeDienTich: (val: string) => void;
   onResetFilters: () => void;
   onSelectContactRoom: (tin: TinDangItem) => void;
+}
+
+// Kiểm tra tin đăng đang hiển thị và còn hạn để hiển thị đầy đủ trên trang chủ
+function isPublicTinDangActive(tin: TinDangItem): boolean {
+  if (!tin) return false;
+  const anyTin = tin as any;
+  const rawStatus = String(anyTin.TrangThai || "DangHienThi")
+    .trim()
+    .toLowerCase();
+
+  // Loại bỏ tin Đã ẩn hoặc Hết hạn
+  if (
+    [
+      "daan",
+      "da an",
+      "đã ẩn",
+      "an",
+      "ẩn",
+      "hethan",
+      "het han",
+      "hết hạn",
+      "dahethan",
+      "đã hết hạn",
+    ].includes(rawStatus)
+  ) {
+    return false;
+  }
+
+  // Kiểm tra ngày hết hạn nếu có
+  if (anyTin.NgayHetHan) {
+    const expiry = new Date(anyTin.NgayHetHan);
+    if (!Number.isNaN(expiry.getTime())) {
+      expiry.setHours(23, 59, 59, 999);
+      if (expiry.getTime() < Date.now()) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 export function extractRoomImageList(tin: TinDangItem): RoomImageObject[] {
@@ -121,13 +161,11 @@ export default function TinDangSection({
   };
 
   const validTotalTinDangList = useMemo(() => {
-    return tinDangList.filter((tin) => isAvailablePublicTinDang(tin as any));
+    return tinDangList.filter((tin) => isPublicTinDangActive(tin));
   }, [tinDangList]);
 
   const validFilteredTinDangList = useMemo(() => {
-    return filteredTinDangList.filter((tin) =>
-      isAvailablePublicTinDang(tin as any)
-    );
+    return filteredTinDangList.filter((tin) => isPublicTinDangActive(tin));
   }, [filteredTinDangList]);
 
   const jsonLdSchema = useMemo(() => {
@@ -191,7 +229,7 @@ export default function TinDangSection({
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-1.5">
-            Tra cứu phòng trống 
+            Tra cứu phòng trống
           </span>
           <h2
             id="tin-dang-heading"

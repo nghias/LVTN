@@ -1,20 +1,26 @@
 // src/models/tinDang.model.js
-const db = require("../../database/db");
+const db = require('../../database/db');
 
-// Cho phép phòng trống hoặc đang bảo trì (nhận cọc trước) được đăng tin & hiển thị
+// Cho phép phòng trống hoặc đang bảo trì được đăng tin mới
 const DANH_SACH_TRANG_THAI_CHO_PHEP_DANG = [
-  "Trong",
-  "ConTrong",
-  "Trống",
-  "Còn trống",
-  "BaoTri",
-  "Bảo trì",
+  'Trong',
+  'ConTrong',
+  'Con trong',
+  'DangTrong',
+  'Dang trong',
+  'Trống',
+  'Còn trống',
+  'Đang trống',
+  'BaoTri',
+  'Bao tri',
+  'Bảo trì',
+  'Đang bảo trì',
 ];
 
 // Subquery lấy thông tin cá nhân theo từng MaND
 const SUBQUERY_THONG_TIN_CA_NHAN = `
   SELECT MaND, MAX(HoTen) AS HoTen, MAX(SDT) AS SDT, MAX(Email) AS Email
-  FROM ThongTinCaNhan
+  FROM thongtincanhan
   GROUP BY MaND
 `;
 
@@ -24,7 +30,7 @@ const SUBQUERY_CHU_TRO = `
     nd.MaND,
     COALESCE(tt.HoTen, nd.TenTK) AS TenChuTro,
     tt.SDT AS SDTChuTro
-  FROM NguoiDung nd
+  FROM nguoidung nd
   LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt ON nd.MaND = tt.MaND
   WHERE nd.Quyen = 'ChuTro'
   ORDER BY nd.MaND ASC
@@ -33,32 +39,33 @@ const SUBQUERY_CHU_TRO = `
 
 // Chuẩn hóa giá trị TrangThai từ FE gửi lên về đúng chuẩn DB
 function normalizeTrangThaiTin(value) {
-  if (!value || String(value).trim() === "") return "DangHienThi";
+  if (!value || String(value).trim() === '') return 'DangHienThi';
   const raw = String(value).trim();
   const mapTrangThai = {
-    DangHienThi: "DangHienThi",
-    DaDang: "DangHienThi",
-    HienThi: "DangHienThi",
-    "Đã đăng": "DangHienThi",
-    "Đang hiển thị": "DangHienThi",
-    DaAn: "DaAn",
-    An: "DaAn",
-    "Đã ẩn": "DaAn",
-    HetHan: "HetHan",
-    "Hết hạn": "HetHan",
+    DangHienThi: 'DangHienThi',
+    DaDang: 'DangHienThi',
+    HienThi: 'DangHienThi',
+    'Đã đăng': 'DangHienThi',
+    'Đang hiển thị': 'DangHienThi',
+    DaAn: 'DaAn',
+    An: 'DaAn',
+    'Đã ẩn': 'DaAn',
+    HetHan: 'HetHan',
+    'Hết hạn': 'HetHan',
+    'Đã hết hạn': 'HetHan',
   };
-  return mapTrangThai[raw] || "DangHienThi";
+  return mapTrangThai[raw] || 'DangHienThi';
 }
 
-// Chuẩn hóa Date object hoặc chuỗi ISO về YYYY-MM-DD cho MySQL 8.4
+// Chuẩn hóa Date object hoặc chuỗi ISO về YYYY-MM-DD cho MySQL
 function normalizeDate(value) {
   if (!value) return null;
 
   if (value instanceof Date) {
     if (isNaN(value.getTime())) return null;
     const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
@@ -69,41 +76,19 @@ function normalizeDate(value) {
     return str;
   }
 
-  if (str.includes("T")) {
-    return str.split("T")[0];
+  if (str.includes('T')) {
+    return str.split('T')[0];
   }
 
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
     const year = parsed.getFullYear();
-    const month = String(parsed.getMonth() + 1).padStart(2, "0");
-    const day = String(parsed.getDate()).padStart(2, "0");
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
   return null;
-}
-
-// Đảm bảo nếu tin đang là DangHienThi nhưng NgayHetHan đã qua thì tự động gia hạn +30 ngày
-function ensureValidExpiryDate(ngayHetHan, trangThaiTin) {
-  const normalized = normalizeDate(ngayHetHan);
-  if (trangThaiTin !== "DangHienThi") {
-    return normalized;
-  }
-
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-
-  // Nếu không truyền ngày hết hạn hoặc ngày hết hạn cũ nhỏ hơn hôm nay -> tự động +7 ngày (1 tuần)
-  if (!normalized || normalized < todayStr) {
-    const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const y = next7Days.getFullYear();
-    const m = String(next7Days.getMonth() + 1).padStart(2, "0");
-    const d = String(next7Days.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }
-
-  return normalized;
 }
 
 // Gắn DanhSachAnh và TienIch vào từng tin đăng
@@ -119,7 +104,7 @@ async function attachImagesToTinDangRows(rows = []) {
   const [allImages] = await db.query(
     `
       SELECT MaAnh, MaPhong, DuongDan, AnhChinh
-      FROM AnhPhong
+      FROM anhphong
       WHERE MaPhong IN (?)
       ORDER BY MaPhong ASC, AnhChinh DESC, MaAnh ASC
     `,
@@ -129,8 +114,8 @@ async function attachImagesToTinDangRows(rows = []) {
   const [allTienIch] = await db.query(
     `
       SELECT ctti.MaPhong, ti.MaTI, ti.TenTI, ti.MoTa
-      FROM ChiTietTienIch ctti
-      INNER JOIN TienIch ti ON ctti.MaTI = ti.MaTI
+      FROM chitiettienich ctti
+      INNER JOIN tienich ti ON ctti.MaTI = ti.MaTI
       WHERE ctti.MaPhong IN (?)
       ORDER BY ti.MaTI ASC
     `,
@@ -192,6 +177,17 @@ async function attachImagesToTinDangRows(rows = []) {
 const TinDangModel = {
   normalizeTrangThaiTin,
 
+  // Tự động chuyển các tin đã quá NgayHetHan sang trạng thái 'HetHan'
+  async syncExpiredTinDang() {
+    await db.query(`
+      UPDATE tindang
+      SET TrangThai = 'HetHan'
+      WHERE TrangThai IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị')
+        AND NgayHetHan IS NOT NULL
+        AND NgayHetHan < CURDATE()
+    `);
+  },
+
   async getNguoiDungById(maND) {
     const sql = `
       SELECT 
@@ -201,7 +197,7 @@ const TinDangModel = {
         COALESCE(ttcn.HoTen, nd.TenTK) AS HoTen,
         ttcn.SDT,
         ttcn.Email
-      FROM NguoiDung nd
+      FROM nguoidung nd
       LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) ttcn ON nd.MaND = ttcn.MaND
       WHERE nd.MaND = ?
       LIMIT 1
@@ -210,17 +206,58 @@ const TinDangModel = {
     return rows[0] || null;
   },
 
+  async getChuTroMacDinh() {
+    const sql = `
+      SELECT 
+        nd.MaND,
+        nd.TenTK,
+        nd.Quyen,
+        COALESCE(ttcn.HoTen, nd.TenTK) AS HoTen,
+        ttcn.SDT,
+        ttcn.Email
+      FROM nguoidung nd
+      LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) ttcn ON nd.MaND = ttcn.MaND
+      WHERE nd.Quyen = 'ChuTro'
+      ORDER BY nd.MaND ASC
+      LIMIT 1
+    `;
+    const [rows] = await db.query(sql);
+    return rows[0] || null;
+  },
+
   async getTinDangById(maTin) {
-    const sql = `SELECT * FROM TinDang WHERE MaTin = ? LIMIT 1`;
+    const sql = `SELECT * FROM tindang WHERE MaTin = ? LIMIT 1`;
     const [rows] = await db.query(sql, [maTin]);
     return rows[0] || null;
   },
 
+  // Lấy danh sách khu trọ theo vai trò (ChuTro thấy tất cả, QuanLy thấy khu mình quản lý)
+  async getKhuTroList(maND, quyen) {
+    const hasFullAccess = quyen === 'ChuTro' || quyen === 'Admin';
+    const params = [];
+    let whereClause = '';
+
+    if (!hasFullAccess) {
+      whereClause = 'WHERE k.MaND = ?';
+      params.push(maND);
+    }
+
+    const sql = `
+      SELECT k.MaKhu, k.MaND, k.TenKhu, k.MoTa, k.DiaChi
+      FROM khutro k
+      ${whereClause}
+      ORDER BY k.MaKhu ASC
+    `;
+    const [rows] = await db.query(sql, params);
+    return rows;
+  },
+
+  // Kiểm tra phòng có thuộc khu trọ do Quản lý (khutro.MaND) phụ trách hay không
   async checkPhongThuocQuanLy(maPhong, maND) {
     const sql = `
       SELECT p.MaPhong
-      FROM Phong p
-      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      FROM phong p
+      INNER JOIN khutro k ON p.MaKhu = k.MaKhu
       WHERE p.MaPhong = ? AND k.MaND = ?
       LIMIT 1
     `;
@@ -228,12 +265,13 @@ const TinDangModel = {
     return rows.length > 0;
   },
 
+  // Kiểm tra tin đăng có thuộc khu trọ do Quản lý (khutro.MaND) phụ trách hay không (không lọc theo tindang.MaND)
   async checkTinThuocQuanLy(maTin, maND) {
     const sql = `
       SELECT td.MaTin
-      FROM TinDang td
-      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
-      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
+      FROM tindang td
+      INNER JOIN phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN khutro k ON p.MaKhu = k.MaKhu
       WHERE td.MaTin = ? AND k.MaND = ?
       LIMIT 1
     `;
@@ -241,29 +279,36 @@ const TinDangModel = {
     return rows.length > 0;
   },
 
-  // Kiểm tra phòng có hợp lệ để tạo/chuyển tin đăng hay không
+  // Kiểm tra phòng có hợp lệ để đăng tin mới hay không (Bỏ qua tin HetHan và DaAn)
   async checkPhongCoTheDangTin(maPhong, excludeMaTin = null) {
     const params = [];
-    let excludeClause = "";
+    let excludeClause = '';
 
     if (excludeMaTin) {
-      excludeClause = "AND td.MaTin <> ?";
+      excludeClause = 'AND td.MaTin <> ?';
       params.push(excludeMaTin);
     }
 
     params.push(maPhong);
 
-    // Chỉ chặn nếu phòng đang có một tin ĐANG HIỂN THỊ và CÒN HẠN
     const sql = `
       SELECT 
         p.MaPhong,
-        p.TrangThai AS TrangThaiPhong,
-        td.MaTin,
-        td.TrangThai AS TrangThaiTin
-      FROM Phong p
-      LEFT JOIN TinDang td 
+        TRIM(p.TrangThai) AS TrangThaiPhong,
+        td.MaTin AS ActiveMaTin,
+        (
+          SELECT COUNT(*)
+          FROM tindang td_old
+          WHERE td_old.MaPhong = p.MaPhong
+            AND (
+              TRIM(td_old.TrangThai) IN ('HetHan', 'Hết hạn', 'Đã hết hạn')
+              OR (td_old.NgayHetHan IS NOT NULL AND td_old.NgayHetHan < CURDATE())
+            )
+        ) AS SoTinHetHan
+      FROM phong p
+      LEFT JOIN tindang td 
         ON p.MaPhong = td.MaPhong 
-        AND td.TrangThai IN ('DangHienThi', 'DaDang')
+        AND TRIM(td.TrangThai) IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị')
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
         ${excludeClause}
       WHERE p.MaPhong = ?
@@ -272,38 +317,46 @@ const TinDangModel = {
 
     const [rows] = await db.query(sql, params);
     if (!rows.length) {
-      return { valid: false, reason: "NOT_FOUND" };
+      return { valid: false, reason: 'NOT_FOUND' };
     }
 
     const phong = rows[0];
 
-    if (!DANH_SACH_TRANG_THAI_CHO_PHEP_DANG.includes(phong.TrangThaiPhong)) {
-      return { valid: false, reason: "NOT_EMPTY" };
+    // Nếu đã có tin đang hiển thị còn hạn thì chặn không cho đăng trùng
+    if (phong.ActiveMaTin) {
+      return { valid: false, reason: 'ALREADY_HAS_STATUS' };
     }
 
-    if (phong.MaTin) {
-      return { valid: false, reason: "ALREADY_HAS_STATUS" };
+    const isAllowedStatus = DANH_SACH_TRANG_THAI_CHO_PHEP_DANG.some(
+      (st) =>
+        st.toLowerCase() === String(phong.TrangThaiPhong || '').toLowerCase()
+    );
+
+    // Cho phép nếu phòng đang Trống/Bảo trì HOẶC phòng có tin đăng đã hết hạn
+    if (!isAllowedStatus && Number(phong.SoTinHetHan) === 0) {
+      return { valid: false, reason: 'NOT_EMPTY' };
     }
 
     return { valid: true };
   },
 
-  // 1. Lấy danh sách tin đăng cho trang Quản lý
+  // 1. Lấy danh sách tin đăng cho trang Quản lý (Lọc theo khutro.MaND đối với QuanLy, lấy tất cả đối với ChuTro)
   async getAllTinDang(maND, quyen) {
-    const hasFullAccess = quyen === "ChuTro" || quyen === "Admin";
+    const hasFullAccess = quyen === 'ChuTro' || quyen === 'Admin';
     const params = [];
 
     const conditions = [
-      "td.TrangThai IS NOT NULL",
+      'td.TrangThai IS NOT NULL',
       "TRIM(td.TrangThai) <> ''",
     ];
 
+    // Quản lý chỉ thấy tin của khu mình quản lý (k.MaND), không lọc theo người tạo tin (td.MaND)
     if (!hasFullAccess) {
-      conditions.push("k.MaND = ?");
+      conditions.push('k.MaND = ?');
       params.push(maND);
     }
 
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
     const sql = `
       SELECT 
@@ -315,9 +368,10 @@ const TinDangModel = {
         td.NgayDang,
         td.NgayHetHan,
         CASE 
-          WHEN td.NgayHetHan IS NOT NULL AND td.NgayHetHan < CURDATE() THEN 'HetHan'
-          WHEN td.TrangThai IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị') THEN 'DangHienThi'
-          ELSE td.TrangThai
+          WHEN td.TrangThai IN ('HetHan', 'Hết hạn', 'Đã hết hạn') 
+            OR (td.NgayHetHan IS NOT NULL AND td.NgayHetHan < CURDATE()) THEN 'HetHan'
+          WHEN td.TrangThai IN ('DaAn', 'An', 'Đã ẩn') THEN 'DaAn'
+          ELSE 'DangHienThi'
         END AS TrangThai,
         p.TenPhong,
         p.DienTich,
@@ -333,15 +387,15 @@ const TinDangModel = {
         COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro,
         (
           SELECT ap.DuongDan
-          FROM AnhPhong ap
+          FROM anhphong ap
           WHERE ap.MaPhong = p.MaPhong
           ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
           LIMIT 1
         ) AS AnhDaiDien
-      FROM TinDang td
-      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
-      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      FROM tindang td
+      INNER JOIN phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN khutro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN nguoidung nd_ql ON k.MaND = nd_ql.MaND
       LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
       LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
       ${whereClause}
@@ -353,22 +407,40 @@ const TinDangModel = {
   },
 
   // 2. Lấy danh sách Phòng gửi qua FE để chọn khi đăng tin mới
-  async getPhongListForSelect(maND, quyen) {
-    const hasFullAccess = quyen === "ChuTro" || quyen === "Admin";
+  // - ChuTro: Thấy tất cả phòng trống / bảo trì chưa có tin DangHienThi còn hạn ở mọi khu trọ
+  // - QuanLy: Thấy tất cả phòng trống / bảo trì chưa có tin DangHienThi còn hạn thuộc khu mình quản lý (k.MaND)
+  // - Phòng mới thêm hoặc phòng chỉ có tin HetHan / DaAn đều được hiển thị đầy đủ
+  async getPhongListForSelect(maND, quyen, excludeMaTin = null) {
+    const hasFullAccess = quyen === 'ChuTro' || quyen === 'Admin';
     const params = [];
+    let excludeJoinClause = '';
 
-    // Cho phép chọn phòng Trống hoặc Bảo trì mà chưa có tin DangHienThi còn hạn
+    if (excludeMaTin) {
+      excludeJoinClause = 'AND td.MaTin <> ?';
+      params.push(excludeMaTin);
+    }
+
     const conditions = [
-      "p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống', 'BaoTri', 'Bảo trì')",
-      "td.MaTin IS NULL",
+      'td.MaTin IS NULL',
+      `(
+        TRIM(p.TrangThai) IN ('Trong', 'ConTrong', 'Con trong', 'DangTrong', 'Dang trong', 'Trống', 'Còn trống', 'Đang trống', 'BaoTri', 'Bao tri', 'Bảo trì', 'Đang bảo trì')
+        OR EXISTS (
+          SELECT 1 FROM tindang td_exp
+          WHERE td_exp.MaPhong = p.MaPhong
+            AND (
+              TRIM(td_exp.TrangThai) IN ('HetHan', 'Hết hạn', 'Đã hết hạn')
+              OR (td_exp.NgayHetHan IS NOT NULL AND td_exp.NgayHetHan < CURDATE())
+            )
+        )
+      )`,
     ];
 
     if (!hasFullAccess) {
-      conditions.push("k.MaND = ?");
+      conditions.push('k.MaND = ?');
       params.push(maND);
     }
 
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
     const sql = `
       SELECT 
@@ -386,15 +458,16 @@ const TinDangModel = {
         tt_ql.SDT AS SDTQuanLy,
         COALESCE(ct.TenChuTro, COALESCE(tt_ql.HoTen, nd_ql.TenTK)) AS TenChuTro,
         COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro
-      FROM Phong p
-      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      FROM phong p
+      INNER JOIN khutro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN nguoidung nd_ql ON k.MaND = nd_ql.MaND
       LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
       LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
-      LEFT JOIN TinDang td 
+      LEFT JOIN tindang td 
         ON p.MaPhong = td.MaPhong 
-        AND td.TrangThai IN ('DangHienThi', 'DaDang')
+        AND TRIM(td.TrangThai) IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị')
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
+        ${excludeJoinClause}
       ${whereClause}
       ORDER BY k.MaKhu ASC, p.MaPhong ASC
     `;
@@ -409,6 +482,8 @@ const TinDangModel = {
 
   // 3. Lấy danh sách tin đăng công khai cho Trang chủ
   async getPublicTinDang() {
+    await this.syncExpiredTinDang();
+
     const sql = `
       SELECT 
         td.MaTin,
@@ -433,19 +508,19 @@ const TinDangModel = {
         COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro,
         (
           SELECT ap.DuongDan
-          FROM AnhPhong ap
+          FROM anhphong ap
           WHERE ap.MaPhong = p.MaPhong
           ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
           LIMIT 1
         ) AS AnhDaiDien
-      FROM TinDang td
-      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
-      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      FROM tindang td
+      INNER JOIN phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN khutro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN nguoidung nd_ql ON k.MaND = nd_ql.MaND
       LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
       LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
-      WHERE td.TrangThai IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị')
-        AND p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống', 'BaoTri', 'Bảo trì')
+      WHERE TRIM(td.TrangThai) IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị')
+        AND TRIM(p.TrangThai) IN ('Trong', 'ConTrong', 'Con trong', 'DangTrong', 'Dang trong', 'Trống', 'Còn trống', 'Đang trống', 'BaoTri', 'Bao tri', 'Bảo trì', 'Đang bảo trì')
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
       ORDER BY td.NgayDang DESC, td.MaTin DESC
     `;
@@ -455,6 +530,8 @@ const TinDangModel = {
 
   // 3.1. Lấy chi tiết 1 tin đăng công khai theo MaTin
   async getPublicTinDangById(maTin) {
+    await this.syncExpiredTinDang();
+
     const sql = `
       SELECT 
         td.MaTin,
@@ -479,20 +556,20 @@ const TinDangModel = {
         COALESCE(ct.SDTChuTro, tt_ql.SDT) AS SDTChuTro,
         (
           SELECT ap.DuongDan
-          FROM AnhPhong ap
+          FROM anhphong ap
           WHERE ap.MaPhong = p.MaPhong
           ORDER BY ap.AnhChinh DESC, ap.MaAnh ASC
           LIMIT 1
         ) AS AnhDaiDien
-      FROM TinDang td
-      INNER JOIN Phong p ON td.MaPhong = p.MaPhong
-      INNER JOIN KhuTro k ON p.MaKhu = k.MaKhu
-      LEFT JOIN NguoiDung nd_ql ON k.MaND = nd_ql.MaND
+      FROM tindang td
+      INNER JOIN phong p ON td.MaPhong = p.MaPhong
+      INNER JOIN khutro k ON p.MaKhu = k.MaKhu
+      LEFT JOIN nguoidung nd_ql ON k.MaND = nd_ql.MaND
       LEFT JOIN (${SUBQUERY_THONG_TIN_CA_NHAN}) tt_ql ON nd_ql.MaND = tt_ql.MaND
       LEFT JOIN (${SUBQUERY_CHU_TRO}) ct ON 1 = 1
       WHERE td.MaTin = ?
-        AND td.TrangThai IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị')
-        AND p.TrangThai IN ('Trong', 'ConTrong', 'Trống', 'Còn trống', 'BaoTri', 'Bảo trì')
+        AND TRIM(td.TrangThai) IN ('DangHienThi', 'DaDang', 'Đã đăng', 'Đang hiển thị')
+        AND TRIM(p.TrangThai) IN ('Trong', 'ConTrong', 'Con trong', 'DangTrong', 'Dang trong', 'Trống', 'Còn trống', 'Đang trống', 'BaoTri', 'Bao tri', 'Bảo trì', 'Đang bảo trì')
         AND (td.NgayHetHan IS NULL OR td.NgayHetHan >= CURDATE())
       LIMIT 1
     `;
@@ -503,18 +580,27 @@ const TinDangModel = {
     return enrichedRows[0] || null;
   },
 
-  // 4. Thêm mới tin đăng (Dọn dẹp tin cũ hết hạn/đã ẩn của cùng phòng để tránh trùng lặp)
+  // 4. Thêm mới tin đăng (Giữ nguyên lịch sử các tin đã HetHan trước đó, chỉ tạo bản ghi tin mới)
   async createTinDang({ MaPhong, MaND, TieuDe, MoTa, NgayHetHan, TrangThai }) {
+    // Chỉ đồng bộ các tin cũ đã quá ngày hết hạn sang trạng thái 'HetHan', giữ nguyên bản ghi cũ
     await db.query(
-      `DELETE FROM TinDang WHERE MaPhong = ? AND (TrangThai IS NULL OR TRIM(TrangThai) = '' OR TrangThai IN ('HetHan', 'DaAn') OR (NgayHetHan IS NOT NULL AND NgayHetHan < CURDATE()))`,
+      `
+        UPDATE tindang
+        SET TrangThai = 'HetHan'
+        WHERE MaPhong = ?
+          AND NgayHetHan IS NOT NULL
+          AND NgayHetHan < CURDATE()
+          AND TrangThai <> 'HetHan'
+      `,
       [MaPhong]
     );
 
     const trangThaiTin = normalizeTrangThaiTin(TrangThai);
     const ngayHetHanChuan = ensureValidExpiryDate(NgayHetHan, trangThaiTin);
 
+    // INSERT bản ghi tin đăng mới hoàn toàn (sinh MaTin mới)
     const sql = `
-      INSERT INTO TinDang (MaPhong, MaND, TieuDe, MoTa, NgayDang, NgayHetHan, TrangThai)
+      INSERT INTO tindang (MaPhong, MaND, TieuDe, MoTa, NgayDang, NgayHetHan, TrangThai)
       VALUES (?, ?, ?, ?, NOW(), ?, ?)
     `;
     const [result] = await db.query(sql, [
@@ -530,11 +616,19 @@ const TinDangModel = {
 
   // 5. Sửa tin đã đăng theo MaTin
   async updateTinDang(maTin, { MaPhong, TieuDe, MoTa, NgayHetHan, TrangThai }) {
-    const trangThaiTin = normalizeTrangThaiTin(TrangThai);
-    const ngayHetHanChuan = ensureValidExpiryDate(NgayHetHan, trangThaiTin);
+    let trangThaiTin = normalizeTrangThaiTin(TrangThai);
+    const ngayHetHanChuan = normalizeDate(NgayHetHan);
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Nếu ngày hết hạn nhỏ hơn ngày hiện tại thì chuyển về HetHan (không tự động mở lại hạn tin cũ)
+    if (ngayHetHanChuan && ngayHetHanChuan < todayStr) {
+      trangThaiTin = 'HetHan';
+    }
 
     const sql = `
-      UPDATE TinDang
+      UPDATE tindang
       SET MaPhong = ?,
           TieuDe = ?,
           MoTa = ?,
@@ -551,54 +645,21 @@ const TinDangModel = {
       maTin,
     ]);
 
-    // Nếu người dùng bật tin sang DangHienThi mà phòng đó không còn khách ở thực tế (không có thành viên NgayDi IS NULL)
-    // thì tự động đồng bộ trạng thái phòng về 'Trong' (tránh lỗi kẹt trạng thái như P.309)
-    if (trangThaiTin === "DangHienThi" && MaPhong) {
-      await db.query(
-        `
-          UPDATE Phong p
-          SET p.TrangThai = 'Trong'
-          WHERE p.MaPhong = ?
-            AND p.TrangThai = 'DangThue'
-            AND NOT EXISTS (
-              SELECT 1
-              FROM HopDongThue hdt
-              INNER JOIN ChiTietHopDongThue cthdt ON hdt.MaHDT = cthdt.MaHDT
-              WHERE hdt.MaPhong = p.MaPhong
-                AND hdt.TrangThai = 'ConHieuLuc'
-                AND cthdt.NgayDi IS NULL
-            )
-        `,
-        [MaPhong]
-      );
-    }
-
     return result.affectedRows > 0;
   },
 
-  // 6. Xóa tin đăng theo MaTin
+  // 6. Xóa đúng tin đăng theo MaTin (không xóa nhầm các tin lịch sử khác của cùng MaPhong)
   async deleteTinDang(maTin) {
-    const [rows] = await db.query(
-      `SELECT MaPhong FROM TinDang WHERE MaTin = ? LIMIT 1`,
-      [maTin]
-    );
-    if (!rows.length) {
-      return false;
-    }
-
-    const maPhong = rows[0].MaPhong;
-
-    const [result] = await db.query(
-      `DELETE FROM TinDang WHERE MaTin = ? OR MaPhong = ?`,
-      [maTin, maPhong]
-    );
+    const [result] = await db.query(`DELETE FROM tindang WHERE MaTin = ?`, [
+      maTin,
+    ]);
     return result.affectedRows > 0;
   },
 
   // 7. Cập nhật giá phòng
   async updateGiaPhong(maPhong, giaMoi) {
     const sql = `
-      UPDATE Phong
+      UPDATE phong
       SET Gia = ?
       WHERE MaPhong = ?
     `;

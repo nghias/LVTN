@@ -1,15 +1,33 @@
 // src/controllers/tinDang.controller.js
 const TinDangModel = require('../models/tinDang.model');
 
-// Hàm phụ lấy MaND từ JWT Cookie (req.user.maND) hoặc từ query/body
+// Lấy MaND từ query/body hoặc từ JWT Cookie (req.user)
 function extractCurrentMaND(req) {
-  return (
-    req.user?.maND ||
-    req.user?.MaND ||
+  const fromQueryOrBody =
     req.query?.MaND ||
+    req.query?.maND ||
     req.body?.MaND ||
-    null
-  );
+    req.body?.maND ||
+    req.headers?.['x-ma-nd'];
+
+  const fromUser =
+    req.user?.MaND ||
+    req.user?.maND ||
+    req.user?.id ||
+    req.user?.userId;
+
+  // Ưu tiên thông tin xác thực từ req.user, nếu không có thì lấy từ query/body
+  return fromUser || fromQueryOrBody || null;
+}
+
+// Xác định người dùng hiện tại (nếu không truyền MaND sẽ fallback về tài khoản ChuTro)
+async function resolveCurrentUser(req) {
+  const rawMaND = extractCurrentMaND(req);
+  if (rawMaND && !isNaN(Number(rawMaND))) {
+    const user = await TinDangModel.getNguoiDungById(Number(rawMaND));
+    if (user) return user;
+  }
+  return null;
 }
 
 const TinDangController = {
@@ -62,36 +80,49 @@ const TinDangController = {
     }
   },
 
-  // GET /tin-dang (Dùng cho trang Quản lý tin đăng - Xét theo quyền ChuTro / QuanLy)
+  // GET /tin-dang (Quản lý tin đăng & lấy danh sách phòng trống theo quyền ChuTro / QuanLy khu)
   async getList(req, res) {
     try {
-      const currentMaND = extractCurrentMaND(req);
+      let nguoiDung = await resolveCurrentUser(req);
 
-      if (!currentMaND) {
+      // Nếu FE không gửi MaND và chưa có cookie, fallback về tài khoản Chủ trọ mặc định
+      if (!nguoiDung) {
+        nguoiDung = await TinDangModel.getChuTroMacDinh();
+      }
+
+      if (!nguoiDung) {
         return res.status(401).json({
           success: false,
           message: 'Không xác định được tài khoản đang đăng nhập.',
         });
       }
 
-      const nguoiDung = await TinDangModel.getNguoiDungById(Number(currentMaND));
-      if (!nguoiDung) {
-        return res.status(403).json({
-          success: false,
-          message: 'Tài khoản người dùng không tồn tại hoặc không hợp lệ.',
-        });
-      }
-
-      if (nguoiDung.Quyen !== 'ChuTro' && nguoiDung.Quyen !== 'QuanLy') {
+      if (
+        nguoiDung.Quyen !== 'ChuTro' &&
+        nguoiDung.Quyen !== 'QuanLy' &&
+        nguoiDung.Quyen !== 'Admin'
+      ) {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền truy cập trang quản lý tin đăng.',
         });
       }
 
-      const [tinDangList, phongList] = await Promise.all([
+      const excludeMaTin = req.query?.excludeMaTin
+        ? Number(req.query.excludeMaTin)
+        : null;
+
+      // Đồng bộ các tin đã quá NgayHetHan sang trạng thái 'HetHan' trước khi lấy dữ liệu
+      await TinDangModel.syncExpiredTinDang();
+
+      const [tinDangList, phongList, khuTroList] = await Promise.all([
         TinDangModel.getAllTinDang(nguoiDung.MaND, nguoiDung.Quyen),
-        TinDangModel.getPhongListForSelect(nguoiDung.MaND, nguoiDung.Quyen),
+        TinDangModel.getPhongListForSelect(
+          nguoiDung.MaND,
+          nguoiDung.Quyen,
+          excludeMaTin
+        ),
+        TinDangModel.getKhuTroList(nguoiDung.MaND, nguoiDung.Quyen),
       ]);
 
       return res.status(200).json({
@@ -99,7 +130,9 @@ const TinDangController = {
         data: {
           tinDangList,
           phongList,
+          khuTroList,
           userRole: nguoiDung.Quyen,
+          currentMaND: nguoiDung.MaND,
         },
       });
     } catch (error) {
@@ -115,7 +148,6 @@ const TinDangController = {
   async create(req, res) {
     try {
       const { MaPhong, Gia, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
-      const currentMaND = extractCurrentMaND(req);
 
       if (!MaPhong || !TieuDe || !String(TieuDe).trim()) {
         return res.status(400).json({
@@ -134,23 +166,23 @@ const TinDangController = {
         }
       }
 
-      if (!currentMaND) {
+      let nguoiDung = await resolveCurrentUser(req);
+      if (!nguoiDung) {
+        nguoiDung = await TinDangModel.getChuTroMacDinh();
+      }
+
+      if (!nguoiDung) {
         return res.status(401).json({
           success: false,
           message: 'Không xác định được người dùng đăng tin.',
         });
       }
 
-      const nguoiDung = await TinDangModel.getNguoiDungById(Number(currentMaND));
-      if (!nguoiDung) {
-        return res.status(403).json({
-          success: false,
-          message: 'Tài khoản người dùng không hợp lệ.',
-        });
-      }
+      const hasFullAccess =
+        nguoiDung.Quyen === 'ChuTro' || nguoiDung.Quyen === 'Admin';
 
-      const isChuTro = nguoiDung.Quyen === 'ChuTro';
-      if (!isChuTro) {
+      // Nếu là Quản lý: kiểm tra phòng có thuộc khu trọ do người này quản lý (khutro.MaND) hay không
+      if (!hasFullAccess) {
         const isAllowed = await TinDangModel.checkPhongThuocQuanLy(
           Number(MaPhong),
           nguoiDung.MaND
@@ -158,21 +190,31 @@ const TinDangController = {
         if (!isAllowed) {
           return res.status(403).json({
             success: false,
-            message: 'Bạn chỉ được phép đăng tin cho phòng thuộc khu trọ mình quản lý.',
+            message:
+              'Bạn chỉ được phép đăng tin cho phòng thuộc khu trọ mình quản lý.',
           });
         }
       }
 
-      const checkPhong = await TinDangModel.checkPhongCoTheDangTin(Number(MaPhong));
+      // Đồng bộ tin hết hạn trước khi kiểm tra phòng
+      await TinDangModel.syncExpiredTinDang();
+
+      const checkPhong = await TinDangModel.checkPhongCoTheDangTin(
+        Number(MaPhong)
+      );
       if (!checkPhong.valid) {
         const errorMessages = {
           NOT_FOUND: 'Phòng không tồn tại trong hệ thống.',
-          NOT_EMPTY: 'Chỉ được phép đăng tin cho phòng đang còn trống hoặc đang bảo trì.',
-          ALREADY_HAS_STATUS: 'Phòng này đã có tin đăng đang hiển thị, không thể thêm tin trùng.',
+          NOT_EMPTY:
+            'Chỉ được phép đăng tin cho phòng đang còn trống hoặc đang bảo trì.',
+          ALREADY_HAS_STATUS:
+            'Phòng này đang có tin hiển thị còn hiệu lực, không thể đăng trùng.',
         };
         return res.status(400).json({
           success: false,
-          message: errorMessages[checkPhong.reason] || 'Phòng không hợp lệ để đăng tin.',
+          message:
+            errorMessages[checkPhong.reason] ||
+            'Phòng không hợp lệ để đăng tin.',
         });
       }
 
@@ -213,14 +255,6 @@ const TinDangController = {
     try {
       const { maTin } = req.params;
       const { MaPhong, Gia, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
-      const currentMaND = extractCurrentMaND(req);
-
-      if (!currentMaND) {
-        return res.status(401).json({
-          success: false,
-          message: 'Không xác định được người dùng thực hiện.',
-        });
-      }
 
       if (Gia !== undefined && Gia !== null && Gia !== '') {
         const giaNum = Number(Gia);
@@ -240,18 +274,27 @@ const TinDangController = {
         });
       }
 
-      const targetMaPhong = MaPhong ? Number(MaPhong) : Number(existingTin.MaPhong);
+      const targetMaPhong = MaPhong
+        ? Number(MaPhong)
+        : Number(existingTin.MaPhong);
 
-      const nguoiDung = await TinDangModel.getNguoiDungById(Number(currentMaND));
+      let nguoiDung = await resolveCurrentUser(req);
       if (!nguoiDung) {
-        return res.status(403).json({
+        nguoiDung = await TinDangModel.getChuTroMacDinh();
+      }
+
+      if (!nguoiDung) {
+        return res.status(401).json({
           success: false,
-          message: 'Tài khoản người dùng không hợp lệ.',
+          message: 'Không xác định được người dùng thực hiện.',
         });
       }
 
-      const isChuTro = nguoiDung.Quyen === 'ChuTro';
-      if (!isChuTro) {
+      const hasFullAccess =
+        nguoiDung.Quyen === 'ChuTro' || nguoiDung.Quyen === 'Admin';
+
+      // Nếu là Quản lý: kiểm tra theo khu trọ quản lý (khutro.MaND), không lọc theo tindang.MaND
+      if (!hasFullAccess) {
         const [ownsTin, ownsPhong] = await Promise.all([
           TinDangModel.checkTinThuocQuanLy(Number(maTin), nguoiDung.MaND),
           TinDangModel.checkPhongThuocQuanLy(targetMaPhong, nguoiDung.MaND),
@@ -260,20 +303,8 @@ const TinDangController = {
         if (!ownsTin || !ownsPhong) {
           return res.status(403).json({
             success: false,
-            message: 'Bạn chỉ được phép chỉnh sửa tin đăng thuộc khu trọ mình quản lý.',
-          });
-        }
-      }
-
-      if (targetMaPhong !== Number(existingTin.MaPhong)) {
-        const checkPhong = await TinDangModel.checkPhongCoTheDangTin(
-          targetMaPhong,
-          Number(maTin)
-        );
-        if (!checkPhong.valid) {
-          return res.status(400).json({
-            success: false,
-            message: 'Phòng được chọn phải đang còn trống và chưa có tin đăng khác.',
+            message:
+              'Bạn chỉ được phép chỉnh sửa tin đăng thuộc khu trọ mình quản lý.',
           });
         }
       }
@@ -282,11 +313,33 @@ const TinDangController = {
         TrangThai || existingTin.TrangThai || 'DangHienThi'
       );
 
+      // Nếu đổi sang phòng khác hoặc đang để trạng thái DangHienThi thì kiểm tra phòng có bị trùng tin đang hiển thị khác không
+      if (
+        targetMaPhong !== Number(existingTin.MaPhong) ||
+        trangThaiCapNhat === 'DangHienThi'
+      ) {
+        const checkPhong = await TinDangModel.checkPhongCoTheDangTin(
+          targetMaPhong,
+          Number(maTin)
+        );
+        if (!checkPhong.valid && checkPhong.reason === 'ALREADY_HAS_STATUS') {
+          return res.status(400).json({
+            success: false,
+            message:
+              'Phòng được chọn đang có một tin đăng hiển thị khác còn hiệu lực.',
+          });
+        }
+      }
+
       const updated = await TinDangModel.updateTinDang(Number(maTin), {
         MaPhong: targetMaPhong,
-        TieuDe: TieuDe !== undefined && String(TieuDe).trim() !== '' ? String(TieuDe).trim() : existingTin.TieuDe,
+        TieuDe:
+          TieuDe !== undefined && String(TieuDe).trim() !== ''
+            ? String(TieuDe).trim()
+            : existingTin.TieuDe,
         MoTa: MoTa !== undefined ? MoTa : existingTin.MoTa,
-        NgayHetHan: NgayHetHan !== undefined ? NgayHetHan : existingTin.NgayHetHan,
+        NgayHetHan:
+          NgayHetHan !== undefined ? NgayHetHan : existingTin.NgayHetHan,
         TrangThai: trangThaiCapNhat,
       });
 
@@ -322,21 +375,22 @@ const TinDangController = {
   async remove(req, res) {
     try {
       const { maTin } = req.params;
-      const currentMaND = extractCurrentMaND(req);
+      const nguoiDung = await resolveCurrentUser(req);
 
-      if (currentMaND) {
-        const nguoiDung = await TinDangModel.getNguoiDungById(Number(currentMaND));
-        if (nguoiDung && nguoiDung.Quyen !== 'ChuTro') {
-          const ownsTin = await TinDangModel.checkTinThuocQuanLy(
-            Number(maTin),
-            nguoiDung.MaND
-          );
-          if (!ownsTin) {
-            return res.status(403).json({
-              success: false,
-              message: 'Bạn không có quyền xóa tin đăng của khu trọ khác.',
-            });
-          }
+      if (
+        nguoiDung &&
+        nguoiDung.Quyen !== 'ChuTro' &&
+        nguoiDung.Quyen !== 'Admin'
+      ) {
+        const ownsTin = await TinDangModel.checkTinThuocQuanLy(
+          Number(maTin),
+          nguoiDung.MaND
+        );
+        if (!ownsTin) {
+          return res.status(403).json({
+            success: false,
+            message: 'Bạn không có quyền xóa tin đăng của khu trọ khác.',
+          });
         }
       }
 
@@ -351,7 +405,7 @@ const TinDangController = {
 
       return res.status(200).json({
         success: true,
-        message: 'Đã xóa tin đăng và trạng thái tin thành công. Phòng đã có thể đăng tin lại.',
+        message: 'Đã xóa tin đăng thành công.',
       });
     } catch (error) {
       console.error('❌ Lỗi xóa tin đăng:', error);

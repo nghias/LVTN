@@ -13,26 +13,121 @@ import TinDangForm, {
   TinDangFormData,
 } from "@/components/tinDang/TinDangForm";
 import { useAlertModal } from "@/components/common/AlertModalProvider";
+import { PhongTroService } from "@/services/phongTro.service";
 import type { PhongSelectOption } from "../page";
 
 interface TinDangItemBrief {
   MaTin: number;
   MaPhong: number;
+  MaKhu?: number;
+  MaND?: number;
   TrangThai?: string | null;
+  NgayHetHan?: string | null;
+  TenPhong?: string;
+  DienTich?: number;
+  Gia?: number;
+  TrangThaiPhong?: string | null;
+  TenKhu?: string;
+  DiaChi?: string;
+  MaQuanLy?: number;
+  TenQuanLy?: string;
+  SDTQuanLy?: string;
+  TenChuTro?: string;
+  SDTChuTro?: string;
+}
+
+interface StoredAuthUser {
+  maND: number;
+  quyen: string;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 function isPhongConTrong(trangThai?: string | null): boolean {
-  if (!trangThai) return false;
+  if (
+    trangThai === undefined ||
+    trangThai === null ||
+    String(trangThai).trim() === ""
+  ) {
+    return true;
+  }
+
   const normalized = String(trangThai).trim().toLowerCase();
   return [
     "trong",
     "controng",
     "con trong",
+    "dangtrong",
+    "dang trong",
     "trống",
     "còn trống",
+    "đang trống",
+    "baotri",
+    "bao tri",
+    "bảo trì",
+    "đang bảo trì",
   ].includes(normalized);
+}
+
+// Kiểm tra xem tin đăng có phải là tin đã hết hạn hay không
+function isTinHetHan(tin: TinDangItemBrief): boolean {
+  const normalizedStatus = String(tin.TrangThai || "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    ["hethan", "het han", "hết hạn", "dahethan", "đã hết hạn"].includes(
+      normalizedStatus
+    )
+  ) {
+    return true;
+  }
+
+  if (tin.NgayHetHan) {
+    const expiryDate = new Date(tin.NgayHetHan);
+    if (!Number.isNaN(expiryDate.getTime())) {
+      expiryDate.setHours(23, 59, 59, 999);
+      if (expiryDate.getTime() < Date.now()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Chỉ chặn phòng nếu phòng đó đang có tin DangHienThi và chưa hết hạn
+function isTinDangHienThiConHan(tin: TinDangItemBrief): boolean {
+  if (isTinHetHan(tin)) {
+    return false;
+  }
+
+  const normalizedStatus = String(tin.TrangThai || "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    !normalizedStatus ||
+    ["daan", "da an", "đã ẩn", "an", "ẩn"].includes(normalizedStatus)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+// Tạo đối tượng PhongSelectOption từ thông tin tin đăng (dùng cho phòng có tin đã hết hạn)
+function buildRoomOptionFromTin(tin: TinDangItemBrief): PhongSelectOption {
+  return {
+    MaPhong: Number(tin.MaPhong),
+    TenPhong: tin.TenPhong || `Phòng #${tin.MaPhong}`,
+    DienTich: Number(tin.DienTich || 0),
+    Gia: Number(tin.Gia || 0),
+    TrangThai: tin.TrangThaiPhong || "Trong",
+    MaKhu: Number(tin.MaKhu || 0),
+    TenKhu: tin.TenKhu || "",
+    DiaChi: tin.DiaChi || "",
+  } as PhongSelectOption;
 }
 
 function ThemTinDangContent() {
@@ -60,8 +155,13 @@ function ThemTinDangContent() {
     TrangThai: "DangHienThi",
   });
 
-  const getStoredMaND = useCallback((): number => {
-    if (typeof window === "undefined") return 1;
+  // Lấy cả MaND và Quyen (ChuTro / QuanLy) từ bộ nhớ trình duyệt
+  const getStoredUser = useCallback((): StoredAuthUser => {
+    const defaultRole = pathname.startsWith("/chuTro") ? "ChuTro" : "QuanLy";
+    if (typeof window === "undefined") {
+      return { maND: 1, quyen: defaultRole };
+    }
+
     for (const storage of [window.localStorage, window.sessionStorage]) {
       for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i);
@@ -69,55 +169,199 @@ function ThemTinDangContent() {
         try {
           const parsed = JSON.parse(storage.getItem(key) || "");
           if (parsed && typeof parsed === "object") {
-            if (parsed.MaND) return Number(parsed.MaND);
-            if (parsed.user?.MaND) return Number(parsed.user.MaND);
+            const rawUser = parsed.user || parsed;
+            const maND = Number(rawUser.MaND ?? rawUser.maND ?? 0);
+            const quyen = String(
+              rawUser.Quyen ?? rawUser.quyen ?? rawUser.role ?? ""
+            ).trim();
+
+            if (maND > 0) {
+              return {
+                maND,
+                quyen: quyen || (maND === 1 ? "ChuTro" : defaultRole),
+              };
+            }
           }
         } catch {
-          // Bỏ qua
+          // Bỏ qua key không phải JSON
         }
       }
     }
-    return 1;
-  }, []);
+
+    return { maND: 1, quyen: defaultRole };
+  }, [pathname]);
 
   useEffect(() => {
+    const fetchTinDangData = async (maNDParam?: number) => {
+      const url = maNDParam
+        ? `${API_BASE_URL}/tin-dang?MaND=${maNDParam}`
+        : `${API_BASE_URL}/tin-dang`;
+      const res = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Không thể tải danh sách phòng.");
+      }
+      return {
+        phongList: (json.data?.phongList || []) as PhongSelectOption[],
+        tinDangList: (json.data?.tinDangList || []) as TinDangItemBrief[],
+      };
+    };
+
     const fetchRooms = async () => {
       try {
         setLoadingPhong(true);
-        const maND = getStoredMaND();
+        const { maND, quyen } = getStoredUser();
+        const isChuTro =
+          quyen.toLowerCase() === "chutro" ||
+          pathname.startsWith("/chuTro") ||
+          maND === 1;
 
-        const response = await fetch(`${API_BASE_URL}/tin-dang?MaND=${maND}`, {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        });
+        // Lấy danh sách khu trọ để biết khu nào thuộc người quản lý nào (khutro.MaND)
+        const khuRes = await PhongTroService.getKhuTroList().catch(() => ({
+          data: [],
+        }));
+        const khuList = khuRes.data || [];
 
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || "Không thể tải danh sách phòng.");
+        const managerIds = Array.from(
+          new Set(
+            khuList
+              .map((k: any) => Number(k.MaND))
+              .filter((id: number) => id > 0)
+          )
+        );
+        if (managerIds.length === 0) {
+          managerIds.push(2, 3, 4);
         }
 
-        const rawRooms: PhongSelectOption[] = result.data.phongList || [];
-        const tinDangList: TinDangItemBrief[] = result.data.tinDangList || [];
+        let rawRooms: PhongSelectOption[] = [];
+        let tinDangList: TinDangItemBrief[] = [];
 
-        const phongDaCoTrangThaiTinSet = new Set(
+        if (isChuTro) {
+          // Chủ trọ: Lấy toàn bộ phòng và toàn bộ tin đăng của tất cả các cơ sở
+          const allRequests = await Promise.allSettled([
+            fetchTinDangData(),
+            ...managerIds.map((id) => fetchTinDangData(id)),
+          ]);
+
+          const roomMap = new Map<string, PhongSelectOption>();
+          const tinMap = new Map<string, TinDangItemBrief>();
+
+          allRequests.forEach((res) => {
+            if (res.status === "fulfilled") {
+              res.value.phongList.forEach((r) =>
+                roomMap.set(String(r.MaPhong), r)
+              );
+              res.value.tinDangList.forEach((t) =>
+                tinMap.set(String(t.MaTin), t)
+              );
+            }
+          });
+
+          tinDangList = Array.from(tinMap.values());
+
+          // Bổ sung các phòng có tin đăng đã hết hạn vào danh sách chọn phòng
+          tinDangList.forEach((tin) => {
+            const key = String(tin.MaPhong);
+            if (isTinHetHan(tin) && !roomMap.has(key)) {
+              roomMap.set(key, buildRoomOptionFromTin(tin));
+            }
+          });
+
+          rawRooms = Array.from(roomMap.values());
+        } else {
+          // Quản lý: Chỉ lấy phòng và tin thuộc khu trọ mà người này quản lý (khutro.MaND === maND)
+          const managedKhuIds = new Set(
+            khuList
+              .filter((k: any) => Number(k.MaND) === maND)
+              .map((k: any) => Number(k.MaKhu))
+          );
+
+          const managerRequests = await Promise.allSettled([
+            fetchTinDangData(maND),
+            fetchTinDangData(),
+          ]);
+
+          const roomMap = new Map<string, PhongSelectOption>();
+          const tinMap = new Map<string, TinDangItemBrief>();
+
+          managerRequests.forEach((res) => {
+            if (res.status === "fulfilled") {
+              res.value.phongList.forEach((r) => {
+                if (
+                  managedKhuIds.size === 0 ||
+                  managedKhuIds.has(Number(r.MaKhu))
+                ) {
+                  roomMap.set(String(r.MaPhong), r);
+                }
+              });
+              res.value.tinDangList.forEach((t) => {
+                if (
+                  managedKhuIds.size === 0 ||
+                  managedKhuIds.has(Number(t.MaKhu))
+                ) {
+                  tinMap.set(String(t.MaTin), t);
+                }
+              });
+            }
+          });
+
+          tinDangList = Array.from(tinMap.values());
+
+          // Bổ sung các phòng thuộc khu quản lý có tin đã hết hạn vào roomMap
+          tinDangList.forEach((tin) => {
+            const key = String(tin.MaPhong);
+            const belongsToManager =
+              managedKhuIds.size === 0 || managedKhuIds.has(Number(tin.MaKhu));
+            if (belongsToManager && isTinHetHan(tin) && !roomMap.has(key)) {
+              roomMap.set(key, buildRoomOptionFromTin(tin));
+            }
+          });
+
+          rawRooms = Array.from(roomMap.values());
+        }
+
+        // Tập hợp các phòng có tin đã hết hạn
+        const phongCoTinHetHanSet = new Set(
           tinDangList
-            .filter(
-              (tin) =>
-                tin.TrangThai !== undefined &&
-                tin.TrangThai !== null &&
-                String(tin.TrangThai).trim() !== ""
-            )
+            .filter((tin) => isTinHetHan(tin))
             .map((tin) => String(tin.MaPhong))
         );
 
-        const rooms = rawRooms.filter((room) => {
-          const conTrong = isPhongConTrong(room.TrangThai);
-          const chuaCoTrangThaiTin = !phongDaCoTrangThaiTinSet.has(
-            String(room.MaPhong)
+        // Chỉ chặn những phòng đang có tin DangHienThi và còn hạn
+        const phongDangCoTinHieuLucSet = new Set(
+          tinDangList
+            .filter((tin) => isTinDangHienThiConHan(tin))
+            .map((tin) => String(tin.MaPhong))
+        );
+
+        const rooms = rawRooms
+          .filter((room) => {
+            const maPhongStr = String(room.MaPhong);
+            // Nếu phòng đã có một tin mới đang hiển thị còn hiệu lực thì không hiện nữa
+            if (phongDangCoTinHieuLucSet.has(maPhongStr)) {
+              return false;
+            }
+
+            const r = room as PhongSelectOption & {
+              TrangThaiPhong?: string | null;
+            };
+            const trangThaiPhong = r.TrangThai ?? r.TrangThaiPhong;
+
+            // Hiển thị phòng nếu phòng đang trống/bảo trì HOẶC phòng có tin cũ đã hết hạn
+            return (
+              isPhongConTrong(trangThaiPhong) ||
+              phongCoTinHetHanSet.has(maPhongStr)
+            );
+          })
+          .sort(
+            (a, b) =>
+              Number(a.MaKhu || 0) - Number(b.MaKhu || 0) ||
+              Number(a.MaPhong) - Number(b.MaPhong)
           );
-          return conTrong && chuaCoTrangThaiTin;
-        });
 
         setPhongOptions(rooms);
 
@@ -167,7 +411,7 @@ function ThemTinDangContent() {
     };
 
     fetchRooms();
-  }, [getStoredMaND, searchParams, showError]);
+  }, [getStoredUser, pathname, searchParams, showError]);
 
   return (
     <FormPageLayout
@@ -193,13 +437,19 @@ function ThemTinDangContent() {
           onSubmit={async (payload) => {
             try {
               setIsSubmitting(true);
+              const { maND } = getStoredUser();
               const response = await fetch(`${API_BASE_URL}/tin-dang`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
                 body: JSON.stringify({
-                  ...payload,
-                  MaND: payload.MaND || getStoredMaND(),
+                  MaPhong: Number(payload.MaPhong),
+                  Gia: payload.Gia,
+                  TieuDe: payload.TieuDe,
+                  MoTa: payload.MoTa,
+                  NgayHetHan: payload.NgayHetHan,
+                  TrangThai: payload.TrangThai || "DangHienThi",
+                  MaND: payload.MaND || maND,
                 }),
               });
 
