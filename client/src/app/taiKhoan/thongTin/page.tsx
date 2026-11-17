@@ -371,7 +371,7 @@ export default function ThongTinCaNhanPage() {
   return (
     <ProtectedRoute allowedRoles={['ChuTro', 'QuanLy', 'KhachThue']}>
       {(user) => (
-        <div className="min-h-screen bg-slate-50/60 flex flex-col">
+        <div className="min-h-screen bg-slate-50 flex flex-col">
           {user.Quyen === 'KhachThue' ? (
             <NguoiThueHeader user={user} />
           ) : (

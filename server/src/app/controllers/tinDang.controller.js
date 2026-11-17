@@ -117,7 +117,7 @@ const TinDangController = {
       const { MaPhong, Gia, TieuDe, MoTa, NgayHetHan, TrangThai } = req.body;
       const currentMaND = extractCurrentMaND(req);
 
-      if (!MaPhong || !TieuDe) {
+      if (!MaPhong || !TieuDe || !String(TieuDe).trim()) {
         return res.status(400).json({
           success: false,
           message: 'Vui lòng chọn phòng và nhập tiêu đề bài đăng.',
@@ -167,8 +167,8 @@ const TinDangController = {
       if (!checkPhong.valid) {
         const errorMessages = {
           NOT_FOUND: 'Phòng không tồn tại trong hệ thống.',
-          NOT_EMPTY: 'Chỉ được phép đăng tin cho phòng đang còn trống.',
-          ALREADY_HAS_STATUS: 'Phòng này đã có tin đăng hoạt động, không thể thêm tin trùng.',
+          NOT_EMPTY: 'Chỉ được phép đăng tin cho phòng đang còn trống hoặc đang bảo trì.',
+          ALREADY_HAS_STATUS: 'Phòng này đã có tin đăng đang hiển thị, không thể thêm tin trùng.',
         };
         return res.status(400).json({
           success: false,
@@ -180,15 +180,12 @@ const TinDangController = {
         await TinDangModel.updateGiaPhong(Number(MaPhong), Number(Gia));
       }
 
-      const trangThaiMoi =
-        TrangThai && String(TrangThai).trim() !== ''
-          ? String(TrangThai).trim()
-          : 'DangHienThi';
+      const trangThaiMoi = TinDangModel.normalizeTrangThaiTin(TrangThai);
 
       const insertId = await TinDangModel.createTinDang({
         MaPhong: Number(MaPhong),
         MaND: nguoiDung.MaND,
-        TieuDe,
+        TieuDe: String(TieuDe).trim(),
         MoTa,
         NgayHetHan,
         TrangThai: trangThaiMoi,
@@ -281,12 +278,16 @@ const TinDangController = {
         }
       }
 
+      const trangThaiCapNhat = TinDangModel.normalizeTrangThaiTin(
+        TrangThai || existingTin.TrangThai || 'DangHienThi'
+      );
+
       const updated = await TinDangModel.updateTinDang(Number(maTin), {
         MaPhong: targetMaPhong,
-        TieuDe: TieuDe ?? existingTin.TieuDe,
+        TieuDe: TieuDe !== undefined && String(TieuDe).trim() !== '' ? String(TieuDe).trim() : existingTin.TieuDe,
         MoTa: MoTa !== undefined ? MoTa : existingTin.MoTa,
         NgayHetHan: NgayHetHan !== undefined ? NgayHetHan : existingTin.NgayHetHan,
-        TrangThai: TrangThai || existingTin.TrangThai || 'DangHienThi',
+        TrangThai: trangThaiCapNhat,
       });
 
       if (!updated) {
@@ -303,6 +304,10 @@ const TinDangController = {
       return res.status(200).json({
         success: true,
         message: 'Cập nhật tin đăng thành công.',
+        data: {
+          MaTin: Number(maTin),
+          TrangThai: trangThaiCapNhat,
+        },
       });
     } catch (error) {
       console.error('❌ Lỗi cập nhật tin đăng:', error);

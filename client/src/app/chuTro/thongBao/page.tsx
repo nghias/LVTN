@@ -83,16 +83,16 @@ export function ThongBaoHeader({
       <div className="flex flex-wrap items-center gap-2.5 shrink-0">
         <Link
           href="/chuTro/thongBao/guiTin"
-          className="px-4 py-3 rounded-2xl border border-teal-200 bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs sm:text-sm font-bold transition"
+          className="px-6 py-3 rounded-full bg-[#00ffd5] hover:bg-[#00e6c0] text-slate-900 text-xs sm:text-sm font-bold transition shadow-xs"
         >
           Trả Lời Phản hồi
         </Link>
 
         <Link
           href={`/chuTro/thongBao/them/${currentUserId || 0}${defaultKhuQuery}`}
-          className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold transition shadow-xs"
+          className="px-6 py-3 rounded-full bg-[#00ffd5] hover:bg-[#00e6c0] text-slate-900 text-xs sm:text-sm font-bold transition shadow-xs"
         >
-          + Soạn Thông Báo Mới
+          Soạn Thông Báo Mới
         </Link>
       </div>
     </div>
@@ -384,7 +384,9 @@ export function ThongBaoList({
                 <div
                   key={item.MaTB}
                   className={`p-5 sm:p-6 transition ${
-                    isUnread ? "bg-[#00FFCC]/10" : "bg-white hover:bg-slate-50/60"
+                    isUnread
+                      ? "bg-[#00FFCC]/10"
+                      : "bg-white hover:bg-slate-50/60"
                   }`}
                 >
                   {/* Hàng 1: Badges + Nút thao tác */}
@@ -414,10 +416,11 @@ export function ThongBaoList({
                       <button
                         type="button"
                         onClick={() => handleGoToChat(item)}
-                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 transition cursor-pointer"
+                        className="px-4 py-1.5 rounded-full text-xs font-bold text-slate-900 bg-[#00ffd5] hover:bg-[#00e6c0] transition cursor-pointer shadow-xs"
                       >
-                        💬 Nhắn tin
+                        Phản Hồi
                       </button>
+
                       <button
                         type="button"
                         onClick={() =>
@@ -426,7 +429,7 @@ export function ThongBaoList({
                             TieuDe: item.TieuDe,
                           })
                         }
-                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
+                        className="px-4 py-1.5 rounded-2xl text-xs font-bold text-red-600 bg-white border border-red-200 hover:bg-red-50 transition cursor-pointer"
                       >
                         Xóa
                       </button>
