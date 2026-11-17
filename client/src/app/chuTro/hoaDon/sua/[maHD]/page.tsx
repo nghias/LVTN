@@ -1,3 +1,4 @@
+// client/src/app/chuTro/hoaDon/sua/[maHD]/page.tsx
 'use client';
 
 import React, { useEffect, useState, useMemo, FormEvent } from 'react';
@@ -360,7 +361,7 @@ export default function SuaHoaDonPage() {
             </div>
           </div>
 
-          {/* Khu vực Thêm / Bỏ Phí phát sinh (Tái sử dụng PhatSinhRowsEditor) */}
+          {/* Khu vực Thêm / Bỏ Phí phát sinh */}
           <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -396,18 +397,18 @@ export default function SuaHoaDonPage() {
             )}
           </div>
 
-          {/* Bảng đối chiếu Tổng tiền sau khi sửa */}
-          <div className="p-5 rounded-2xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Bảng đối chiếu Tổng tiền sau khi sửa (Nền sáng đồng bộ #00FFCC) */}
+          <div className="p-5 rounded-2xl bg-[#00FFCC]/20 border border-teal-300 text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1 text-xs">
-              <p className="text-slate-300 font-bold">
+              <p className="text-slate-700 font-bold">
                 Tiền phòng ({formatVND(tienPhong)}) + Điện ({formatVND(tienDienMoi)}) + Nước ({formatVND(tienNuocMoi)}) + Dịch vụ ({formatVND(tienPhuPhi)}) + Phát sinh ({formatVND(tienPhatSinhMoi)})
               </p>
             </div>
             <div className="text-right">
-              <span className="text-xs font-bold text-slate-300 block">
+              <span className="text-xs font-bold text-teal-900 block">
                 Tổng tiền hóa đơn mới:
               </span>
-              <span className="text-xl sm:text-2xl font-bold text-[#00FFCC]">
+              <span className="text-xl sm:text-2xl font-bold text-teal-900">
                 {formatVND(tongTienMoi)}
               </span>
             </div>

@@ -130,7 +130,7 @@ export default function QuanLyKhuTroVaPhongPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Quản Lý Cơ Sở & Phòng Trọ
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   {user.Quyen === 'ChuTro'
                     ? 'Chủ trọ quản lý toàn bộ các khu trọ và danh sách phòng trên hệ thống'
                     : 'Quản lý cơ sở và danh sách phòng trọ thuộc phạm vi phụ trách của bạn'}

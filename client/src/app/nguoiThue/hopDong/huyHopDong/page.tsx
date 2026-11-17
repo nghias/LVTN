@@ -103,7 +103,7 @@ export default function YeuCauHuyHopDongModal({
                 min={new Date().toISOString().split('T')[0]}
                 value={ngayDuKienTraPhong}
                 onChange={(e) => setNgayDuKienTraPhong(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#00E6B8] focus:bg-white focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs focus:border-[#00E6B8] focus:bg-white focus:outline-none"
               />
             </div>
 
@@ -116,7 +116,7 @@ export default function YeuCauHuyHopDongModal({
                 value={sdtLienHe}
                 onChange={(e) => setSdtLienHe(e.target.value)}
                 placeholder="VD: 0901234567"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#00E6B8] focus:bg-white focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs focus:border-[#00E6B8] focus:bg-white focus:outline-none"
               />
             </div>
           </div>
@@ -147,7 +147,7 @@ export default function YeuCauHuyHopDongModal({
               value={lyDoHuy}
               onChange={(e) => setLyDoHuy(e.target.value)}
               placeholder="Nhập rõ lý do bạn muốn chấm dứt hợp đồng thuê phòng..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#00E6B8] focus:bg-white focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs focus:border-[#00E6B8] focus:bg-white focus:outline-none"
             />
           </div>
 
@@ -160,7 +160,7 @@ export default function YeuCauHuyHopDongModal({
               value={ghiChuThem}
               onChange={(e) => setGhiChuThem(e.target.value)}
               placeholder="VD: Có thể kiểm tra phòng vào cuối tuần lúc 9h sáng..."
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs sm:text-sm focus:border-[#00E6B8] focus:bg-white focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs focus:border-[#00E6B8] focus:bg-white focus:outline-none"
             />
           </div>
 

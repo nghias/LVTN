@@ -116,7 +116,7 @@ export default function KhachThueHoaDonPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Hóa Đơn Tiền Phòng Của Tôi
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Tra cứu tiền phòng, chỉ số điện nước, phí dịch vụ và phí phát sinh hàng tháng của bạn.
                 </p>
               </div>
@@ -138,7 +138,7 @@ export default function KhachThueHoaDonPage() {
                   <button
                     type="button"
                     onClick={openMonthPicker}
-                    className="min-w-[200px] px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:border-teal-500 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] text-xs sm:text-sm font-bold text-slate-800 flex items-center justify-between gap-3 cursor-pointer transition"
+                    className="min-w-[200px] px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:border-teal-500 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] text-xs font-bold text-slate-800 flex items-center justify-between gap-3 cursor-pointer transition"
                   >
                     <span>{formatMonthLabel(thangNam)}</span>
                     <svg
@@ -287,7 +287,7 @@ export default function KhachThueHoaDonPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-3 text-xs sm:text-sm">
+                      <div className="space-y-3 text-xs">
                         <div className="flex justify-between py-2 border-b border-slate-100">
                           <span className="font-bold text-slate-700">
                             1. Tiền phòng

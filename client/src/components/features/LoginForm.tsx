@@ -413,7 +413,7 @@ export default function LoginForm() {
 
               {/* Hàng tùy chọn: Ghi nhớ mật khẩu + Quên mật khẩu */}
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-700 cursor-pointer select-none">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={rememberMe}
@@ -426,7 +426,7 @@ export default function LoginForm() {
                 <button
                   type="button"
                   onClick={() => router.push('/taiKhoan/quenMatKhau')}
-                  className="text-xs sm:text-sm font-bold text-teal-700 hover:underline cursor-pointer"
+                  className="text-xs font-bold text-teal-700 hover:underline cursor-pointer"
                 >
                   Bạn quên mật khẩu?
                 </button>

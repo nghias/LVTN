@@ -73,7 +73,7 @@ export function ThongBaoHeader({
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
           Quản Lý & Phát Thông Báo Thời Gian Thực
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500">
+        <p className="text-xs text-slate-500">
           {isSupremeLandlord
             ? "Bạn có thể gửi thông báo tới toàn bộ hệ thống (bao gồm cả 3 quản lý và khách thuê) hoặc từng khu trọ riêng biệt."
             : "Bạn chỉ có thể gửi thông báo cho khách thuê đang cư trú tại khu trọ thuộc quyền quản lý của mình."}
@@ -83,14 +83,14 @@ export function ThongBaoHeader({
       <div className="flex flex-wrap items-center gap-2.5 shrink-0">
         <Link
           href="/chuTro/thongBao/guiTin"
-          className="px-6 py-3 rounded-full bg-[#00ffd5] hover:bg-[#00e6c0] text-slate-900 text-xs sm:text-sm font-bold transition shadow-xs"
+          className="px-6 py-3 rounded-full bg-[#00ffd5] hover:bg-[#00e6c0] text-slate-900 text-xs font-bold transition shadow-xs"
         >
           Trả Lời Phản hồi
         </Link>
 
         <Link
           href={`/chuTro/thongBao/them/${currentUserId || 0}${defaultKhuQuery}`}
-          className="px-6 py-3 rounded-full bg-[#00ffd5] hover:bg-[#00e6c0] text-slate-900 text-xs sm:text-sm font-bold transition shadow-xs"
+          className="px-6 py-3 rounded-full bg-[#00ffd5] hover:bg-[#00e6c0] text-slate-900 text-xs font-bold transition shadow-xs"
         >
           Soạn Thông Báo Mới
         </Link>
@@ -156,7 +156,7 @@ export function ThongBaoSearchBar({
               value={keyword}
               onChange={(e) => onKeywordChange(e.target.value)}
               placeholder="Tìm theo tiêu đề, nội dung hoặc người gửi..."
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-teal-600 focus:bg-white transition"
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:border-teal-600 focus:bg-white transition"
             />
             {keyword && (
               <button
@@ -172,7 +172,7 @@ export function ThongBaoSearchBar({
           <select
             value={maLTB}
             onChange={(e) => onMaLTBChange(e.target.value)}
-            className="px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-700 focus:outline-none focus:border-teal-600"
+            className="px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 focus:outline-none focus:border-teal-600"
           >
             <option value="">Tất cả loại thông báo</option>
             {loaiThongBaoList.map((ltb) => (
@@ -359,18 +359,18 @@ export function ThongBaoList({
     <>
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
         <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <span className="text-xs sm:text-sm font-bold text-slate-800">
+          <span className="text-xs font-bold text-slate-800">
             Danh sách thông báo ({filteredItems.length})
           </span>
         </div>
 
         <div className="divide-y divide-slate-200">
           {loading ? (
-            <div className="p-10 text-center text-xs sm:text-sm text-slate-400">
+            <div className="p-10 text-center text-xs text-slate-400">
               Đang tải danh sách thông báo...
             </div>
           ) : filteredItems.length === 0 ? (
-            <div className="p-10 text-center text-xs sm:text-sm text-slate-400">
+            <div className="p-10 text-center text-xs text-slate-400">
               Không có thông báo nào phù hợp.
             </div>
           ) : (
@@ -459,7 +459,7 @@ export function ThongBaoList({
 
                   {/* Hàng 4: Nội dung chi tiết thông báo hiển thị trực tiếp */}
                   <div className="mt-3.5 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-                    <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                    <p className="text-xs text-slate-800 whitespace-pre-line leading-relaxed">
                       {item.NoiDung}
                     </p>
                   </div>

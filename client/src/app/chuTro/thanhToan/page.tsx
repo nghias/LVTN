@@ -247,7 +247,7 @@ export default function QuanLyThanhToanPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Quản Lý Thanh Toán
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   {user.Quyen === 'ChuTro'
                     ? 'Chủ trọ thiết lập, đối soát và xác nhận thanh toán.'
                     : 'Quản lý cơ sở theo dõi lịch sử thanh toán và xác nhận thu tiền mặt của các phòng phụ trách.'}
@@ -365,7 +365,7 @@ export default function QuanLyThanhToanPage() {
                   <strong className="font-bold text-slate-800">
                     Trạng thái kênh thanh toán:
                   </strong>{' '}
-                  Đã kích hoạt xác thực tự động. Hệ thống tự động sinh mã QR theo từnghóa đơn và gạch nợ ngay khi chuyển khoản thành công.
+                  Đã kích hoạt xác thực tự động. Hệ thống tự động sinh mã QR theo từng hóa đơn và gạch nợ ngay khi chuyển khoản thành công.
                 </p>
               </div>
 
@@ -393,7 +393,7 @@ export default function QuanLyThanhToanPage() {
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="Tìm kiếm theo tên phòng (VD: P.101, P.102), tên khách, mã HĐ..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 />
               </div>
 
@@ -438,7 +438,7 @@ export default function QuanLyThanhToanPage() {
                     onClick={() => setFilterMode(st.value as any)}
                     className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
                       filterMode === st.value
-                        ? 'bg-slate-900 text-white shadow-2xs'
+                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-300 shadow-2xs'
                         : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
                     }`}
                   >
@@ -530,7 +530,6 @@ export default function QuanLyThanhToanPage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider">
-                        
                         <th className="py-3.5 px-4 font-bold whitespace-nowrap">
                           Phòng / Cơ Sở
                         </th>
@@ -554,7 +553,7 @@ export default function QuanLyThanhToanPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-200 text-xs">
                       {filteredHistory.map((item) => (
                         <tr
                           key={item.MaTT}

@@ -180,7 +180,7 @@ export default function AiChatbotWidget({
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-900">
+                  <h3 className="text-xs font-bold text-slate-900">
                     Trợ Lý Ảo AI Nhà Trọ
                   </h3>
                   <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />

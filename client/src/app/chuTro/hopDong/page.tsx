@@ -40,7 +40,7 @@ export default function QuanLyHopDongPage() {
   // Dữ liệu danh mục dùng cho Bộ lọc
   const [danhSachPhong, setDanhSachPhong] = useState<any[]>([]);
 
-  // State điều khiển các Modal (Đã loại bỏ moModalTaoMoi)
+  // State điều khiển các Modal
   const [hopDongCanXoa, setHopDongCanXoa] = useState<HopDongItem | null>(null);
   const [maHDTXemPdf, setMaHDTXemPdf] = useState<number | null>(null);
   const [maHDTXuatBanCung, setMaHDTXuatBanCung] = useState<number | null>(null);
@@ -284,7 +284,7 @@ export default function QuanLyHopDongPage() {
                   <button
                     type="button"
                     onClick={() => taiDanhSachHopDong()}
-                    className="w-full cursor-pointer whitespace-nowrap rounded-xl bg-[#0F172A] px-3 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800"
+                    className="w-full cursor-pointer whitespace-nowrap rounded-xl border border-teal-300 bg-[#00FFCC] px-3 py-2.5 text-xs font-bold text-slate-900 shadow-2xs transition hover:bg-[#00e6b8]"
                   >
                     Tìm kiếm
                   </button>
@@ -311,7 +311,7 @@ export default function QuanLyHopDongPage() {
                   onClick={() => xuLyChonTrangThai("")}
                   className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-1.5 font-medium transition ${
                     trangThaiLoc === ""
-                      ? "border-slate-900 bg-slate-900 text-white"
+                      ? "border-teal-400 bg-[#00FFCC] text-slate-900 shadow-2xs"
                       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
@@ -555,7 +555,7 @@ export default function QuanLyHopDongPage() {
                               </button>
                               <button
                                 onClick={() => chuyenTrangSua(hd.MaHDT)}
-                                className="cursor-pointer whitespace-nowrap rounded-full bg-[#0F172A] px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-slate-800"
+                                className="cursor-pointer whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800 transition hover:bg-amber-200"
                               >
                                 Sửa
                               </button>

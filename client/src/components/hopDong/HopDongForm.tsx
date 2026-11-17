@@ -480,7 +480,7 @@ export default function HopDongForm({
 
       {/* PHẦN 1: THÔNG TIN PHÒNG, TIỀN CỌC & THỜI HẠN */}
       <div className="space-y-4">
-        <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
           1. Thông tin phòng & Thời hạn hợp đồng
         </h2>
 
@@ -687,7 +687,7 @@ export default function HopDongForm({
       <div className="pt-4 border-t border-slate-200 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
               2. Danh sách người thuê lưu trú trong phòng{" "}
               <span className="text-red-500">*</span>
             </h2>
@@ -823,7 +823,7 @@ export default function HopDongForm({
       {/* PHẦN 3: PHÍ DỊCH VỤ ĐĂNG KÝ SỬ DỤNG HÀNG THÁNG */}
       <div className="pt-4 border-t border-slate-200 space-y-3">
         <div>
-          <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
             3. Phí dịch vụ đăng ký sử dụng hàng tháng
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">

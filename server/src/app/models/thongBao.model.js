@@ -11,6 +11,10 @@ const JOIN_THONG_TIN_CA_NHAN = `
 `;
 
 const ThongBaoModel = {
+  getAll: async () => {
+    const [rows] = await db.execute(`SELECT * FROM ThongBao ORDER BY 1 DESC`);
+    return rows;
+  },
   // 1. Lấy tất cả loại thông báo
   async getLoaiThongBao() {
     const [rows] = await db.query(

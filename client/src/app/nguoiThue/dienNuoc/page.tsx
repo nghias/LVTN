@@ -90,7 +90,6 @@ export default function NguoiThueDienNuocPage() {
         if (res.giaHienTai) setGiaHienTai(res.giaHienTai);
 
         if (allRows.length > 0) {
-          // Bản ghi đầu tiên là bản ghi có ngày ghi mới nhất
           const newestRecord = allRows[0];
           setKyGanNhat(newestRecord);
 
@@ -132,14 +131,14 @@ export default function NguoiThueDienNuocPage() {
     });
   };
 
-  // Nút "Mới nhất": Đưa bộ lọc và dữ liệu về đúng kỳ tháng mới nhất
+  // Nút "Kỳ mới nhất": Đưa bộ lọc và dữ liệu về đúng kỳ tháng mới nhất
   const handleResetToLatestMonth = () => {
     setSelectedMaPhong('');
     setSearch('');
     initLatestMonthData();
   };
 
-  // Nút "Xem toàn bộ lịch sử các tháng": Hiển thị tất cả các kỳ
+  // Nút "Xem hết": Hiển thị tất cả các kỳ
   const handleViewAllHistory = () => {
     setSelectedMaPhong('');
     setSearch('');
@@ -159,8 +158,8 @@ export default function NguoiThueDienNuocPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Theo Dõi Chỉ Số Điện Nước Phòng Thuê
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Tra cứu chỉ số điện, nước và lịch sử tiêu thụ hàng tháng và đơn giá đang áp dụng.
+                <p className="text-xs text-slate-500 mt-1">
+                  Tra cứu chỉ số điện, nước, lịch sử tiêu thụ hàng tháng và đơn giá đang áp dụng.
                 </p>
               </div>
 
@@ -175,7 +174,7 @@ export default function NguoiThueDienNuocPage() {
                 <button
                   type="button"
                   onClick={() => router.push('/nguoiThue/hoaDon')}
-                  className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap"
                 >
                   Xem Hóa Đơn & Thanh Toán →
                 </button>
@@ -242,7 +241,7 @@ export default function NguoiThueDienNuocPage() {
               </div>
             </div>
 
-            {/* Thanh chọn nhanh Phòng thuê (nếu người thuê đứng tên nhiều phòng) */}
+            {/* Thanh chọn nhanh Phòng thuê */}
             {phongList.length > 1 && (
               <div className="mt-6 flex flex-wrap items-center gap-2">
                 <button
@@ -253,7 +252,7 @@ export default function NguoiThueDienNuocPage() {
                   }}
                   className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                     selectedMaPhong === ''
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-2xs'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -270,7 +269,7 @@ export default function NguoiThueDienNuocPage() {
                     }}
                     className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                       selectedMaPhong === String(p.MaPhong)
-                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400'
+                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-2xs'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -300,7 +299,7 @@ export default function NguoiThueDienNuocPage() {
                         search,
                       });
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   >
                     <option value="">-- Tất cả phòng của tôi --</option>
                     {phongList.map((p) => (
@@ -332,7 +331,7 @@ export default function NguoiThueDienNuocPage() {
                         search,
                       });
                     }}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
 
@@ -345,7 +344,7 @@ export default function NguoiThueDienNuocPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Tìm theo tên phòng, khu trọ, mã CS..."
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   />
                 </div>
               </div>
@@ -353,7 +352,7 @@ export default function NguoiThueDienNuocPage() {
               <div className="flex items-center gap-2.5 shrink-0">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-2xs transition cursor-pointer whitespace-nowrap"
                 >
                   Lọc dữ liệu
                 </button>
@@ -424,10 +423,9 @@ export default function NguoiThueDienNuocPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-200 text-xs">
                       {danhSach.map((item) => (
                         <tr key={item.MaCS} className="hover:bg-slate-50/80 transition">
-                          
                           <td className="py-4 px-4 whitespace-nowrap">
                             <p className="font-bold text-slate-900">{item.TenPhong}</p>
                             <p className="text-xs text-slate-500">{item.TenKhu}</p>

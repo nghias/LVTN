@@ -162,7 +162,7 @@ export default function QuanLyHoaDonPage() {
     initLatestMonthData(defaultKhu);
   };
 
-  // Nút "Xem hết": Hiển thị toàn bộ lịch sử hóa đơn các tháng (nhưng giữ nguyên chuỗi YYYY-MM trên input để không bị lỗi vạch gạch ngang)
+  // Nút "Xem hết": Hiển thị toàn bộ lịch sử hóa đơn các tháng
   const handleViewAllHistory = () => {
     const safeMonth = latestMonthFromDB || thangNam || getCurrentMonth();
     const defaultKhu = khuTroList.length === 1 ? khuTroList[0].MaKhu : selectedMaKhu;
@@ -411,7 +411,7 @@ export default function QuanLyHoaDonPage() {
               <div className="flex items-center gap-2.5 shrink-0">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer transition whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-2xs cursor-pointer transition whitespace-nowrap"
                 >
                   Lọc dữ liệu
                 </button>
@@ -494,7 +494,7 @@ export default function QuanLyHoaDonPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 text-xs sm:text-sm">
+                  <tbody className="divide-y divide-slate-200 text-xs">
                     {hoaDonList.map((item) => {
                       const dienNuoc =
                         Math.round(Number(item.TienDien) || 0) +
@@ -505,8 +505,7 @@ export default function QuanLyHoaDonPage() {
                           key={item.MaHD}
                           className="hover:bg-slate-50/80 transition"
                         >
-
-                          {/* Phòng & Cơ sở rút gọn trên 1 dòng, không nhảy chữ */}
+                          {/* Phòng & Cơ sở rút gọn trên 1 dòng */}
                           <td className="py-3.5 px-3 whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               <span className="font-bold text-slate-900">

@@ -167,7 +167,7 @@ export default function QuanLyKhachThuePage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Quản Lý Hồ Sơ & Tài Khoản Khách Thuê
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Quản lý tài khoản đăng nhập và hồ sơ định danh cá nhân của khách thuê trong hệ thống.
                 </p>
               </div>
@@ -229,7 +229,7 @@ export default function QuanLyKhachThuePage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Tìm theo Họ tên, SĐT, CCCD, Nghề nghiệp, Tên tài khoản hoặc Phòng..."
-                className="flex-1 px-4 py-2.5 rounded-full border border-slate-200 text-xs sm:text-sm text-slate-800 bg-slate-50/60 focus:bg-white focus:outline-none focus:border-teal-500 transition"
+                className="flex-1 px-4 py-2.5 rounded-full border border-slate-200 text-xs text-slate-800 bg-slate-50/60 focus:bg-white focus:outline-none focus:border-teal-500 transition"
               />
               <div className="text-xs text-slate-600 font-medium px-2 whitespace-nowrap">
                 Tổng số:{' '}
@@ -246,7 +246,7 @@ export default function QuanLyKhachThuePage() {
                 Đang tải danh sách khách thuê...
               </div>
             ) : filteredList.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-xs sm:text-sm font-semibold text-slate-500">
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center text-xs text-slate-500">
                 Không tìm thấy khách thuê nào phù hợp với bộ lọc hiện tại.
               </div>
             ) : (
@@ -262,7 +262,7 @@ export default function QuanLyKhachThuePage() {
                         <th className="py-3.5 px-4 text-right whitespace-nowrap">Thao tác</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
+                    <tbody className="divide-y divide-slate-100 text-xs">
                       {filteredList.map((item) => (
                         <tr key={item.MaND} className="hover:bg-slate-50/80 transition">
                           <td className="py-3.5 px-4">

@@ -463,7 +463,7 @@ export default function ThongBaoList({
               <div className="p-5 space-y-5 flex-1 max-h-105 overflow-y-auto">
                 {/* Nội dung gốc */}
                 <div className="p-4 rounded-2xl bg-[#00FFCC]/10 border border-teal-200">
-                  <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                  <p className="text-xs text-slate-800 whitespace-pre-line leading-relaxed">
                     {selectedDetail.NoiDung}
                   </p>
                 </div>

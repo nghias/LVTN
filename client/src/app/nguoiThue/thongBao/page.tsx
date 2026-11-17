@@ -519,7 +519,7 @@ export default function NguoiThueThongBaoPage() {
                   <div className="w-12 h-12 rounded-2xl bg-[#00FFCC]/20 border border-[#00FFCC] flex items-center justify-center text-slate-700 mb-3 font-bold">
                     🔔
                   </div>
-                  <p className="text-sm font-bold text-slate-800">
+                  <p className="font-bold text-slate-800">
                     Chọn một thông báo để xem chi tiết
                   </p>
                   <p className="text-xs text-slate-400 mt-1 max-w-sm">
@@ -556,7 +556,7 @@ export default function NguoiThueThongBaoPage() {
                   <div className="p-5 space-y-5 flex-1 max-h-105 overflow-y-auto">
                     {/* Nội dung gốc */}
                     <div className="p-4 rounded-2xl bg-[#00FFCC]/10 border border-teal-200">
-                      <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                      <p className="text-xs text-slate-800 whitespace-pre-line leading-relaxed">
                         {selectedDetail.NoiDung}
                       </p>
                     </div>
@@ -645,7 +645,7 @@ export default function NguoiThueThongBaoPage() {
               <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
                 <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">
+                    <h3 className="font-bold text-slate-900">
                       Báo cáo sự cố / Gửi phản ánh
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">

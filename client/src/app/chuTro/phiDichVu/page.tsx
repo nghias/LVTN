@@ -111,7 +111,7 @@ export default function QuanLyPhiDichVuPage() {
                 />
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-2xs transition cursor-pointer whitespace-nowrap"
                 >
                   Tìm kiếm
                 </button>

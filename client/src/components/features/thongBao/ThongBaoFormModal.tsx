@@ -202,7 +202,7 @@ export default function ThongBaoFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white border border-slate-200 rounded-3xl max-w-xl w-full p-6 shadow-xl space-y-4 max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
@@ -242,7 +242,7 @@ export default function ThongBaoFormModal({
             <select
               value={maLTB}
               onChange={(e) => setMaLTB(Number(e.target.value))}
-              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900"
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
               required
             >
               {loaiThongBaoList.map((ltb) => (
@@ -263,7 +263,7 @@ export default function ThongBaoFormModal({
               onChange={(e) =>
                 handleChangePhamVi(e.target.value as PhamViThongBao)
               }
-              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-900"
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
             >
               {isSupremeLandlord && (
                 <>
@@ -306,7 +306,7 @@ export default function ThongBaoFormModal({
                   setMaPhong(0);
                 }}
                 disabled={!isSupremeLandlord && khuTroList.length === 1}
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 disabled:opacity-75"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 disabled:opacity-75 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
               >
                 {khuTroList.map((khu) => (
                   <option key={khu.MaKhu} value={khu.MaKhu}>
@@ -326,7 +326,7 @@ export default function ThongBaoFormModal({
               <select
                 value={maPhong}
                 onChange={(e) => setMaPhong(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 required
               >
                 <option value={0}>-- Chọn phòng --</option>
@@ -376,7 +376,7 @@ export default function ThongBaoFormModal({
                   <select
                     value={filterKhuId}
                     onChange={(e) => setFilterKhuId(Number(e.target.value))}
-                    className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800"
+                    className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   >
                     <option value={0}>Tất cả khu trọ</option>
                     {khuTroList.map((k) => (
@@ -392,7 +392,7 @@ export default function ThongBaoFormModal({
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Tìm theo tên, phòng, khu trọ..."
-                  className={`px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 ${
+                  className={`px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] ${
                     khuTroList.length <= 1 ? "sm:col-span-2" : ""
                   }`}
                 />
@@ -470,7 +470,7 @@ export default function ThongBaoFormModal({
               value={tieuDe}
               onChange={(e) => setTieuDe(e.target.value)}
               placeholder="VD: Thông báo lịch bảo trì hệ thống điện nước..."
-              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900"
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
               required
             />
           </div>
@@ -484,23 +484,23 @@ export default function ThongBaoFormModal({
               value={noiDung}
               onChange={(e) => setNoiDung(e.target.value)}
               placeholder="Nhập nội dung thông báo..."
-              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900"
+              className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
               required
             />
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-2.5">
+          <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              className="px-5 py-2.5 rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 transition cursor-pointer"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 rounded-2xl bg-teal-700 hover:bg-slate-900 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
             >
               {submitting ? "Đang gửi thông báo..." : "Gửi Ngay →"}
             </button>

@@ -59,7 +59,7 @@ export default function ThongBaoSearchBar({
               value={keyword}
               onChange={(e) => onKeywordChange(e.target.value)}
               placeholder="Tìm theo tiêu đề, nội dung hoặc người gửi..."
-              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-teal-600 focus:bg-white transition"
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:border-teal-600 focus:bg-white transition"
             />
             {keyword && (
               <button
@@ -75,7 +75,7 @@ export default function ThongBaoSearchBar({
           <select
             value={maLTB}
             onChange={(e) => onMaLTBChange(e.target.value)}
-            className="px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-700 focus:outline-none focus:border-teal-600"
+            className="px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 focus:outline-none focus:border-teal-600"
           >
             <option value="">Tất cả loại thông báo</option>
             {loaiThongBaoList.map((ltb) => (

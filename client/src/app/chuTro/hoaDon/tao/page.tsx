@@ -1,3 +1,4 @@
+// client/src/app/chuTro/hoaDon/tao/page.tsx
 'use client';
 
 import React, { useEffect, useState, useCallback, Suspense } from 'react';
@@ -566,18 +567,18 @@ function TaoHoaDonThangContent() {
                             </p>
                           </div>
 
-                          <div className="p-3 rounded-2xl bg-slate-900 text-white">
-                            <p className="font-bold text-slate-300">
+                          <div className="p-3 rounded-2xl bg-[#00FFCC]/25 border border-teal-300 text-slate-900">
+                            <p className="font-bold text-teal-900">
                               Tổng cộng hóa đơn
                             </p>
-                            <p className="text-sm font-bold text-[#00FFCC] mt-1">
+                            <p className="text-sm font-bold text-teal-950 mt-1">
                               {formatVND(tongCong)}
                             </p>
                           </div>
                         </div>
                       )}
 
-                      {/* Khu vực thêm nhanh Phí phát sinh khi tạo (Tái sử dụng PhatSinhRowsEditor) */}
+                      {/* Khu vực thêm nhanh Phí phát sinh khi tạo */}
                       {isEligible && psList.length > 0 && (
                         <div className="pt-3 border-t border-slate-200 space-y-2">
                           <p className="text-xs font-bold text-slate-700">

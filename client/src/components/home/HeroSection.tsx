@@ -40,7 +40,7 @@ export default function HeroSection({
             Tìm Phòng Ưng Ý – An Tâm Tận Hưởng Cuộc Sống Số
           </h1>
 
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+          <p className="text-xs text-slate-600 leading-relaxed">
             Hệ thống quản lý tập trung nhiều cơ sở, minh bạch diện tích, tiện
             ích từng phòng (gác lửng, máy lạnh, quạt, phí rác, wifi) cùng 
               Trợ lý ảo AI Chatbot tư vấn 24/7 

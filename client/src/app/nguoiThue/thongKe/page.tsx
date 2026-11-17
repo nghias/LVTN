@@ -1,68 +1,674 @@
+// client/src/app/nguoiThue/thongKe/page.tsx
 'use client';
 
-import ProtectedRoute from '../../../components/common/ProtectedRoute';
-import NguoiThueHeader from '../../../components/layout/NguoiThueHeader';
-import { useAlertModal } from '../../../components/common/AlertModalProvider';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import Link from 'next/link';
+import NguoiThueHeader from '@/components/layout/NguoiThueHeader';
+import ProtectedRoute from '@/components/common/ProtectedRoute';
+import { useAlertModal } from '@/components/common/AlertModalProvider';
+
+const getApiBaseUrl = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  const trimmed = raw.replace(/\/auth\/?$/, '').replace(/\/+$/, '');
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
+// Tính khoảng tháng YYYY-MM mặc định để ô input type="month" không bao giờ hiện "---------- ----"
+const getDefaultMonthRange = (monthsCount = 6) => {
+  const now = new Date();
+  const endY = now.getFullYear();
+  const endM = now.getMonth() + 1;
+
+  let startY = endY;
+  let startM = endM - (monthsCount - 1);
+  while (startM <= 0) {
+    startM += 12;
+    startY -= 1;
+  }
+
+  return {
+    tuThang: `${startY}-${String(startM).padStart(2, '0')}`,
+    denThang: `${endY}-${String(endM).padStart(2, '0')}`,
+  };
+};
+
+const formatVND = (val: number) =>
+  new Intl.NumberFormat('vi-VN').format(Math.round(Number(val) || 0)) + ' đ';
+
+const formatCompactVND = (val: number) => {
+  const num = Number(val) || 0;
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)} tr`;
+  if (num >= 1_000) return `${Math.round(num / 1_000)}k`;
+  return String(num);
+};
 
 export default function ThongKeNguoiThuePage() {
-  const { showSuccess, showError, showConfirm } = useAlertModal();
+  const { showError } = useAlertModal();
+  const showErrorRef = useRef(showError);
+  showErrorRef.current = showError;
+
+  const [loading, setLoading] = useState<boolean>(true);
+  const [stats, setStats] = useState<any>(null);
+
+  const [selectedMaPhong, setSelectedMaPhong] = useState<string>('ALL');
+  const [presetMonths, setPresetMonths] = useState<string>('6');
+  const [tuThang, setTuThang] = useState<string>(
+    () => getDefaultMonthRange(6).tuThang
+  );
+  const [denThang, setDenThang] = useState<string>(
+    () => getDefaultMonthRange(6).denThang
+  );
+
+  const fetchTenantStats = useCallback(
+    async (paramsObj?: {
+      maPhong?: string;
+      soThang?: string;
+      tuThang?: string;
+      denThang?: string;
+    }) => {
+      try {
+        setLoading(true);
+        let token: string | null = null;
+        let storedMaND = '';
+
+        if (typeof window !== 'undefined') {
+          token =
+            localStorage.getItem('token') ||
+            localStorage.getItem('accessToken') ||
+            sessionStorage.getItem('token');
+
+          const rawUser =
+            localStorage.getItem('user') ||
+            localStorage.getItem('userProfile') ||
+            sessionStorage.getItem('user');
+          if (rawUser) {
+            try {
+              const parsed = JSON.parse(rawUser);
+              const u = parsed?.user || parsed;
+              if (u?.MaND || u?.maND) {
+                storedMaND = String(u.MaND || u.maND);
+              }
+            } catch {
+              // Bỏ qua nếu không phải JSON
+            }
+          }
+        }
+
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const query = new URLSearchParams();
+        const phongVal =
+          paramsObj?.maPhong !== undefined
+            ? paramsObj.maPhong
+            : selectedMaPhong;
+        const soThangVal =
+          paramsObj?.soThang !== undefined ? paramsObj.soThang : presetMonths;
+        const tuVal =
+          paramsObj?.tuThang !== undefined ? paramsObj.tuThang : tuThang;
+        const denVal =
+          paramsObj?.denThang !== undefined ? paramsObj.denThang : denThang;
+
+        if (storedMaND) query.set('maND', storedMaND);
+        if (phongVal && phongVal !== 'ALL') query.set('maPhong', phongVal);
+        if (soThangVal) query.set('soThang', soThangVal);
+        if (tuVal) query.set('tuThang', tuVal);
+        if (denVal) query.set('denThang', denVal);
+
+        const res = await fetch(
+          `${getApiBaseUrl()}/thong-ke/nguoi-thue?${query.toString()}`,
+          {
+            method: 'GET',
+            headers,
+            credentials: 'include',
+          }
+        );
+
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          throw new Error(json.message || 'LOAD_FAILED');
+        }
+
+        setStats(json.data);
+        if (json.data?.boLoc?.tuThang) {
+          setTuThang(json.data.boLoc.tuThang);
+        }
+        if (json.data?.boLoc?.denThang) {
+          setDenThang(json.data.boLoc.denThang);
+        }
+      } catch {
+        showErrorRef.current(
+          'Không thể tải dữ liệu thống kê phòng thuê lúc này.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selectedMaPhong, presetMonths, tuThang, denThang]
+  );
+
+  useEffect(() => {
+    const def = getDefaultMonthRange(6);
+    fetchTenantStats({
+      maPhong: 'ALL',
+      soThang: '6',
+      tuThang: def.tuThang,
+      denThang: def.denThang,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSelectPhong = (maPhongVal: string) => {
+    setSelectedMaPhong(maPhongVal);
+    fetchTenantStats({
+      maPhong: maPhongVal,
+      soThang: presetMonths,
+      tuThang,
+      denThang,
+    });
+  };
+
+  const handleSelectPreset = (monthsCount: string) => {
+    const range = getDefaultMonthRange(Number(monthsCount) || 6);
+    setPresetMonths(monthsCount);
+    setTuThang(range.tuThang);
+    setDenThang(range.denThang);
+    fetchTenantStats({
+      maPhong: selectedMaPhong,
+      soThang: monthsCount,
+      tuThang: range.tuThang,
+      denThang: range.denThang,
+    });
+  };
+
+  const handleApplyCustomRange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (tuThang && denThang && tuThang > denThang) {
+      showError('Tháng bắt đầu không được lớn hơn tháng kết thúc!');
+      return;
+    }
+    setPresetMonths('');
+    fetchTenantStats({
+      maPhong: selectedMaPhong,
+      soThang: '',
+      tuThang,
+      denThang,
+    });
+  };
+
+  const tongQuan = stats?.tongQuan || {};
+  const coCau = stats?.coCauChiPhi || {};
+  const chartChiPhi: any[] = stats?.bieuDoChiPhiTheoThang || [];
+  const chartDienNuoc: any[] = stats?.bieuDoDienNuocTheoThang || [];
+  const phongList: any[] = stats?.boLoc?.phongList || [];
+  const hopDong = stats?.hopDongHienTai || null;
+
+  const maxChiPhi = Math.max(
+    1,
+    ...chartChiPhi.map((c) => Number(c.tongTien) || 0)
+  );
+  const maxDien = Math.max(
+    1,
+    ...chartDienNuoc.map((c) => Number(c.soDien) || 0)
+  );
+  const maxNuoc = Math.max(
+    1,
+    ...chartDienNuoc.map((c) => Number(c.soNuoc) || 0)
+  );
 
   return (
-    <ProtectedRoute allowedRoles={['KhachThue']}>
+    <ProtectedRoute allowedRoles={['KhachThue', 'ChuTro', 'QuanLy']}>
       {(user) => (
-        <div className="flex-1 flex flex-col bg-white text-slate-900">
+        <div className="min-h-screen bg-white text-slate-900 flex flex-col">
           <NguoiThueHeader user={user} />
 
-          <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-12 flex flex-col items-center justify-center text-center">
-            <div className="bg-white border border-slate-200 rounded-3xl p-8 sm:p-12 shadow-lg max-w-2xl w-full">
-              <span className="inline-block px-3.5 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900 mb-4">
-                Không gian cư dân
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-snug">
-                Xin chào Người thuê {user.HoTen}, chào mừng bạn đến với trang Thống kê!
-              </h1>
-              <p className="text-sm text-slate-500 mt-3">
-                Kiểm tra 3 loại Modal (Thành công xanh lá tự tắt, Thất bại đỏ tự tắt, Xác nhận #00FFCC không đếm ngược):
-              </p>
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+            {/* Tiêu đề & Nút chọn nhanh khoảng thời gian */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  Thống Kê Chi Phí & Tiêu Thụ Phòng Thuê
+                </h1>
+                <p className="text-xs text-slate-500 mt-1">
+                  Theo dõi lịch sử chi phí hóa đơn, lượng điện nước tiêu thụ và thông tin hợp đồng của bạn.
+                </p>
+              </div>
 
-              <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    showSuccess('Đã gửi yêu cầu đăng ký tạm trú thành công!')
-                  }
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full shadow-xs transition cursor-pointer"
-                >
-                  Modal Thành công (2s)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    showError('Mã VietQR đã hết hạn, vui lòng tải lại!', 'Lỗi thanh toán', 3)
-                  }
-                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-full shadow-xs transition cursor-pointer"
-                >
-                  Modal Thất bại (3s)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    showConfirm(
-                      'Bạn có chắc chắn muốn gửi báo cáo sự cố hỏng thiết bị này cho Quản lý không?',
-                      'Xác nhận gửi báo cáo',
-                      () => showSuccess('Đã gửi báo cáo sự cố thành công!'),
-                      'Xác nhận',
-                      'Hủy'
-                    )
-                  }
-                  className="px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-full shadow-xs transition cursor-pointer"
-                >
-                  Modal Xác nhận (Không đếm ngược)
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { label: '3 tháng', val: '3' },
+                  { label: '6 tháng', val: '6' },
+                  { label: '12 tháng', val: '12' },
+                ].map((btn) => (
+                  <button
+                    key={btn.val}
+                    type="button"
+                    onClick={() => handleSelectPreset(btn.val)}
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
+                      presetMonths === btn.val
+                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-300 shadow-2xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
               </div>
             </div>
+
+            {/* Các nút chọn phòng đang thuê */}
+            {phongList.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSelectPhong('ALL')}
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
+                    selectedMaPhong === 'ALL'
+                      ? 'bg-[#00FFCC] text-slate-900 border border-teal-300 shadow-2xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Tất cả phòng của tôi ({phongList.length})
+                </button>
+
+                {phongList.map((p: any) => (
+                  <button
+                    key={p.MaPhong}
+                    type="button"
+                    onClick={() => handleSelectPhong(String(p.MaPhong))}
+                    className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
+                      selectedMaPhong === String(p.MaPhong)
+                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-300 shadow-2xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {p.TenPhong} ({p.TenKhu})
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Thanh lọc khoảng tháng tùy chỉnh */}
+            <form
+              onSubmit={handleApplyCustomRange}
+              className="bg-slate-50 rounded-2xl border border-slate-200 p-3.5 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3"
+            >
+              <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
+                    Từ tháng:
+                  </span>
+                  <input
+                    type="month"
+                    value={tuThang}
+                    onChange={(e) => {
+                      const val =
+                        e.target.value || getDefaultMonthRange(6).tuThang;
+                      setTuThang(val);
+                    }}
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#00FFCC] transition"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
+                    Đến tháng:
+                  </span>
+                  <input
+                    type="month"
+                    value={denThang}
+                    onChange={(e) => {
+                      const val =
+                        e.target.value || getDefaultMonthRange(6).denThang;
+                      setDenThang(val);
+                    }}
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#00FFCC] transition"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-end gap-3">
+                <span className="text-xs text-slate-600 font-medium whitespace-nowrap">
+                  Kỳ xem:{' '}
+                  <strong className="font-bold text-slate-900">
+                    {tuThang} → {denThang}
+                  </strong>
+                </span>
+                <button
+                  type="submit"
+                  className="cursor-pointer whitespace-nowrap rounded-full bg-[#00FFCC] border border-teal-300 px-5 py-2 text-xs font-bold text-slate-900 shadow-2xs transition hover:bg-[#00e6b8]"
+                >
+                  Lọc dữ liệu
+                </button>
+              </div>
+            </form>
+
+            {/* 4 Thẻ chỉ số quan trọng cho Người thuê */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
+                  Tổng chi phí trong kỳ
+                </span>
+                <div className="text-base sm:text-lg font-bold text-slate-900 mt-2 truncate">
+                  {formatVND(tongQuan.tongChiPhiTrongKy || 0)}
+                </div>
+                <div className="text-xs text-emerald-600 font-semibold mt-1 truncate">
+                  Đã thanh toán: {formatVND(tongQuan.tongDaThanhToan || 0)}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
+                  Công nợ hiện tại
+                </span>
+                <div
+                  className={`text-base sm:text-lg font-bold mt-2 truncate ${
+                    (tongQuan.tongCongNoHienTai || 0) > 0
+                      ? 'text-red-600'
+                      : 'text-emerald-600'
+                  }`}
+                >
+                  {formatVND(tongQuan.tongCongNoHienTai || 0)}
+                </div>
+                <Link
+                  href="/nguoiThue/hoaDon"
+                  className="inline-block text-xs font-bold text-teal-700 hover:underline mt-1 no-underline"
+                >
+                  Xem hóa đơn & Thanh toán →
+                </Link>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
+                  Điện Nước kỳ gần nhất
+                </span>
+                <div className="text-sm sm:text-base font-bold text-slate-900 mt-2">
+                  {tongQuan.dienTieuThuKyGanNhat || 0} kWh •{' '}
+                  {tongQuan.nuocTieuThuKyGanNhat || 0} m³
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Ngày ghi: {tongQuan.kyDienNuocGanNhat || 'Chưa cập nhật'}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
+                  Hợp đồng & Tạm trú
+                </span>
+                <div className="text-sm sm:text-base font-bold text-slate-900 mt-2">
+                  {tongQuan.soNgayHopDongConLai !== null &&
+                  tongQuan.soNgayHopDongConLai !== undefined
+                    ? `Còn ${Math.max(0, tongQuan.soNgayHopDongConLai)} ngày`
+                    : 'Đang hiệu lực'}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Tạm trú:{' '}
+                  <strong className="text-teal-700">
+                    {tongQuan.trangThaiTamTru === 'DaDangKy' ||
+                    tongQuan.trangThaiTamTru === '1'
+                      ? 'Đã đăng ký'
+                      : 'Chưa đăng ký'}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-500">
+                Đang tải biểu đồ thống kê...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* 1. Biểu đồ chi phí hàng tháng */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Biểu Đồ Chi Phí Hóa Đơn Hàng Tháng
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Biến động tổng tiền hóa đơn của phòng qua từng tháng
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="h-52 flex items-end gap-2 sm:gap-4 pt-6 pb-2 px-1 border-b border-slate-200 overflow-x-auto">
+                    {chartChiPhi.map((item) => {
+                      const hPct = Math.round(
+                        ((Number(item.tongTien) || 0) / maxChiPhi) * 100
+                      );
+                      return (
+                        <div
+                          key={item.thangNam}
+                          className="flex-1 min-w-[46px] flex flex-col items-center justify-end h-full"
+                        >
+                          <span className="text-[10px] font-bold text-teal-800 mb-1">
+                            {item.tongTien > 0
+                              ? formatCompactVND(item.tongTien)
+                              : ''}
+                          </span>
+                          <div
+                            style={{
+                              height: `${Math.max(
+                                hPct,
+                                item.tongTien > 0 ? 8 : 2
+                              )}%`,
+                            }}
+                            title={`${item.nhan}: ${formatVND(item.tongTien)}`}
+                            className="w-7 sm:w-9 bg-teal-500 hover:bg-teal-600 rounded-t-md transition-all"
+                          />
+                          <span className="text-xs font-bold text-slate-600 mt-2">
+                            {item.nhan}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Biểu đồ tiêu thụ Điện & Nước cá nhân */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Biểu Đồ Điện (kWh) & Nước (m³)
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Sản lượng điện nước tiêu thụ hàng tháng của phòng
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-semibold text-slate-700">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 bg-amber-500 inline-block rounded-xs" />
+                        Điện
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 bg-teal-500 inline-block rounded-xs" />
+                        Nước
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="h-52 flex items-end gap-2 sm:gap-4 pt-6 pb-2 px-1 border-b border-slate-200 overflow-x-auto">
+                    {chartDienNuoc.map((item) => {
+                      const hDien = Math.round(
+                        ((Number(item.soDien) || 0) / maxDien) * 100
+                      );
+                      const hNuoc = Math.round(
+                        ((Number(item.soNuoc) || 0) / maxNuoc) * 100
+                      );
+                      return (
+                        <div
+                          key={item.thangNam}
+                          className="flex-1 min-w-[48px] flex flex-col items-center justify-end h-full"
+                        >
+                          <div className="w-full flex items-end justify-center gap-1 h-full">
+                            <div className="flex flex-col items-center justify-end h-full w-4 sm:w-5">
+                              <span className="text-[10px] font-bold text-amber-700 mb-1">
+                                {item.soDien > 0 ? item.soDien : ''}
+                              </span>
+                              <div
+                                style={{
+                                  height: `${Math.max(
+                                    hDien,
+                                    item.soDien > 0 ? 6 : 2
+                                  )}%`,
+                                }}
+                                className="w-full bg-amber-500 rounded-t-md"
+                              />
+                            </div>
+                            <div className="flex flex-col items-center justify-end h-full w-4 sm:w-5">
+                              <span className="text-[10px] font-bold text-teal-700 mb-1">
+                                {item.soNuoc > 0 ? item.soNuoc : ''}
+                              </span>
+                              <div
+                                style={{
+                                  height: `${Math.max(
+                                    hNuoc,
+                                    item.soNuoc > 0 ? 6 : 2
+                                  )}%`,
+                                }}
+                                className="w-full bg-teal-500 rounded-t-md"
+                              />
+                            </div>
+                          </div>
+                          <span className="text-xs font-bold text-slate-600 mt-2">
+                            {item.nhan}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Cơ cấu chi phí */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Cơ Cấu Chi Phí Sinh Hoạt Trong Kỳ
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Tỷ trọng các khoản chi phí cấu thành hóa đơn
+                    </p>
+                  </div>
+
+                  <div className="space-y-3 pt-1">
+                    {[
+                      {
+                        label: 'Tiền thuê phòng',
+                        val: coCau.tienPhong || 0,
+                        color: 'bg-teal-500',
+                      },
+                      {
+                        label: 'Tiền điện',
+                        val: coCau.tienDien || 0,
+                        color: 'bg-amber-500',
+                      },
+                      {
+                        label: 'Tiền nước',
+                        val: coCau.tienNuoc || 0,
+                        color: 'bg-sky-500',
+                      },
+                      {
+                        label: 'Phí dịch vụ cố định',
+                        val: coCau.tienPhuPhi || 0,
+                        color: 'bg-emerald-500',
+                      },
+                      {
+                        label: 'Chi phí phát sinh',
+                        val: coCau.tienPhatSinh || 0,
+                        color: 'bg-red-500',
+                      },
+                    ].map((item) => {
+                      const total = Math.max(
+                        1,
+                        tongQuan.tongChiPhiTrongKy || 1
+                      );
+                      const pct = Math.round((item.val / total) * 100);
+                      return (
+                        <div key={item.label} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-slate-700">{item.label}</span>
+                            <span className="text-slate-900 font-bold">
+                              {formatVND(item.val)} ({pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${item.color} rounded-full`}
+                              style={{ width: `${Math.min(100, pct)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 4. Thông tin hợp đồng phòng đang ở */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Thông Tin Hợp Đồng Phòng Đang Ở
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                      Tóm tắt thời hạn hợp đồng và tiền cọc phòng
+                    </p>
+
+                    {!hopDong ? (
+                      <div className="p-6 text-center text-xs text-slate-500 bg-slate-50 rounded-xl">
+                        Chưa tìm thấy hợp đồng thuê phòng đang hiệu lực.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                          <div className="text-slate-500">Phòng / Cơ sở</div>
+                          <div className="font-bold text-slate-900 mt-1">
+                            {hopDong.TenPhong}{' '}
+                            {hopDong.TenKhu ? `(${hopDong.TenKhu})` : ''}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-teal-50/60 rounded-xl border border-teal-200">
+                          <div className="text-teal-800">Tiền cọc hợp đồng</div>
+                          <div className="font-bold text-teal-900 mt-1">
+                            {formatVND(hopDong.TienCoc || 0)}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                          <div className="text-slate-500">Ngày bắt đầu</div>
+                          <div className="font-bold text-slate-900 mt-1">
+                            {hopDong.NgayBD || '—'}
+                          </div>
+                        </div>
+                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                          <div className="text-slate-500">Ngày kết thúc</div>
+                          <div className="font-bold text-slate-900 mt-1">
+                            {hopDong.NgayKT || '—'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-2.5 pt-3 border-t border-slate-100">
+                    <Link
+                      href="/nguoiThue/hopDong"
+                      className="flex-1 py-2.5 px-4 text-center rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] border border-teal-300 text-slate-900 text-xs font-bold shadow-2xs transition no-underline"
+                    >
+                      Xem chi tiết Hợp đồng
+                    </Link>
+                    <Link
+                      href="/nguoiThue/dienNuoc"
+                      className="flex-1 py-2.5 px-4 text-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition no-underline"
+                    >
+                      Lịch sử Điện Nước
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            )}
           </main>
         </div>
       )}

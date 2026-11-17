@@ -12,11 +12,14 @@ const dienNuocRouter = require('./dienNuoc.router');
 const hoaDonRouter = require('./hoaDon.router');
 const thanhToanRouter = require('./thanhToan.router');
 const aiChatRouter = require('./aiChat.router');
+const thongKeRouter = require('./thongKe.router');
+
 
 
 
 router.use('/ai-chat', aiChatRouter);
 router.use('/auth', authRouter);
+router.use('/thong-ke', thongKeRouter);
 router.use('/phong-tro', phongTroRouter);
 router.use('/khach-thue', khachThueRouter);
 router.use('/tien-ich', tienIchRouter);

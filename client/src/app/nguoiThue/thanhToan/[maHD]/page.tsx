@@ -167,7 +167,7 @@ export default function NguoiThueThanhToanHoaDonPage() {
                   : 'Thanh Toán Hóa Đơn'}
               </h1>
               {hoaDon && (
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   {hoaDon.TenKhu} • Kỳ {hoaDon.NgayTinh}
                   
                 </p>

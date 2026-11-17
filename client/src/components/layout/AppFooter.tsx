@@ -51,7 +51,7 @@ return (
               d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
             />
           </svg>
-          <span className="text-xs sm:text-sm font-bold leading-snug truncate">
+          <span className="text-xs font-bold leading-snug truncate">
             Hỗ trợ khách hàng
           </span>
         </div>
@@ -101,7 +101,7 @@ return (
 
       {/* Cột 2: Giải pháp */}
       <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 min-w-0">
-        <h4 className="text-xs sm:text-sm font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
+        <h4 className="text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
           Giải pháp
         </h4>
         <ul className="space-y-2 text-slate-700">
@@ -135,7 +135,7 @@ return (
 
       {/* Cột 3: Tài nguyên */}
       <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 min-w-0">
-        <h4 className="text-xs sm:text-sm font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
+        <h4 className="text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
           Tài nguyên
         </h4>
         <ul className="space-y-2 text-slate-700">
@@ -164,7 +164,7 @@ return (
 
       {/* Cột 4: Kết nối */}
       <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 shadow-2xs lg:shadow-none flex flex-col justify-start space-y-3 min-w-0">
-        <h4 className="text-xs sm:text-sm font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
+        <h4 className="text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
           Kết nối
         </h4>
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1">
@@ -172,7 +172,7 @@ return (
             href="#"
             className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] flex items-center justify-center transition shadow-xs border border-green-700 shrink-0"
           >
-            <span className="font-bold text-xs sm:text-sm ">
+            <span className="font-bold text-xs ">
               f
             </span>
           </Link>
@@ -180,7 +180,7 @@ return (
             href="#"
             className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] flex items-center justify-center transition shadow-xs border border-green-700 shrink-0"
           >
-            <span className="font-bold text-xs sm:text-sm ">
+            <span className="font-bold text-xs ">
               in
             </span>
           </Link>
@@ -188,7 +188,7 @@ return (
             href="#"
             className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] flex items-center justify-center transition shadow-xs border border-green-700 shrink-0"
           >
-            <span className="font-bold text-xs sm:text-sm ">
+            <span className="font-bold text-xs ">
               yt
             </span>
           </Link>

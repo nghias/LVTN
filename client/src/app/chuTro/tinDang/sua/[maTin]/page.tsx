@@ -202,11 +202,11 @@ export default function SuaTinDangPage() {
         showSuccess(
           `Đã tự động gia hạn thêm 1 tuần (đến ${formatDateVN(
             autoExtendedDate
-          )}) và hiển thị tin đăng #${maTin} thành công!`
+          )}) và hiển thị tin đăng thành công!`
         );
       } else {
         showSuccess(
-          `Đã cập nhật tin đăng #${maTin} và giá phòng thành công!`
+          `Đã cập nhật tin đăng và giá phòng thành công!`
         );
       }
 
@@ -245,16 +245,16 @@ export default function SuaTinDangPage() {
       allowedRoles={["ChuTro", "QuanLy"]}
       backHref={baseTinDangPath}
       backLabel="Quay lại danh sách Tin đăng"
-      title={`Chỉnh Sửa Tin Đăng #${maTin}`}
+      title={`Chỉnh Sửa Tin Đăng`}
       maxWidth="max-w-3xl"
       loading={loading}
-      loadingText={`Đang tải dữ liệu tin đăng #${maTin}...`}
+      loadingText={`Đang tải dữ liệu tin đăng...`}
     >
       {() =>
         notFound ? (
           <div className="py-16 text-center bg-slate-50 rounded-2xl border border-slate-200 p-6 space-y-3">
             <p className="text-base font-bold text-slate-700">
-              Không tìm thấy tin đăng #{maTin}!
+              Không tìm thấy tin đăng!
             </p>
             <button
               type="button"
@@ -270,7 +270,7 @@ export default function SuaTinDangPage() {
             {isCurrentExpiryPast && (
               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <p className="text-xs sm:text-sm font-bold text-amber-900">
+                  <p className="text-xs font-bold text-amber-900">
                     ⚠️ Ngày hết hạn của tin đăng ({formatDateVN(initialData.NgayHetHan)}) nhỏ hơn ngày hiện tại ({formatDateVN(todayStr)})
                   </p>
                   <p className="text-xs text-amber-800">

@@ -3,6 +3,18 @@ const db = require('../../database/db');
 const ChiTietHopDongModel = require('./chiTietHopDong.model');
 
 const HopDongModel = {
+  getAll: async () => {
+    const [rows] = await db.execute(
+      `SELECT MaHDT, MaPhong, MaHDTCu,
+              DATE_FORMAT(NgayBD, '%Y-%m-%d') AS NgayBD,
+              DATE_FORMAT(NgayKT, '%Y-%m-%d') AS NgayKT,
+              DATE_FORMAT(NgayKy, '%Y-%m-%d') AS NgayKy,
+              TienCoc, TrangThai
+       FROM HopDongThue
+       ORDER BY MaHDT DESC`
+    );
+    return rows;
+  },
   // 0. Các hàm phục vụ xác thực và phân quyền ChuTro / QuanLy
   getNguoiDungById: async (maND) => {
     const [rows] = await db.execute(
@@ -10,6 +22,23 @@ const HopDongModel = {
       [maND]
     );
     return rows[0] || null;
+  },
+
+  getByMaPhongList: async (maPhongIds = []) => {
+    if (!Array.isArray(maPhongIds) || maPhongIds.length === 0) return [];
+    const placeholders = maPhongIds.map(() => '?').join(',');
+    const [rows] = await db.execute(
+      `SELECT MaHDT, MaPhong, MaHDTCu,
+              DATE_FORMAT(NgayBD, '%Y-%m-%d') AS NgayBD,
+              DATE_FORMAT(NgayKT, '%Y-%m-%d') AS NgayKT,
+              DATE_FORMAT(NgayKy, '%Y-%m-%d') AS NgayKy,
+              TienCoc, TrangThai
+       FROM HopDongThue
+       WHERE MaPhong IN (${placeholders})
+       ORDER BY MaHDT DESC`,
+      maPhongIds.map(Number)
+    );
+    return rows;
   },
 
   getHopDongCoBanById: async (maHDT) => {

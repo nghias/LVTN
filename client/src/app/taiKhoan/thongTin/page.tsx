@@ -158,7 +158,7 @@ function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
             Hồ Sơ Thông Tin Cá Nhân
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Thông tin định danh dùng để liên hệ, lập hợp đồng thuê phòng và khai báo tạm trú
           </p>
         </div>
@@ -198,7 +198,7 @@ function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
 
         {/* Khối thông tin định danh & liên hệ */}
         <div className="space-y-4">
-          <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
             Thông tin định danh & Liên hệ
           </h2>
 
@@ -357,7 +357,7 @@ function ThongTinCaNhanContent({ user }: { user: UserProfile }) {
           <button
             type="submit"
             disabled={submitting || loading}
-            className="px-7 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 font-bold text-xs sm:text-sm shadow-xs transition cursor-pointer disabled:opacity-50"
+            className="px-7 py-3 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
           >
             {submitting ? 'Đang lưu...' : 'Lưu thông tin cá nhân'}
           </button>

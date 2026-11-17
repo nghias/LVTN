@@ -142,7 +142,7 @@ export default function DoiMatKhauPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   Đổi Mật Khẩu
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Cập nhật mật khẩu định kỳ để bảo vệ tài khoản của bạn.
                 </p>
               </div>
@@ -215,7 +215,7 @@ export default function DoiMatKhauPage() {
                 />
               </div>
 
-              <label className="inline-flex items-center gap-2 text-xs sm:text-sm text-slate-700 cursor-pointer select-none">
+              <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={showPass}

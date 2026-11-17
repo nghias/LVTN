@@ -223,7 +223,7 @@ export default function ThietLapThongTinThanhToanPage() {
             <h2 className="text-lg font-bold text-slate-900">
               Chỉ Chủ Trọ Mới Được Thay Đổi Thông Tin Thanh Toán
             </h2>
-            <p className="text-xs sm:text-sm text-slate-600">
+            <p className="text-xs text-slate-600">
               Quản lý cơ sở chỉ có quyền xem lịch sử và xác nhận thu tiền mặt, không có quyền thay đổi tài khoản ngân hàng nhận tiền.
             </p>
             <Link
@@ -364,7 +364,7 @@ export default function ThietLapThongTinThanhToanPage() {
                         )
                       }
                       placeholder="Để trống nếu dùng khóa mặc định của hệ thống"
-                      className={`w-full px-4 py-2.5 border rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:outline-none transition ${inputErrorClass(
+                      className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono text-slate-900 focus:outline-none transition ${inputErrorClass(
                         errors.PayosClientId
                       )}`}
                     />
@@ -385,7 +385,7 @@ export default function ThietLapThongTinThanhToanPage() {
                         )
                       }
                       placeholder="Để trống nếu dùng khóa mặc định của hệ thống"
-                      className={`w-full px-4 py-2.5 border rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:outline-none transition ${inputErrorClass(
+                      className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono text-slate-900 focus:outline-none transition ${inputErrorClass(
                         errors.PayosApiKey
                       )}`}
                     />
@@ -409,7 +409,7 @@ export default function ThietLapThongTinThanhToanPage() {
                         )
                       }
                       placeholder="Để trống nếu dùng khóa mặc định của hệ thống"
-                      className={`w-full px-4 py-2.5 border rounded-xl text-xs sm:text-sm font-mono text-slate-900 focus:outline-none transition ${inputErrorClass(
+                      className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono text-slate-900 focus:outline-none transition ${inputErrorClass(
                         errors.PayosChecksumKey
                       )}`}
                     />

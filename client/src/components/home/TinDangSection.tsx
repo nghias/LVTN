@@ -238,7 +238,7 @@ export default function TinDangSection({
             Danh Sách Phòng Đang Cần Cho Thuê ({validFilteredTinDangList.length}/
             {validTotalTinDangList.length})
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Hỗ trợ bộ lọc đa tiêu chí theo cơ sở, diện tích, mức giá thuê và xem
             chi tiết của từng phòng
           </p>

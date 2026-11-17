@@ -168,7 +168,7 @@ export default function KhachThueForm({
     >
       {/* 1. Thông tin tài khoản đăng nhập */}
       <div className="space-y-4">
-        <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
           1. Thông tin tài khoản đăng nhập
         </h2>
 
@@ -235,7 +235,7 @@ export default function KhachThueForm({
 
       {/* 2. Thông tin định danh cá nhân */}
       <div className="space-y-4">
-        <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 border-b border-slate-100 pb-2.5">
           2. Hồ sơ định danh & Liên hệ cá nhân
         </h2>
 

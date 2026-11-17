@@ -86,7 +86,6 @@ function ThemThongBaoContent() {
         const defaultKhu = queryMaKhu || khus[0]?.MaKhu || 0;
         setMaKhu(defaultKhu);
 
-        // Nếu MaND trên URL là 1 người nhận cụ thể (khác người đang đăng nhập)
         const isRecipientParam =
           paramMaND > 0 &&
           paramMaND !== currentLoggedMaND &&
@@ -223,17 +222,17 @@ function ThemThongBaoContent() {
   };
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <main className="max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       {/* Điều hướng quay lại */}
       <div className="flex items-center justify-between gap-3">
         <Link
           href="/chuTro/thongBao"
-          className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-600 hover:text-teal-700 transition"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 transition no-underline"
         >
           ← Quay lại danh sách thông báo
         </Link>
 
-        <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900">
+        <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900 border border-teal-300">
           {isSupremeLandlord ? "Quyền Chủ Trọ" : "Quyền Quản Lý Cơ Sở"}
         </span>
       </div>
@@ -244,7 +243,7 @@ function ThemThongBaoContent() {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
             Soạn & Phát Thông Báo Trực Tiếp
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Gửi thông báo thời gian thực cho toàn hệ thống, theo khu/phòng, hoặc
             chọn từng cá nhân cụ thể.
           </p>
@@ -270,7 +269,7 @@ function ThemThongBaoContent() {
               <select
                 value={maLTB}
                 onChange={(e) => setMaLTB(Number(e.target.value))}
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-teal-600"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
                 required
               >
                 {loaiThongBaoList.map((ltb) => (
@@ -291,12 +290,12 @@ function ThemThongBaoContent() {
                 onChange={(e) =>
                   handleChangePhamVi(e.target.value as PhamViThongBao)
                 }
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:border-teal-600"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
               >
                 {isSupremeLandlord && (
                   <>
                     <option value="TOAN_HE_THONG">
-                      🌐 Tất cả mọi người (Toàn bộ Khách thuê & Quản lý)
+                      Tất cả mọi người (Toàn bộ Khách thuê & Quản lý)
                     </option>
                     <option value="TAT_CA_QUAN_LY">
                       🛡️ Tất cả Quản lý khu trọ
@@ -304,19 +303,19 @@ function ThemThongBaoContent() {
                   </>
                 )}
                 <option value="THEO_KHU">
-                  🏢{" "}
+                  {" "}
                   {isSupremeLandlord
                     ? "Tất cả mọi người trong 1 Khu trọ"
                     : "Tất cả mọi người trong Khu trọ của tôi"}
                 </option>
                 <option value="THEO_PHONG">
-                  🚪 Tất cả khách thuê trong 1 Phòng
+                  Tất cả khách thuê trong 1 Phòng
                 </option>
                 <option value="MOT_NGUOI">
-                  👤 Gửi riêng cho 1 người cụ thể
+                  Gửi riêng cho 1 người cụ thể
                 </option>
                 <option value="NHIEU_NGUOI">
-                  👥 Gửi cho nhiều người (Tùy chọn danh sách)
+                  Gửi cho nhiều người (Tùy chọn danh sách)
                 </option>
               </select>
             </div>
@@ -334,7 +333,7 @@ function ThemThongBaoContent() {
                     setMaPhong(0);
                   }}
                   disabled={!isSupremeLandlord && khuTroList.length === 1}
-                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 disabled:opacity-75"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 disabled:opacity-75 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                 >
                   {khuTroList.map((khu) => (
                     <option key={khu.MaKhu} value={khu.MaKhu}>
@@ -354,7 +353,7 @@ function ThemThongBaoContent() {
                 <select
                   value={maPhong}
                   onChange={(e) => setMaPhong(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900"
+                  className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                   required
                 >
                   <option value={0}>-- Chọn phòng --</option>
@@ -403,7 +402,7 @@ function ThemThongBaoContent() {
                     <select
                       value={filterKhuId}
                       onChange={(e) => setFilterKhuId(Number(e.target.value))}
-                      className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800"
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
                     >
                       <option value={0}>Tất cả khu trọ</option>
                       {khuTroList.map((k) => (
@@ -419,7 +418,7 @@ function ThemThongBaoContent() {
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
                     placeholder="Tìm theo tên, phòng, khu trọ..."
-                    className={`px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 ${
+                    className={`px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] ${
                       khuTroList.length <= 1 ? "sm:col-span-2" : ""
                     }`}
                   />
@@ -496,7 +495,7 @@ function ThemThongBaoContent() {
                 value={tieuDe}
                 onChange={(e) => setTieuDe(e.target.value)}
                 placeholder="VD: Thông báo lịch bảo trì hệ thống điện nước..."
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-teal-600 focus:bg-white"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
                 required
               />
             </div>
@@ -510,7 +509,7 @@ function ThemThongBaoContent() {
                 value={noiDung}
                 onChange={(e) => setNoiDung(e.target.value)}
                 placeholder="Nhập nội dung thông báo..."
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-teal-600 focus:bg-white"
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] focus:bg-white"
                 required
               />
             </div>
@@ -518,14 +517,14 @@ function ThemThongBaoContent() {
             <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
               <Link
                 href="/chuTro/thongBao"
-                className="px-4 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100"
+                className="px-5 py-2.5 rounded-full border border-slate-300 bg-white text-xs font-bold text-slate-700 hover:bg-slate-100 transition no-underline"
               >
                 Hủy
               </Link>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2.5 rounded-2xl bg-teal-700 hover:bg-slate-900 text-white text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                className="px-6 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50"
               >
                 {submitting ? "Đang gửi thông báo..." : "Gửi Ngay →"}
               </button>
@@ -541,7 +540,7 @@ export default function ThemThongBaoPage() {
   return (
     <ProtectedRoute allowedRoles={["ChuTro", "QuanLy"]}>
       {(user) => (
-        <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
+        <div className="min-h-screen flex flex-col bg-white text-slate-900">
           <QuanLyHeader user={user} />
           <Suspense
             fallback={

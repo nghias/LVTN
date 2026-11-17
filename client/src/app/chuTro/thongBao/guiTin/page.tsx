@@ -120,12 +120,12 @@ export function ThongBaoGuiTin({
               ? "Nhập nội dung trả lời thông báo..."
               : "Nhập tin nhắn phản hồi realtime..."
           }
-          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-teal-500 resize-none"
+          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00FFCC] resize-none"
         />
         <button
           type="submit"
           disabled={sendingReply || !replyText.trim()}
-          className="px-5 py-2.5 rounded-xl bg-[#00FFCC] hover:bg-teal-300 disabled:opacity-50 text-slate-900 text-xs font-bold shrink-0 cursor-pointer transition"
+          className="px-5 py-2.5 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] border border-teal-300 disabled:opacity-50 text-slate-900 text-xs font-bold shrink-0 cursor-pointer shadow-2xs transition"
         >
           {sendingReply
             ? "Đang gửi..."
@@ -185,7 +185,6 @@ function GuiTinRealtimeContent() {
         if (existingIsReply && !currentIsReply) {
           groupMap.set(groupKey, item);
         } else if (!existingIsReply && !currentIsReply) {
-          // Nếu cả 2 đều là thông báo gốc thì ưu tiên bản ghi gốc đầu tiên (MaTB nhỏ hơn)
           if (item.MaTB < existing.MaTB) {
             groupMap.set(groupKey, item);
           }
@@ -281,13 +280,13 @@ function GuiTinRealtimeContent() {
   };
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+    <main className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Link
               href="/chuTro/thongBao"
-              className="text-xs font-bold text-teal-700 hover:underline"
+              className="text-xs font-bold text-teal-700 hover:underline no-underline"
             >
               ← Quay lại Thông báo
             </Link>
@@ -314,7 +313,7 @@ function GuiTinRealtimeContent() {
 
         <Link
           href={`/chuTro/thongBao/them/${currentUserId || 0}`}
-          className="px-4 py-2.5 rounded-2xl bg-slate-900 hover:bg-teal-700 text-white text-xs font-bold transition w-fit"
+          className="px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-xs transition w-fit no-underline"
         >
           + Tạo Chủ Đề Thông Báo Mới
         </Link>
@@ -398,7 +397,7 @@ function GuiTinRealtimeContent() {
 
               <div className="p-5 space-y-4 flex-1 max-h-105 overflow-y-auto">
                 <div className="p-4 rounded-2xl bg-[#00FFCC]/15 border border-teal-200">
-                  <p className="text-xs sm:text-sm text-slate-800 whitespace-pre-line">
+                  <p className="text-xs text-slate-800 whitespace-pre-line">
                     {selectedDetail.NoiDung}
                   </p>
                 </div>
@@ -445,7 +444,7 @@ export default function GuiTinRealtimePage() {
   return (
     <ProtectedRoute allowedRoles={["ChuTro", "QuanLy"]}>
       {(user) => (
-        <div className="min-h-screen bg-[#F8FAFC] text-slate-900">
+        <div className="min-h-screen flex flex-col bg-white text-slate-900">
           <QuanLyHeader user={user} />
           <Suspense
             fallback={

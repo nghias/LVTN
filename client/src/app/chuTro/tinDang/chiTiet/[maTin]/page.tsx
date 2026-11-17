@@ -123,7 +123,7 @@ export default function ChiTietTinDangPage() {
               : null,
             TrangThai: newStatus,
           }),
-        },
+        }
       );
 
       const result = await response.json();
@@ -155,7 +155,7 @@ export default function ChiTietTinDangPage() {
             `${API_BASE_URL}/tin-dang/${tinDang.MaTin}`,
             {
               method: "DELETE",
-            },
+            }
           );
 
           const result = await response.json();
@@ -170,7 +170,7 @@ export default function ChiTietTinDangPage() {
             showError(err.message, "Không thể xóa tin đăng", 3.5);
           }
         }
-      },
+      }
     );
   };
 
@@ -207,7 +207,7 @@ export default function ChiTietTinDangPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-                  Chi Tiết Tin Đăng #{maTin}
+                  Chi Tiết Tin Đăng
                 </h1>
                 <p className="text-xs text-slate-500 mt-1">
                   Xem đầy đủ nội dung bài viết và thông tin phòng trọ đang liên
@@ -271,10 +271,9 @@ export default function ChiTietTinDangPage() {
                   <div>
                     <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-900 text-[#00FFCC]">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
                           {tinDang.TenKhu}
                         </span>
-                        
                       </div>
                       {renderStatusBadge(tinDang.TrangThai)}
                     </div>
@@ -306,7 +305,7 @@ export default function ChiTietTinDangPage() {
                           </span>
                           <span className="text-sm font-bold text-slate-900">
                             {new Date(tinDang.NgayDang).toLocaleDateString(
-                              "vi-VN",
+                              "vi-VN"
                             )}
                           </span>
                         </div>
@@ -317,7 +316,7 @@ export default function ChiTietTinDangPage() {
                           <span className="text-sm font-bold text-slate-900">
                             {tinDang.NgayHetHan
                               ? new Date(tinDang.NgayHetHan).toLocaleDateString(
-                                  "vi-VN",
+                                  "vi-VN"
                                 )
                               : "Không giới hạn"}
                           </span>

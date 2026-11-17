@@ -1,3 +1,4 @@
+// client/src/app/chuTro/hoaDon/chiTiet/[maHD]/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -254,29 +255,29 @@ export default function ChiTietHoaDonPage() {
                   )}
                 </div>
 
-                {/* Tổng kết thanh toán */}
-                <div className="p-5 rounded-2xl bg-slate-900 text-white grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-xs font-bold text-slate-400">
+                {/* Tổng kết thanh toán (Nền sáng đồng bộ hệ thống) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                    <p className="text-xs font-bold text-slate-500">
                       Tổng cộng hóa đơn
                     </p>
-                    <p className="text-xl font-bold text-white mt-1">
+                    <p className="text-xl font-bold text-slate-900 mt-1">
                       {formatVND(detail.TongTien)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-400">
+                  <div className="p-4 rounded-2xl bg-[#00FFCC]/20 border border-teal-300">
+                    <p className="text-xs font-bold text-teal-900">
                       Số tiền đã trả
                     </p>
-                    <p className="text-xl font-bold text-[#00FFCC] mt-1">
+                    <p className="text-xl font-bold text-teal-900 mt-1">
                       {formatVND(detail.TienDaTra)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-400">
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200">
+                    <p className="text-xs font-bold text-rose-700">
                       Dư nợ còn lại
                     </p>
-                    <p className="text-xl font-bold text-rose-400 mt-1">
+                    <p className="text-xl font-bold text-rose-600 mt-1">
                       {formatVND(detail.ConNo)}
                     </p>
                   </div>

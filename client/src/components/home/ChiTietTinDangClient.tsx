@@ -358,7 +358,7 @@ export default function ChiTietTinDangClient({
                   <h2 className="text-base sm:text-lg font-bold text-slate-900">
                     {currentTin.TieuDe}
                   </h2>
-                  <div className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 whitespace-pre-line">
+                  <div className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 whitespace-pre-line">
                     {currentTin.MoTa ||
                       "Chưa có mô tả chi tiết cho bài đăng này."}
                   </div>

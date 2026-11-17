@@ -232,7 +232,7 @@ export default function QuenMatKhauPage() {
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
               Khôi Phục Mật Khẩu Qua Email
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Nhận mã xác thực OTP qua Email thật để đặt lại mật khẩu mới
             </p>
           </div>

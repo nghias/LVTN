@@ -98,7 +98,6 @@ export default function QuanLyDienNuocPage() {
         if (res.giaHienTai) setGiaHienTai(res.giaHienTai);
 
         if (allRows.length > 0) {
-          // Bản ghi đầu tiên là bản ghi mới nhất (do Backend đã ORDER BY NgayGhi DESC)
           const newestMonth = allRows[0].NgayGhi
             ? allRows[0].NgayGhi.slice(0, 7)
             : getCurrentMonth();
@@ -281,7 +280,7 @@ export default function QuanLyDienNuocPage() {
                   onClick={() => handleSelectKhu('')}
                   className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                     selectedMaKhu === ''
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-2xs'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -294,7 +293,7 @@ export default function QuanLyDienNuocPage() {
                     onClick={() => handleSelectKhu(String(khu.MaKhu))}
                     className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                       selectedMaKhu === String(khu.MaKhu)
-                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400'
+                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-2xs'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -380,7 +379,7 @@ export default function QuanLyDienNuocPage() {
               <div className="flex items-center gap-2.5 shrink-0">
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition cursor-pointer whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-2xs transition cursor-pointer whitespace-nowrap"
                 >
                   Lọc dữ liệu
                 </button>

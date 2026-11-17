@@ -48,7 +48,7 @@ export default function FormPageLayout({
                 {title}
               </h1>
               {subtitle && (
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   {subtitle}
                 </p>
               )}

@@ -34,6 +34,7 @@ const PhongTroModel = {
       SELECT MaPhong, MaKhu, TenPhong, DienTich, Gia, TrangThai
       FROM Phong
       WHERE MaKhu IN (${placeholders})
+      ORDER BY MaKhu ASC, TenPhong ASC
     `;
     const [rows] = await db.execute(sql, maKhuIds);
     return rows;

@@ -198,7 +198,6 @@ export default function ThemChiSoDienNuocPage() {
       return;
     }
 
-    // Kiểm tra xem có phòng nào nhập dở dang (chỉ nhập Điện mà quên nhập Nước hoặc ngược lại) hoặc nhỏ hơn số cũ không
     let hasValidationError = false;
     for (const room of touchedRoomEntries) {
       const entry = inputsByRoom[room.MaPhong];
@@ -309,7 +308,7 @@ export default function ThemChiSoDienNuocPage() {
                     onClick={() => setSelectedMaKhu(String(khu.MaKhu))}
                     className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                       selectedMaKhu === String(khu.MaKhu)
-                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400'
+                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-2xs'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -321,7 +320,7 @@ export default function ThemChiSoDienNuocPage() {
                   onClick={() => setSelectedMaKhu('')}
                   className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                     selectedMaKhu === ''
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-2xs'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
@@ -402,7 +401,6 @@ export default function ThemChiSoDienNuocPage() {
               </div>
             </div>
 
-            {/* Cảnh báo chung bằng thẻ <small> nếu người dùng bấm Lưu khi chưa nhập hoặc có ô lỗi */}
             {globalTableError && (
               <div className="mt-3 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
                 <FormError message={globalTableError} />
@@ -425,7 +423,7 @@ export default function ThemChiSoDienNuocPage() {
                     setFilterMode('TAT_CA');
                     setSearchRoom('');
                   }}
-                  className="mt-3 px-5 py-2.5 rounded-full bg-slate-900 text-white text-xs font-bold cursor-pointer"
+                  className="mt-3 px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold shadow-2xs transition cursor-pointer"
                 >
                   Hiển thị tất cả {roomsInKhu.length} phòng
                 </button>
@@ -475,7 +473,6 @@ export default function ThemChiSoDienNuocPage() {
                         const dienMoiNum = Number(entry.soDienMoi);
                         const nuocMoiNum = Number(entry.soNuocMoi);
 
-                        // Phát hiện lỗi từng ô: Nhỏ hơn số cũ HOẶC nhập dở 1 bên khi đã bấm Lưu
                         let dienErrorMsg: string | null = null;
                         if (hasDienMoi && dienMoiNum < dienCu) {
                           dienErrorMsg = `Nhỏ hơn số cũ (${dienCu})!`;

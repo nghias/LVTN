@@ -82,7 +82,7 @@ export default function ContactRoomModal({
               href={selectedRoomContact.zaloUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-3 px-4 rounded-xl bg-[#0068FF] hover:bg-[#0052CC] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm shadow-[#0068FF]/25 transition no-underline"
+              className="w-full py-3 px-4 rounded-xl bg-[#0068FF] hover:bg-[#0052CC] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-[#0068FF]/25 transition no-underline"
             >
               <span className="px-1.5 py-0.5 rounded bg-white text-[#0068FF] text-[10px] font-bold leading-none">
                 Zalo

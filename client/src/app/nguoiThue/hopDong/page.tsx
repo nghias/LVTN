@@ -35,7 +35,7 @@ export default function NguoiThueHopDongPage() {
   const [filterTrangThai, setFilterTrangThai] = useState<string>('');
   const [tuKhoa, setTuKhoa] = useState<string>('');
 
-  // State cho Modal Xem & Xuất PDF toàn màn hình (chỉ mở khi nhấn nút Xem hợp đồng / Tải PDF)
+  // State cho Modal Xem & Xuất PDF toàn màn hình
   const [pdfModalMaHDT, setPdfModalMaHDT] = useState<number | null>(null);
   const [chiTietPdfModal, setChiTietPdfModal] = useState<ChiTietHopDongPdfType | null>(null);
   const [dangTaiPdfModal, setDangTaiPdfModal] = useState<boolean>(false);
@@ -259,39 +259,39 @@ export default function NguoiThueHopDongPage() {
   return (
     <ProtectedRoute allowedRoles={['KhachThue']}>
       {(user) => (
-        <main className="min-h-screen bg-[#F8FAFC] py-6 pb-14">
+        <div className="min-h-screen flex flex-col bg-white text-slate-900">
           <NguoiThueHeader user={user} />
 
-          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-6">
-            {/* 1. HEADER ĐỒNG BỘ VỚI TRANG HÓA ĐƠN TIỀN PHÒNG CỦA TÔI */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+          <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-6 pb-14 space-y-6">
+            {/* 1. HEADER */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
                   Hợp Đồng Thuê Phòng Của Tôi
                 </h1>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-xs sm:text-sm text-slate-500">
                   Theo dõi thông tin hợp đồng, danh sách thành viên tạm trú và các dịch vụ đăng ký của phòng bạn.
                 </p>
-              </div>              
+              </div>
             </div>
 
-            {/* 2. BỐ CỤC 2 CỘT: DANH SÁCH BÊN TRÁI (4 CỘT) & THÔNG TIN CHI TIẾT BÊN PHẢI (8 CỘT) */}
+            {/* 2. BỐ CỤC 2 CỘT */}
             {loadingList ? (
               <div className="rounded-3xl border border-slate-200/80 bg-white p-14 text-center shadow-2xs">
-                <div className="mx-auto mb-3 h-9 w-9 animate-spin rounded-full border-4 border-[#00F5C4] border-t-[#0F172A]" />
+                <div className="mx-auto mb-3 h-9 w-9 animate-spin rounded-full border-4 border-[#00FFCC]/40 border-t-teal-600" />
                 <p className="text-sm font-semibold text-slate-600">
                   Đang tải dữ liệu hợp đồng của bạn...
                 </p>
               </div>
             ) : danhSachLoc.length === 0 ? (
               <div className="rounded-3xl border border-slate-200/80 bg-white p-12 text-center shadow-2xs">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#6EE7B7] bg-[#D1FAE5]/60 text-2xl">
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-200 bg-teal-50 text-2xl">
                   📄
                 </div>
-                <h2 className="text-base font-extrabold text-[#0F172A]">
+                <h2 className="text-base font-bold text-slate-900">
                   Không tìm thấy hợp đồng thuê phòng nào
                 </h2>
-                <p className="mx-auto mt-1 max-w-md text-xs sm:text-sm text-slate-500">
+                <p className="mx-auto mt-1 max-w-md text-xs text-slate-500">
                   Bạn chỉ có thể xem các hợp đồng mà tài khoản của bạn có tên trong danh sách thành viên lưu trú.
                 </p>
               </div>
@@ -307,12 +307,12 @@ export default function NguoiThueHopDongPage() {
                   />
                 </div>
 
-                {/* CỘT PHẢI: THÔNG TIN CHI TIẾT HỢP ĐỒNG (8 CỘT - ĐỒNG BỘ KHUNG PHIẾU BÁO TIỀN PHÒNG) */}
+                {/* CỘT PHẢI: THÔNG TIN CHI TIẾT HỢP ĐỒNG (8 CỘT) */}
                 <div ref={detailSectionRef} className="lg:col-span-8">
                   {loadingDetail || !chiTiet ? (
                     <div className="flex min-h-[420px] flex-col items-center justify-center rounded-3xl border border-slate-200/80 bg-white p-12 text-center shadow-2xs">
-                      <div className="mb-3 h-8 w-8 animate-spin rounded-full border-4 border-[#00F5C4] border-t-[#0F172A]" />
-                      <p className="text-xs sm:text-sm font-semibold text-slate-500">
+                      <div className="mb-3 h-8 w-8 animate-spin rounded-full border-4 border-[#00FFCC]/40 border-t-teal-600" />
+                      <p className="text-xs font-semibold text-slate-500">
                         Đang tải chi tiết hợp đồng...
                       </p>
                     </div>
@@ -324,7 +324,7 @@ export default function NguoiThueHopDongPage() {
                           <h2 className="text-lg sm:text-xl font-bold text-slate-900">
                             Hợp Đồng Thuê Phòng
                           </h2>
-                          <p className="mt-1 text-xs sm:text-sm font-medium text-slate-500">
+                          <p className="mt-1 text-xs font-medium text-slate-500">
                             {chuanHoaNFC(chiTiet.TenPhong)} — {chuanHoaNFC(chiTiet.TenKhu)}
                             {chiTiet.DiaChiKhuTro || selectedTomTat?.DiaChiKhu
                               ? ` | ${chuanHoaNFC(chiTiet.DiaChiKhuTro || selectedTomTat?.DiaChiKhu)}`
@@ -332,12 +332,12 @@ export default function NguoiThueHopDongPage() {
                           </p>
                         </div>
 
-                        {/* Cụm nút hành động: Chỉ mở bản hợp đồng A4 khi người dùng nhấn nút */}
+                        {/* Cụm nút hành động */}
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => handleOpenPdfModal(chiTiet.MaHDT, false)}
-                            className="rounded-xl bg-[#00F5C4] hover:bg-[#00E0B0] px-4 py-2 text-xs font-bold text-[#0F172A] shadow-2xs transition cursor-pointer"
+                            className="rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] border border-teal-300 px-4 py-2 text-xs font-bold text-slate-900 shadow-2xs transition cursor-pointer"
                           >
                             Xem hợp đồng
                           </button>
@@ -345,7 +345,7 @@ export default function NguoiThueHopDongPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenPdfModal(chiTiet.MaHDT, true)}
-                            className="rounded-xl bg-[#0F172A] hover:bg-slate-800 px-3.5 py-2 text-xs font-bold text-white transition cursor-pointer"
+                            className="rounded-full border border-teal-300 bg-teal-50 hover:bg-teal-100 px-4 py-2 text-xs font-bold text-teal-900 transition cursor-pointer"
                           >
                             Tải PDF
                           </button>
@@ -354,7 +354,7 @@ export default function NguoiThueHopDongPage() {
                             <button
                               type="button"
                               onClick={() => setCancelModalOpen(true)}
-                              className="rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 px-3.5 py-2 text-xs font-bold text-rose-600 transition cursor-pointer"
+                              className="rounded-full border border-rose-200 bg-rose-50 hover:bg-rose-100 px-4 py-2 text-xs font-bold text-rose-600 transition cursor-pointer"
                             >
                               Yêu cầu hủy HĐ
                             </button>
@@ -382,7 +382,7 @@ export default function NguoiThueHopDongPage() {
                         </div>
                       )}
 
-                      {/* Nội dung chi tiết hợp đồng, dịch vụ & tạm trú (không hiển thị tờ A4 trực tiếp) */}
+                      {/* Nội dung chi tiết hợp đồng, dịch vụ & tạm trú */}
                       <ChiTietThongTinHopDong
                         chiTiet={chiTiet}
                         tomTat={selectedTomTat}
@@ -392,18 +392,18 @@ export default function NguoiThueHopDongPage() {
                 </div>
               </div>
             )}
-          </div>
+          </main>
 
           {/* MODAL LOADING KHI ĐANG TẢI BẢN XEM HỢP ĐỒNG PDF A4 */}
           {pdfModalMaHDT && dangTaiPdfModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
-              <div className="rounded-2xl border border-[#6EE7B7] bg-white px-6 py-4 text-sm font-bold text-[#0F172A] shadow-lg">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+              <div className="rounded-2xl border border-teal-300 bg-white px-6 py-4 text-sm font-bold text-slate-900 shadow-lg">
                 Đang tải bản xem hợp đồng #{pdfModalMaHDT}...
               </div>
             </div>
           )}
 
-          {/* MODAL XEM & XUẤT PDF HỢP ĐỒNG CHUẨN A4 (CHỈ HIỆN KHI NHẤN "XEM HỢP ĐỒNG" HOẶC "TẢI PDF") */}
+          {/* MODAL XEM & XUẤT PDF HỢP ĐỒNG CHUẨN A4 */}
           {pdfModalMaHDT && !dangTaiPdfModal && chiTietPdfModal && (
             <HopDongPdfModal
               hopDong={chiTietPdfModal}
@@ -424,7 +424,7 @@ export default function NguoiThueHopDongPage() {
             onClose={() => setCancelModalOpen(false)}
             onSubmit={handleSubmitCancelRequest}
           />
-        </main>
+        </div>
       )}
     </ProtectedRoute>
   );

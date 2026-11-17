@@ -214,7 +214,7 @@ export default function XacNhanTraTienPage() {
                   : 'Chi Tiết Thanh Toán Hóa Đơn'}
               </h1>
               {hoaDon && (
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   {hoaDon.TenKhu} • Kỳ {hoaDon.NgayTinh}
                    • Khách đại
                   diện: <strong>{hoaDon.TenKhachThue}</strong>
@@ -405,7 +405,7 @@ export default function XacNhanTraTienPage() {
                   </h2>
 
                   {lichSu.length === 0 ? (
-                    <p className="text-xs sm:text-sm text-slate-500">
+                    <p className="text-xs text-slate-500">
                       Chưa có giao dịch nào được ghi nhận cho hóa đơn này.
                     </p>
                   ) : (

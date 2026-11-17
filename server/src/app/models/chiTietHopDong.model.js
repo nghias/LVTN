@@ -12,6 +12,21 @@ const ChiTietHopDongModel = {
     return rows;
   },
 
+  getByMaHDTList: async (maHDTIds = []) => {
+    if (!Array.isArray(maHDTIds) || maHDTIds.length === 0) return [];
+    const placeholders = maHDTIds.map(() => '?').join(',');
+    const [rows] = await db.execute(
+      `SELECT MaND, MaHDT,
+              DATE_FORMAT(NgayVao, '%Y-%m-%d') AS NgayVao,
+              DATE_FORMAT(NgayDi, '%Y-%m-%d') AS NgayDi,
+              VaiTro, TamTru
+       FROM ChiTietHopDongThue
+       WHERE MaHDT IN (${placeholders})`,
+      maHDTIds.map(Number)
+    );
+    return rows;
+  },
+
   // 2. Lấy các dòng chi tiết hợp đồng cơ bản theo MaHDT
   getByMaHDT: async (maHDT) => {
     const [rows] = await db.execute(

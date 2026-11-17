@@ -324,7 +324,7 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
           </div>
         </div>
 
-        {/* 3. Thanh chọn Khu trọ (Chủ trọ thấy Tất cả cơ sở, Quản lý chỉ thấy cơ sở của mình) */}
+        {/* 3. Thanh chọn Khu trọ */}
         {khuTroTabs.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-2">
             {(isChuTro || khuTroTabs.length > 1) && (
@@ -409,7 +409,7 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
               Không tìm thấy tin đăng nào phù hợp!
             </p>
             <p className="text-xs text-slate-500 mt-1">
-              Hãy thử thay đổi bộ lọc hoặc bấm &quot;+ Đăng Tin Mới&quot; để tạo
+              Hãy thử thay đổi bộ lọc hoặc bấm &quot;Đăng Tin Mới&quot; để tạo
               bài đăng tìm khách thuê.
             </p>
           </div>
@@ -423,10 +423,9 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
                 {/* Phần đầu thẻ: Nhãn Khu trọ & Trạng thái tin */}
                 <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900 text-[#00FFCC]">
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
                       {tin.TenKhu}
                     </span>
-                    
                   </div>
                   {renderStatusBadge(tin.TrangThai)}
                 </div>
