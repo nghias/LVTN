@@ -183,7 +183,7 @@ function QuanLyTinDangContent({ user }: { user: UserProfile }) {
   const handleDeleteTin = (tin: TinDangItem) => {
     showConfirm(
       `Bạn có chắc chắn muốn xóa bài đăng "${tin.TieuDe}" của phòng ${tin.TenPhong} (${tin.TenKhu}) không? Thao tác này không thể hoàn tác.`,
-      `Xác nhận xóa Tin đăng #${tin.MaTin}`,
+      `Xác nhận xóa Tin đăng`,
       async () => {
         try {
           const response = await fetch(

@@ -786,7 +786,7 @@ const HopDongModel = {
          AND TieuDe LIKE ?
        ORDER BY NgayGui DESC
        LIMIT 1`,
-      [Number(maND), `%[Yêu cầu hủy HĐ #${Number(maHDT)}]%`]
+      [Number(maND), `%[Yêu cầu hủy HĐ]%`]
     );
     return rows[0] || null;
   },

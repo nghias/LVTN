@@ -3,6 +3,41 @@ const db = require('../../database/db');
 const HoaDonModel = require('../models/hoaDon.model');
 const PhatSinhModel = require('../models/phatSinh.model');
 
+// Kiểm tra hợp đồng có trạng thái đang hiệu lực
+const isActiveStatus = (hd) => {
+  if (!hd) return false;
+  const status = String(hd.TrangThai || '').trim();
+  return (
+    status === 'ConHieuLuc' ||
+    status === 'DangThue' ||
+    status === 'HieuLuc' ||
+    status === '1'
+  );
+};
+
+// Kiểm tra hợp đồng có hiệu lực trong đúng kỳ tháng (YYYY-MM) đang xét hay không
+// (Khắc phục lỗi: Tháng 12 mới thuê nhưng lại bị bắt/cho phép tạo hóa đơn tháng 10, 11)
+const isContractValidInMonth = (hd, thangNam) => {
+  if (!isActiveStatus(hd)) return false;
+  if (!thangNam || !/^\d{4}-\d{2}$/.test(String(thangNam))) return true;
+
+  const ky = String(thangNam).trim();
+
+  // Nếu có NgayBD (YYYY-MM-DD), tháng bắt đầu hợp đồng không được lớn hơn kỳ tính hóa đơn
+  if (hd.NgayBD) {
+    const startMonth = String(hd.NgayBD).slice(0, 7);
+    if (startMonth > ky) return false;
+  }
+
+  // Nếu có NgayKT (YYYY-MM-DD), tháng kết thúc hợp đồng không được nhỏ hơn kỳ tính hóa đơn
+  if (hd.NgayKT) {
+    const endMonth = String(hd.NgayKT).slice(0, 7);
+    if (endMonth < ky) return false;
+  }
+
+  return true;
+};
+
 const HoaDonController = {
   // =========================================================================
   // HÀM NỘI BỘ: Lấy dữ liệu nền từ các bảng & Phân quyền (ChuTro, QuanLy, KhachThue)
@@ -20,7 +55,12 @@ const HoaDonController = {
     ] = await Promise.all([
       db.execute(`SELECT * FROM KhuTro`),
       db.execute(`SELECT * FROM Phong`),
-      db.execute(`SELECT * FROM HopDongThue`),
+      db.execute(
+        `SELECT *, 
+                DATE_FORMAT(NgayBD, '%Y-%m-%d') AS NgayBD, 
+                DATE_FORMAT(NgayKT, '%Y-%m-%d') AS NgayKT 
+         FROM HopDongThue`
+      ),
       db.execute(`SELECT * FROM ChiTietHopDongThue`),
       db.execute(`SELECT * FROM ChiTietPhiDichVu`),
       db.execute(`SELECT * FROM PhiDichVu`),
@@ -55,7 +95,6 @@ const HoaDonController = {
         allowedKhuIds.includes(Number(p.MaKhu))
       );
     } else if (role === 'KhachThue') {
-      // Lấy các hợp đồng mà người thuê này đang ở
       const myContractIds = dsCTHDT
         .filter((ct) => Number(ct.MaND) === maND && !ct.NgayDi)
         .map((ct) => Number(ct.MaHDT));
@@ -96,6 +135,7 @@ const HoaDonController = {
 
   // =========================================================================
   // HÀM NỘI BỘ: Tính toán tự động các khoản của 1 phòng trong kỳ (YYYY-MM)
+  // Chỉ tính cho phòng CÓ HỢP ĐỒNG ĐANG HIỆU LỰC TRONG ĐÚNG KỲ THÁNG ĐÓ
   // =========================================================================
   calculateRoomInvoiceData: (
     maPhong,
@@ -114,19 +154,17 @@ const HoaDonController = {
     const phong = dsPhong.find((p) => Number(p.MaPhong) === Number(maPhong));
     if (!phong) return null;
 
-    const khu = dsKhuTro.find((k) => Number(k.MaKhu) === Number(phong.MaKhu));
-
-    // 1. Tìm hợp đồng đang hiệu lực của phòng
+    // 1. Tìm hợp đồng của phòng có hiệu lực trong đúng tháng `thangNam`
     const hopDong = dsHopDong.find(
       (hd) =>
         Number(hd.MaPhong) === Number(maPhong) &&
-        (hd.TrangThai === 'ConHieuLuc' ||
-          hd.TrangThai === 'DangThue' ||
-          hd.TrangThai === 'HieuLuc' ||
-          hd.TrangThai === 1 ||
-          hd.TrangThai === '1' ||
-          !hd.TrangThai)
+        isContractValidInMonth(hd, thangNam)
     );
+
+    // Nếu trong kỳ `thangNam` phòng chưa có khách thuê (VD: tháng 10, 11 trống, tháng 12 mới thuê) -> Bỏ qua
+    if (!hopDong) return null;
+
+    const khu = dsKhuTro.find((k) => Number(k.MaKhu) === Number(phong.MaKhu));
 
     // 2. Tiền phòng (Lấy từ Hợp đồng hoặc cột Gia của bảng Phong)
     const tienPhong = Math.round(
@@ -145,49 +183,58 @@ const HoaDonController = {
     const chiTietDichVuPhong = [];
     let tienPhuPhi = 0;
 
-    if (hopDong) {
-      const ctList = dsCTDichVu.filter(
-        (ct) => Number(ct.MaHDT) === Number(hopDong.MaHDT)
-      );
-      for (const ct of ctList) {
-        const dv = dsPhiDichVu.find((d) => Number(d.MaDV) === Number(ct.MaDV));
-        if (dv) {
-          // Loại trừ dòng Tiền điện / Tiền nước nếu có lưu chung trong bảng PhiDichVu (vì Điện Nước đã tính riêng theo chỉ số)
-          const tenDVLower = String(dv.TenDV || '').trim().toLowerCase();
-          if (tenDVLower === 'tiền điện' || tenDVLower === 'tiền nước') {
-            continue;
-          }
-
-          const donGia = Math.round(Number(dv.DonGia) || 0);
-          const soLuong = Number(ct.SoLuong) || 1;
-          const thanhTien = donGia * soLuong;
-          tienPhuPhi += thanhTien;
-          chiTietDichVuPhong.push({
-            MaDV: dv.MaDV,
-            TenDV: dv.TenDV,
-            DonGia: donGia,
-            DonViTinh: dv.DonViTinh,
-            SoLuong: soLuong,
-            ThanhTien: thanhTien,
-          });
+    const ctList = dsCTDichVu.filter(
+      (ct) => Number(ct.MaHDT) === Number(hopDong.MaHDT)
+    );
+    for (const ct of ctList) {
+      const dv = dsPhiDichVu.find((d) => Number(d.MaDV) === Number(ct.MaDV));
+      if (dv) {
+        const tenDVLower = String(dv.TenDV || '').trim().toLowerCase();
+        if (tenDVLower === 'tiền điện' || tenDVLower === 'tiền nước') {
+          continue;
         }
+
+        const donGia = Math.round(Number(dv.DonGia) || 0);
+        const soLuong = Number(ct.SoLuong) || 1;
+        const thanhTien = donGia * soLuong;
+        tienPhuPhi += thanhTien;
+        chiTietDichVuPhong.push({
+          MaDV: dv.MaDV,
+          TenDV: dv.TenDV,
+          DonGia: donGia,
+          DonViTinh: dv.DonViTinh,
+          SoLuong: soLuong,
+          ThanhTien: thanhTien,
+        });
       }
     }
 
-    // 4. Tìm chỉ số điện nước của phòng trong tháng (YYYY-MM)
+    // 4. Tìm chỉ số điện nước của phòng ĐÚNG TRONG THÁNG `thangNam` (YYYY-MM)
+    // Không bắt buộc phải có chỉ số của các tháng trống trước đó (tháng 10, 11)
     const chiSoThang = dsChiSo.find(
       (cs) =>
         Number(cs.MaPhong) === Number(maPhong) &&
         String(cs.NgayGhi).slice(0, 7) === String(thangNam)
     );
 
-    // 5. Tìm hóa đơn đã tạo của phòng trong tháng (hoặc trùng MaCS)
-    const hoaDonDaTao = dsHoaDon.find(
-      (hd) =>
-        Number(hd.MaPhong) === Number(maPhong) &&
-        (String(hd.NgayTinh).slice(0, 7) === String(thangNam) ||
-          (chiSoThang && Number(hd.MaCS) === Number(chiSoThang.MaCS)))
-    );
+    // 5. Kiểm tra chặt chẽ xem phòng đã có hóa đơn trong kỳ `thangNam` chưa
+    // (So khớp theo tháng của NgayTinh, hoặc tháng của NgayGhi thuộc MaCS, hoặc trùng MaCS)
+    const hoaDonDaTao = dsHoaDon.find((hd) => {
+      if (Number(hd.MaPhong) !== Number(maPhong)) return false;
+
+      const matchNgayTinh =
+        hd.NgayTinh && String(hd.NgayTinh).slice(0, 7) === String(thangNam);
+      const matchMaCS =
+        chiSoThang && Number(hd.MaCS) === Number(chiSoThang.MaCS);
+
+      const csCuaHD = dsChiSo.find((c) => Number(c.MaCS) === Number(hd.MaCS));
+      const matchNgayGhiCS =
+        csCuaHD &&
+        csCuaHD.NgayGhi &&
+        String(csCuaHD.NgayGhi).slice(0, 7) === String(thangNam);
+
+      return Boolean(matchNgayTinh || matchMaCS || matchNgayGhiCS);
+    });
 
     // 6. Lấy đơn giá điện nước áp dụng
     const mocGia = dsGiaDienNuoc[0] || {
@@ -220,7 +267,7 @@ const HoaDonController = {
       tienNuoc = nuocTieuThu * giaNuoc;
     }
 
-    // Kiểm tra điều kiện tạo hóa đơn
+    // 7. Kiểm tra điều kiện tạo hóa đơn cho kỳ `thangNam`
     let trangThaiTao = 'DU_DIEU_KIEN';
     let lyDoKhongTheTao = '';
 
@@ -239,11 +286,13 @@ const HoaDonController = {
 
     return {
       MaPhong: Number(phong.MaPhong),
-      TenPhong: phong.TenPhong || `Phòng #${phong.MaPhong}`,
+      TenPhong: phong.TenPhong || ``,
       MaKhu: Number(phong.MaKhu),
       TenKhu: khu ? khu.TenKhu : '',
       TrangThaiPhong: phong.TrangThai || '',
-      MaHDT: hopDong ? Number(hopDong.MaHDT) : null,
+      MaHDT: Number(hopDong.MaHDT),
+      NgayBDHopDong: hopDong.NgayBD || null,
+      NgayKTHopDong: hopDong.NgayKT || null,
       MaCS: chiSoThang ? Number(chiSoThang.MaCS) : null,
       NgayGhiChiSo: chiSoThang ? chiSoThang.NgayGhi : null,
       SoDienCu: soDienCu,
@@ -269,7 +318,6 @@ const HoaDonController = {
 
   // =========================================================================
   // 1. [GET] /api/hoa-don
-  // Xem danh sách hóa đơn (Phân quyền ChuTro, QuanLy, KhachThue)
   // =========================================================================
   getDanhSachHoaDon: async (req, res) => {
     try {
@@ -318,7 +366,7 @@ const HoaDonController = {
 
           return {
             ...hd,
-            TenPhong: phong ? phong.TenPhong : `Phòng #${hd.MaPhong}`,
+            TenPhong: phong ? phong.TenPhong : ``,
             MaKhu: phong ? Number(phong.MaKhu) : 0,
             TenKhu: khu ? khu.TenKhu : '',
             SoDienCu: chiSo ? Number(chiSo.SoDienCu) : 0,
@@ -389,7 +437,9 @@ const HoaDonController = {
   getDuLieuTaoHoaDonThang: async (req, res) => {
     try {
       const thangNam =
-        req.query.thangNam || new Date().toISOString().slice(0, 7);
+        req.query.thangNam && /^\d{4}-\d{2}$/.test(String(req.query.thangNam))
+          ? String(req.query.thangNam)
+          : new Date().toISOString().slice(0, 7);
       const maKhu = Number(req.query.maKhu) || 0;
 
       const sys = await HoaDonController.getSystemDataAndPermissions(req.user);
@@ -410,7 +460,17 @@ const HoaDonController = {
 
       const dsHoaDon = await HoaDonModel.getAll();
 
-      let roomsToCalculate = sys.allowedRoomList;
+      // Chỉ lấy các phòng có hợp đồng hiệu lực trong đúng tháng `thangNam`
+      const validContractRoomIds = new Set(
+        sys.dsHopDong
+          .filter((hd) => isContractValidInMonth(hd, thangNam))
+          .map((hd) => Number(hd.MaPhong))
+      );
+
+      let roomsToCalculate = sys.allowedRoomList.filter((r) =>
+        validContractRoomIds.has(Number(r.MaPhong))
+      );
+
       if (maKhu > 0) {
         roomsToCalculate = roomsToCalculate.filter(
           (r) => Number(r.MaKhu) === maKhu
@@ -449,6 +509,8 @@ const HoaDonController = {
 
   // =========================================================================
   // 3. [POST] /api/hoa-don/tao-hoa-don
+  // Tạo trực tiếp hóa đơn cho kỳ `thangNam` (không bắt tạo bù tháng trống trước đó)
+  // và chặn tuyệt đối nếu kỳ `thangNam` đã có hóa đơn.
   // =========================================================================
   taoHoaDonThang: async (req, res) => {
     try {
@@ -457,7 +519,7 @@ const HoaDonController = {
       if (!thangNam || !/^\d{4}-\d{2}$/.test(String(thangNam))) {
         return res.status(400).json({
           success: false,
-          message: 'Kỳ tháng tạo hóa đơn không hợp lệ.',
+          message: 'Kỳ tháng tạo hóa đơn không hợp lệ (định dạng YYYY-MM).',
         });
       }
 
@@ -484,15 +546,27 @@ const HoaDonController = {
       }
 
       const dsHoaDon = await HoaDonModel.getAll();
+
+      // Đảm bảo NgayTinh luôn nằm trong kỳ `thangNam` để không bị lệch kỳ khi kiểm tra trùng
+      const defaultDay = new Date().toISOString().slice(8, 10);
       const ngayTinhHopLe =
-        ngayTinh && /^\d{4}-\d{2}-\d{2}$/.test(String(ngayTinh))
-          ? ngayTinh
-          : `${thangNam}-${new Date().toISOString().slice(8, 10)}`;
+        ngayTinh &&
+        /^\d{4}-\d{2}-\d{2}$/.test(String(ngayTinh)) &&
+        String(ngayTinh).slice(0, 7) === String(thangNam)
+          ? String(ngayTinh)
+          : `${thangNam}-${defaultDay}`;
 
       const validatedPayloads = [];
+      const processedRooms = new Set();
 
       for (const item of danhSachPhongTao) {
         const maPhong = Number(item.MaPhong);
+
+        // Chặn trường hợp payload gửi trùng 1 phòng 2 lần trong cùng 1 request
+        if (processedRooms.has(maPhong)) {
+          continue;
+        }
+        processedRooms.add(maPhong);
 
         if (!sys.allowedRoomIds.includes(maPhong)) {
           return res.status(403).json({
@@ -501,6 +575,12 @@ const HoaDonController = {
               'Bạn không có quyền tạo hóa đơn cho phòng ngoài cơ sở quản lý.',
           });
         }
+
+        // Kiểm tra trực tiếp dưới DB xem phòng đã có hóa đơn trong kỳ `thangNam` chưa
+        const existingInMonth = await HoaDonModel.getByPhongAndMonth(
+          maPhong,
+          thangNam
+        );
 
         const calc = HoaDonController.calculateRoomInvoiceData(
           maPhong,
@@ -511,24 +591,33 @@ const HoaDonController = {
           }
         );
 
-        if (!calc) {
-          return res.status(404).json({
+        if (!calc || !calc.MaHDT) {
+          return res.status(400).json({
             success: false,
-            message: 'Không tìm thấy thông tin phòng trọ.',
+            message: `Phòng không có hợp đồng thuê hiệu lực trong kỳ ${thangNam}, không thể tạo hóa đơn!`,
           });
         }
 
-        if (calc.TrangThaiTao === 'DA_TAO') {
+        if (existingInMonth || calc.TrangThaiTao === 'DA_TAO') {
           return res.status(400).json({
             success: false,
-            message: `${calc.TenPhong} đã được tạo hóa đơn trong tháng ${thangNam}. Không thể tạo 2 hóa đơn trong cùng 1 tháng!`,
+            message: `${calc.TenPhong} đã tồn tại hóa đơn trong kỳ ${thangNam}. Không được phép tạo trùng hóa đơn trong cùng 1 tháng!`,
           });
         }
 
         if (calc.TrangThaiTao === 'CHUA_CO_CHI_SO' || !calc.MaCS) {
           return res.status(400).json({
             success: false,
-            message: `${calc.TenPhong} chưa có chỉ số điện nước trong tháng ${thangNam}. Vui lòng ghi điện nước trước khi tạo hóa đơn!`,
+            message: `${calc.TenPhong} chưa có chỉ số điện nước trong tháng ${thangNam}. Vui lòng ghi điện nước tháng ${thangNam} trước khi tạo hóa đơn!`,
+          });
+        }
+
+        // Kiểm tra thêm: MaCS này đã từng được gắn cho hóa đơn nào khác chưa
+        const existingByMaCS = await HoaDonModel.getByMaCS(calc.MaCS);
+        if (existingByMaCS) {
+          return res.status(400).json({
+            success: false,
+            message: `Chỉ số điện nước kỳ ${thangNam} của ${calc.TenPhong} đã được lập hóa đơn!`,
           });
         }
 
@@ -653,9 +742,24 @@ const HoaDonController = {
           (g) => Number(g.MaGia) === Number(hoaDon.MaGia)
         ) || sys.dsGiaDienNuoc[0];
 
-      const hopDong = sys.dsHopDong.find(
-        (hd) => Number(hd.MaPhong) === Number(hoaDon.MaPhong)
-      );
+      const kyHoaDon = hoaDon.NgayTinh
+        ? String(hoaDon.NgayTinh).slice(0, 7)
+        : '';
+
+      const hopDong =
+        sys.dsHopDong.find(
+          (hd) =>
+            Number(hd.MaPhong) === Number(hoaDon.MaPhong) &&
+            isContractValidInMonth(hd, kyHoaDon)
+        ) ||
+        sys.dsHopDong.find(
+          (hd) =>
+            Number(hd.MaPhong) === Number(hoaDon.MaPhong) && isActiveStatus(hd)
+        ) ||
+        sys.dsHopDong.find(
+          (hd) => Number(hd.MaPhong) === Number(hoaDon.MaPhong)
+        );
+
       const danhSachDichVu = [];
       if (hopDong) {
         const ctList = sys.dsCTDichVu.filter(
@@ -700,7 +804,7 @@ const HoaDonController = {
         success: true,
         data: {
           ...hoaDon,
-          TenPhong: phong ? phong.TenPhong : `Phòng #${hoaDon.MaPhong}`,
+          TenPhong: phong ? phong.TenPhong : ``,
           MaKhu: phong ? Number(phong.MaKhu) : 0,
           TenKhu: khu ? khu.TenKhu : '',
           DiaChiKhu: khu ? khu.DiaChi : '',

@@ -149,6 +149,21 @@ const HoaDonModel = {
     );
     return result.affectedRows > 0;
   },
+
+  // 3. Kiểm tra phòng đã có hóa đơn trong tháng (YYYY-MM) chưa (kiểm tra cả NgayTinh và NgayGhi của MaCS)
+  getByPhongAndMonth: async (maPhong, thangNam) => {
+    const ky = String(thangNam).trim();
+    const [rows] = await db.execute(
+      `SELECT hd.MaHD, hd.MaCS, hd.MaPhong, DATE_FORMAT(hd.NgayTinh, '%Y-%m-%d') AS NgayTinh
+       FROM HoaDon hd
+       LEFT JOIN ChiSoDienNuoc cs ON hd.MaCS = cs.MaCS
+       WHERE hd.MaPhong = ? 
+         AND (DATE_FORMAT(hd.NgayTinh, '%Y-%m') = ? OR DATE_FORMAT(cs.NgayGhi, '%Y-%m') = ?)
+       LIMIT 1`,
+      [Number(maPhong), ky, ky]
+    );
+    return rows[0] || null;
+  },
 };
 
 module.exports = HoaDonModel;

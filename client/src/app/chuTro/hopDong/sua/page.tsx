@@ -106,7 +106,7 @@ function NoiDungSuaHopDong() {
       allowedRoles={["ChuTro", "QuanLy"]}
       backHref="/chuTro/hopDong"
       backLabel="Quay lại danh sách Hợp đồng"
-      title={`Chỉnh Sửa Hợp Đồng #${maHDTSua || ""}`}
+      title={`Chỉnh Sửa Hợp Đồng}`}
       subtitle="Cập nhật thông tin phòng, tiền cọc, thời hạn thuê, dịch vụ và danh sách người lưu trú"
       maxWidth="max-w-4xl"
       loading={dangTaiDuLieu}
@@ -132,7 +132,7 @@ function NoiDungSuaHopDong() {
             try {
               const res = await hopDongService.suaHopDong(maHDTSua!, payload);
               showSuccess(
-                res.thongBao || `Đã cập nhật hợp đồng #${maHDTSua} thành công!`,
+                res.thongBao || `Đã cập nhật hợp đồng thành công!`,
                 "Thành công",
                 1.5,
                 () => {

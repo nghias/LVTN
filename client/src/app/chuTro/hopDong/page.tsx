@@ -392,9 +392,7 @@ export default function QuanLyHopDongPage() {
                 <table className="w-full border-collapse text-left text-xs sm:text-[13px]">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:text-[11px]">
-                      <th className="whitespace-nowrap px-2.5 py-3 pl-3.5">
-                        Mã HĐ
-                      </th>
+                      
                       <th className="whitespace-nowrap px-2.5 py-3">
                         Phòng / Khu trọ
                       </th>
@@ -443,16 +441,7 @@ export default function QuanLyHopDongPage() {
                           key={hd.MaHDT}
                           className="transition hover:bg-[#00FFCC]/5"
                         >
-                          <td className="whitespace-nowrap px-2.5 py-3 pl-3.5 align-middle">
-                            <div className="font-bold text-slate-900">
-                              #{String(hd.MaHDT).padStart(3, "0")}
-                            </div>
-                            {hd.MaHDTCu && (
-                              <div className="mt-0.5 text-[10px] font-medium text-slate-400">
-                                Nối #{String(hd.MaHDTCu).padStart(3, "0")}
-                              </div>
-                            )}
-                          </td>
+                          
 
                           <td className="px-2.5 py-3 align-middle">
                             <div className="font-bold text-slate-900">

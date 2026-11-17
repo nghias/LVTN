@@ -193,7 +193,7 @@ export default function CapNhatGiaDienNuocPage() {
               <div className="flex items-center justify-between">
                 <h2 className="text-sm sm:text-base font-bold text-slate-900">
                   {editingId
-                    ? `Chỉnh sửa mốc giá #${editingId}`
+                    ? `Chỉnh sửa mốc giá áp dụng ngày ${formatDateVN(ngayApDung)}`
                     : 'Áp dụng bảng giá Điện Nước mới'}
                 </h2>
                 {editingId && (

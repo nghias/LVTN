@@ -300,7 +300,7 @@ const ThongKeController = {
         if (ctDaiDien) {
           const prof = profileMap.get(Number(ctDaiDien.MaND));
           daiDienByRoom.set(Number(hdt.MaPhong), {
-            HoTen: prof ? prof.HoTen : `Khách #${ctDaiDien.MaND}`,
+            HoTen: prof ? prof.HoTen : `Khách`,
             SDT: prof ? prof.SDT : '',
           });
         }
@@ -320,7 +320,7 @@ const ThongKeController = {
           return {
             MaHD: hd.MaHD,
             MaPhong: hd.MaPhong,
-            TenPhong: room ? room.TenPhong : `Phòng #${hd.MaPhong}`,
+            TenPhong: room ? room.TenPhong : ``,
             TenKhu: khu ? khu.TenKhu : '',
             NgayTinh: hd.NgayTinhStr,
             KyThang: hd.NgayTinhStr.slice(0, 7),
@@ -397,7 +397,7 @@ const ThongKeController = {
           return {
             MaHDT: hdt.MaHDT,
             MaPhong: hdt.MaPhong,
-            TenPhong: room ? room.TenPhong : `Phòng #${hdt.MaPhong}`,
+            TenPhong: room ? room.TenPhong : ``,
             TenKhu: khu ? khu.TenKhu : '',
             NgayKT: hdt.NgayKTStr,
             TienCoc: Number(hdt.TienCoc) || 0,
@@ -496,7 +496,7 @@ const ThongKeController = {
           const khu = room ? khuMap.get(Number(room.MaKhu)) : null;
           return {
             ...item,
-            TenPhong: room ? room.TenPhong : `Phòng #${item.MaPhong}`,
+            TenPhong: room ? room.TenPhong : ``,
             TenKhu: khu ? khu.TenKhu : '',
           };
         })

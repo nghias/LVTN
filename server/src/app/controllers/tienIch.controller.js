@@ -190,7 +190,7 @@ const TienIchController = {
         if (!allowedRoomIds.includes(roomId)) {
           return res.status(403).json({
             success: false,
-            message: `Bạn không có quyền gán tiện ích cho phòng mã #${roomId}!`,
+            message: `Bạn không có quyền gán tiện ích cho phòng!`,
           });
         }
       }
@@ -250,7 +250,7 @@ const TienIchController = {
       if (duplicate) {
         return res.status(400).json({
           success: false,
-          message: `Tên tiện ích "${TenTI.trim()}" đã tồn tại ở mã #${duplicate.MaTI}`,
+          message: `Tên tiện ích "${TenTI.trim()}" đã tồn tại`,
         });
       }
 

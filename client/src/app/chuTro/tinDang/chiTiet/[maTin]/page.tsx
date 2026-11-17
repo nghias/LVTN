@@ -148,7 +148,7 @@ export default function ChiTietTinDangPage() {
 
     showConfirm(
       `Bạn có chắc chắn muốn xóa bài đăng "${tinDang.TieuDe}" của phòng ${tinDang.TenPhong} (${tinDang.TenKhu}) không? Thao tác này không thể hoàn tác.`,
-      `Xác nhận xóa Tin đăng #${tinDang.MaTin}`,
+      `Xác nhận xóa Tin đăng`,
       async () => {
         try {
           const response = await fetch(
@@ -163,7 +163,7 @@ export default function ChiTietTinDangPage() {
             throw new Error(result.message || "Xóa tin đăng thất bại.");
           }
 
-          showSuccess(`Đã xóa tin đăng #${tinDang.MaTin} thành công!`);
+          showSuccess(`Đã xóa tin đăng thành công!`);
           router.push(baseTinDangPath);
         } catch (err: unknown) {
           if (err instanceof Error) {

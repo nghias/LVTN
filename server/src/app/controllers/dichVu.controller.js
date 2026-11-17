@@ -180,7 +180,7 @@ const DichVuController = {
       if (duplicate) {
         return res.status(400).json({
           success: false,
-          message: `Tên phí dịch vụ "${TenDV.trim()}" đã tồn tại ở mã #${duplicate.MaDV}`,
+          message: `Tên phí dịch vụ "${TenDV.trim()}" đã tồn tại trong hệ thống`,
         });
       }
 

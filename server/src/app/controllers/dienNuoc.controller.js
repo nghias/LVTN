@@ -90,7 +90,7 @@ const DienNuocController = {
 
         return {
           ...cs,
-          TenPhong: room ? room.TenPhong : `Phòng #${cs.MaPhong}`,
+          TenPhong: room ? room.TenPhong : ``,
           MaKhu: room ? room.MaKhu : null,
           TenKhu: room && room.TenKhu ? room.TenKhu : '',
           SoDienTieuThu: soDienTieuThu,
@@ -274,7 +274,7 @@ const DienNuocController = {
 
         return {
           ...cs,
-          TenPhong: room ? room.TenPhong : `Phòng #${cs.MaPhong}`,
+          TenPhong: room ? room.TenPhong : ``,
           MaKhu: room ? room.MaKhu : null,
           TenKhu: khu ? khu.TenKhu : '',
           SoDienTieuThu: soDienTieuThu,
@@ -403,7 +403,7 @@ const DienNuocController = {
       if (existedMonth) {
         return res.status(400).json({
           success: false,
-          message: `Phòng này đã có bản ghi chỉ số trong tháng này (Mã #${existedMonth.MaCS} ngày ${existedMonth.NgayGhi}).`,
+          message: `Phòng này đã có bản ghi chỉ số trong tháng này ngày ${existedMonth.NgayGhi}).`,
         });
       }
 
@@ -478,7 +478,7 @@ const DienNuocController = {
       for (const item of DanhSachChiSo) {
         const maPhong = Number(item.MaPhong);
         const roomObj = allowedRooms.find((r) => Number(r.MaPhong) === maPhong);
-        const tenPhong = roomObj ? roomObj.TenPhong : `Phòng #${maPhong}`;
+        const tenPhong = roomObj ? roomObj.TenPhong : ``;
 
         if (!allowedRoomIds.includes(maPhong)) {
           return res.status(403).json({
@@ -494,7 +494,7 @@ const DienNuocController = {
         if (existedMonth) {
           return res.status(400).json({
             success: false,
-            message: `${tenPhong} đã được ghi chỉ số trong tháng này (Mã #${existedMonth.MaCS}).`,
+            message: `${tenPhong} đã được ghi chỉ số trong tháng này.`,
           });
         }
 
@@ -623,7 +623,7 @@ const DienNuocController = {
       if (existedMonth) {
         return res.status(400).json({
           success: false,
-          message: `Phòng này đã có bản ghi chỉ số khác trong cùng tháng (Mã #${existedMonth.MaCS})!`,
+          message: `Phòng này đã có bản ghi chỉ số khác trong cùng tháng!`,
         });
       }
 

@@ -174,7 +174,7 @@ function TaoHoaDonThangContent() {
           const roomObj = danhSachPhong.find((r) => r.MaPhong === maPhong);
           setGlobalError(
             `${
-              roomObj?.TenPhong || `Phòng #${maPhong}`
+              roomObj?.TenPhong || `Phòng`
             }: Khoản phí phát sinh chưa nhập đầy đủ Tên hoặc Số tiền (>= 1.000 VNĐ). Hãy kiểm tra các ô báo đỏ bên dưới hoặc bấm "Bỏ" nếu không dùng!`
           );
           return;

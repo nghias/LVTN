@@ -182,13 +182,13 @@ export default function QuanLyHoaDonPage() {
   const handleDelete = (item: HoaDonItem) => {
     if (Number(item.TienDaTra) > 0) {
       showError(
-        `Hóa đơn #${item.MaHD} của ${item.TenPhong} đã có thanh toán nên không thể xóa!`
+        `Hóa đơn của ${item.TenPhong} đã có thanh toán nên không thể xóa!`
       );
       return;
     }
 
     showConfirm(
-      `Bạn có chắc chắn muốn xóa hóa đơn #${item.MaHD} (${item.TenPhong} - kỳ ${formatDateVN(
+      `Bạn có chắc chắn muốn xóa hóa đơn (${item.TenPhong} - kỳ ${formatDateVN(
         item.NgayTinh
       )}) không?`,
       'Xác nhận xóa hóa đơn',

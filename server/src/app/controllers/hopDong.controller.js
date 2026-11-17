@@ -352,7 +352,7 @@ const HopDongController = {
       const ngayTraFormatted = new Date(ngayDuKienTraPhong).toLocaleDateString('vi-VN');
       const soDienThoai = sdtLienHe || sdtNguoiGui || 'Chưa cập nhật';
 
-      const tieuDe = `[Yêu cầu hủy HĐ #${maHDT}] Phòng ${tenPhong} - ${tenKhu}`;
+      const tieuDe = `[Yêu cầu hủy HĐ của Phòng ${tenPhong} - ${tenKhu}`;
       const noiDung = [
         `Kính gửi Ban quản lý và Chủ trọ,`,
         `Khách thuê ${tenNguoiGui} (${vaiTroLabel}) vừa gửi yêu cầu chấm dứt/hủy hợp đồng thuê phòng với thông tin chi tiết:`,

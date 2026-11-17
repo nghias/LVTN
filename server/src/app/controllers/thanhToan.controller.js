@@ -396,7 +396,7 @@ const ThanhToanController = {
         if (!roomTenantMap.has(maP)) {
           roomTenantMap.set(maP, {
             MaND: row.MaND,
-            HoTen: row.HoTen || `Khách #${row.MaND}`,
+            HoTen: row.HoTen || `Khách`,
             SDT: row.SDT || '',
           });
         }
@@ -440,7 +440,7 @@ const ThanhToanController = {
           TrangThaiThanhToan: trangThaiThanhToan,
           CoGiaoDichChoXacNhan: coChoXacNhan,
           MaKhu: room ? Number(room.MaKhu) : null,
-          TenPhong: room?.TenPhong || `Phòng #${hd.MaPhong}`,
+          TenPhong: room?.TenPhong || ``,
           TenKhu: khu?.TenKhu || '',
           TenKhachThue: tenant?.HoTen || 'Chưa gắn khách',
           SDTKhachThue: tenant?.SDT || '',
@@ -560,7 +560,7 @@ const ThanhToanController = {
             TongTien: tongTien,
             TienDaTra: tienDaTra,
             ConNo: conNo,
-            TenPhong: room?.TenPhong || `Phòng #${hoaDon.MaPhong}`,
+            TenPhong: room?.TenPhong || ``,
             TenKhu: khu?.TenKhu || '',
             MaHDT: hopDongInfo?.MaHDT || null,
             TenKhachThue: hopDongInfo?.TenKhachThue || 'Khách thuê phòng',

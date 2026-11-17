@@ -120,7 +120,7 @@ function isTinDangHienThiConHan(tin: TinDangItemBrief): boolean {
 function buildRoomOptionFromTin(tin: TinDangItemBrief): PhongSelectOption {
   return {
     MaPhong: Number(tin.MaPhong),
-    TenPhong: tin.TenPhong || `Phòng #${tin.MaPhong}`,
+    TenPhong: tin.TenPhong || ``,
     DienTich: Number(tin.DienTich || 0),
     Gia: Number(tin.Gia || 0),
     TrangThai: tin.TrangThaiPhong || "Trong",

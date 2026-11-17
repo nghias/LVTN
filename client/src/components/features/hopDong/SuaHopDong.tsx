@@ -535,7 +535,7 @@ export default function SuaHopDongModal({
             <div>
               <h3 className="text-lg font-bold text-[#0F172A]">
                 {maHDTSua
-                  ? `Chỉnh Sửa Hợp Đồng #${maHDTSua}`
+                  ? `Chỉnh Sửa Hợp Đồng`
                   : "Tạo Hợp Đồng Thuê Phòng Mới"}
               </h3>
               <p className="text-xs text-slate-600">

@@ -72,7 +72,7 @@ export default function SuaChiSoDienNuocPage() {
 
         if (detailRes.success && detailRes.data) {
           const d = detailRes.data;
-          setTenPhong(d.TenPhong || `Phòng #${d.MaPhong}`);
+          setTenPhong(d.TenPhong || ``);
           setTenKhu(d.TenKhu || '');
           setNgayGhi(d.NgayGhi || '');
           setSoDienCu(Number(d.SoDienCu) || 0);
