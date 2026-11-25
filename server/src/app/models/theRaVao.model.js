@@ -6,7 +6,7 @@ const TheRaVaoModel = {
     const [rows] = await db.query(
       `SELECT MaThe, MaND, GiaTri, NgayTao, TrangThai, GhiChu
        FROM TheRaVao
-       ORDER BY FIELD(TrangThai, 'ChoCapLai', 'DangGhiThe', 'HoatDong', 'BiKhoa', 'ThuHoi'), MaThe DESC`
+       ORDER BY FIELD(TrangThai, 'ChoCapLai', 'HoatDong', 'BiKhoa', 'ThuHoi'), MaThe DESC`
     );
     return rows;
   },
@@ -44,101 +44,58 @@ const TheRaVaoModel = {
     return rows;
   },
 
-  async findByMaNDList(maNDList) {
-    if (!maNDList || maNDList.length === 0) return [];
-    const placeholders = maNDList.map(() => "?").join(",");
+  // Kiểm tra phôi thẻ (UID) có đang thuộc về 1 bản ghi thẻ khác không
+  async findByUidPrefix(uid, excludeMaThe = 0) {
     const [rows] = await db.query(
-      `SELECT MaThe, MaND, GiaTri, NgayTao, TrangThai, GhiChu
+      `SELECT MaThe, MaND
        FROM TheRaVao
-       WHERE MaND IN (${placeholders})
-       ORDER BY FIELD(TrangThai, 'ChoCapLai', 'DangGhiThe', 'HoatDong', 'BiKhoa', 'ThuHoi'), MaThe DESC`,
-      maNDList
-    );
-    return rows;
-  },
-
-  async findPendingByMaND(maND) {
-    const [rows] = await db.query(
-      `SELECT MaThe, MaND, GiaTri, NgayTao, TrangThai, GhiChu
-       FROM TheRaVao
-       WHERE MaND = ? AND TrangThai IN ('ChoCapLai', 'DangGhiThe')
+       WHERE (GiaTri LIKE ? OR GiaTri = ?) AND MaThe <> ?
        LIMIT 1`,
-      [maND]
+      [`${uid}|%`, uid, Number(excludeMaThe) || 0]
     );
     return rows[0] || null;
   },
 
-  async findPendingWriteJobsByMaNDList(maNDList) {
-    if (!maNDList || maNDList.length === 0) return [];
-    const placeholders = maNDList.map(() => "?").join(",");
-    const [rows] = await db.query(
-      `SELECT MaThe, MaND, GiaTri, NgayTao, TrangThai, GhiChu
-       FROM TheRaVao
-       WHERE MaND IN (${placeholders})
-         AND TrangThai = 'DangGhiThe'
-         AND GiaTri LIKE 'WAIT|%'
-       ORDER BY NgayTao DESC`,
-      maNDList
-    );
-    return rows;
-  },
-
-  async findActiveByUidPrefix(uidPrefix, excludeMaThe) {
-    const [rows] = await db.query(
-      `SELECT MaThe
-       FROM TheRaVao
-       WHERE GiaTri LIKE ? AND TrangThai = 'HoatDong' AND MaThe <> ?
-       LIMIT 1`,
-      [`${uidPrefix}|%`, excludeMaThe]
-    );
-    return rows[0] || null;
-  },
-
-  async create({ maND, giaTri, trangThai, ghiChu }) {
+  async create({ maND, giaTri, trangThai = "HoatDong", ghiChu }) {
     const [result] = await db.query(
       `INSERT INTO TheRaVao (MaND, GiaTri, NgayTao, TrangThai, GhiChu)
-       VALUES (?, ?, NOW(), ?, ?)`,
-      [maND, giaTri, trangThai, ghiChu]
+       VALUES (?, ?, CURDATE(), ?, ?)`,
+      [maND, giaTri, trangThai, ghiChu || null]
     );
     return result.insertId;
   },
 
-  async updateForWrite(maThe, maND, { giaTri, ghiChu }) {
-    await db.query(
+  // Cấp lại thẻ: cập nhật trực tiếp bản ghi đã có, không tạo dòng mới
+  async reissueById(maThe, { giaTri, ghiChu }) {
+    const [result] = await db.query(
       `UPDATE TheRaVao
-       SET GiaTri = ?, TrangThai = 'DangGhiThe', NgayTao = NOW(), GhiChu = ?
-       WHERE MaThe = ? AND MaND = ?`,
-      [giaTri, ghiChu, maThe, maND]
-    );
-  },
-
-  async activateCard(maThe, giaTriMoi) {
-    await db.query(
-      `UPDATE TheRaVao
-       SET GiaTri = ?, TrangThai = 'HoatDong', NgayTao = NOW()
+       SET GiaTri = ?, NgayTao = CURDATE(), TrangThai = 'HoatDong', GhiChu = ?
        WHERE MaThe = ?`,
-      [giaTriMoi, maThe]
+      [giaTri, ghiChu || null, maThe]
     );
+    return result.affectedRows > 0;
   },
 
-  async lockActiveByMaND(maND, lyDo) {
-    await db.query(
+  async updateStatus(maThe, trangThai, ghiChu) {
+    const [result] = await db.query(
       `UPDATE TheRaVao
-       SET TrangThai = 'BiKhoa',
-           GhiChu = TRIM(BOTH ' | ' FROM CONCAT(IFNULL(GhiChu, ''), ' | ', ?))
-       WHERE MaND = ? AND TrangThai = 'HoatDong'`,
-      [lyDo, maND]
-    );
-  },
-
-  async lockById(maThe, lyDo) {
-    await db.query(
-      `UPDATE TheRaVao
-       SET TrangThai = 'BiKhoa',
-           GhiChu = TRIM(BOTH ' | ' FROM CONCAT(IFNULL(GhiChu, ''), ' | ', ?))
+       SET TrangThai = ?,
+           GhiChu = CASE
+             WHEN ? IS NOT NULL AND ? <> '' THEN ?
+             ELSE GhiChu
+           END
        WHERE MaThe = ?`,
-      [lyDo, maThe]
+      [trangThai, ghiChu || "", ghiChu || "", ghiChu || "", maThe]
     );
+    return result.affectedRows > 0;
+  },
+
+  async deleteById(maThe) {
+    const [result] = await db.query(
+      `DELETE FROM TheRaVao WHERE MaThe = ?`,
+      [maThe]
+    );
+    return result.affectedRows > 0;
   },
 };
 

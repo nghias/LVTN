@@ -14,13 +14,28 @@ export interface TheRaVaoItem {
   MaND: number;
   MaUID: string | null;
   NgayTao: string;
-  TrangThai: "HoatDong" | "ChoCapLai" | "DangGhiThe" | "BiKhoa" | "ThuHoi" | string;
+  TrangThai: "HoatDong" | "ChoCapLai" | "BiKhoa" | "ThuHoi" | string;
   GhiChu: string | null;
-  HoTen?: string;
+  HoTen: string;
+  SDT?: string | null;
+  CCCD?: string | null;
   MaPhong?: number | null;
   TenPhong?: string | null;
   MaKhu?: number | null;
   TenKhu?: string | null;
+  VaiTroHienThi?: string;
+}
+
+export interface NguoiChuaCoTheItem {
+  MaND: number;
+  HoTen: string;
+  SDT: string | null;
+  CCCD: string | null;
+  MaPhong: number | null;
+  TenPhong: string | null;
+  MaKhu: number | null;
+  TenKhu: string | null;
+  VaiTroHienThi: string;
 }
 
 export interface LichSuTheItem {
@@ -30,10 +45,24 @@ export interface LichSuTheItem {
   NgayQuetThe: string;
   GioQuetThe: string;
   MaND?: number;
-  HoTen?: string;
+  HoTen: string;
   TenPhong?: string | null;
   MaKhu?: number | null;
   TenKhu?: string | null;
+}
+
+export interface PhienGhiStatus {
+  sessionId: string;
+  mode: "NEW" | "REISSUE";
+  status: "WAITING" | "SUCCESS" | "CANCELLED" | "EXPIRED" | "ERROR";
+  remainingSec: number;
+  lastError: string | null;
+  result: {
+    maThe: number;
+    maND: number;
+    uid: string;
+    trangThai: string;
+  } | null;
 }
 
 async function request(path: string, options?: RequestInit) {
@@ -59,22 +88,49 @@ async function request(path: string, options?: RequestInit) {
 }
 
 export const theRaVaoService = {
-  // Người thuê (KhachThue)
-  getTheCuaToi: (params?: { tuNgay?: string; denNgay?: string }) => {
+  // Người thuê
+  getTheCuaToi: (
+    params?: { tuNgay?: string; denNgay?: string },
+    options?: { silent?: boolean }
+  ) => {
     const qs = new URLSearchParams();
     if (params?.tuNgay) qs.set("tuNgay", params.tuNgay);
     if (params?.denNgay) qs.set("denNgay", params.denNgay);
     const query = qs.toString() ? `?${qs.toString()}` : "";
-    return request(`/cua-toi${query}`);
+    return request(`/cua-toi${query}`, {
+      headers: options?.silent ? { "x-silent-fetch": "1" } : undefined,
+    });
   },
 
-  yeuCauCapLai: (payload: { lyDo: string; khoaTheCu: boolean }) =>
+  yeuCauCapLai: (payload: { lyDo: string }) =>
     request("/yeu-cau-cap-lai", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
 
+  
+
   // Chủ trọ & Quản lý
+  getLichSuRaVao: (
+    params?: {
+      maKhu?: string;
+      tuNgay?: string;
+      denNgay?: string;
+      keyword?: string;
+    },
+    options?: { silent?: boolean }
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.maKhu) qs.set("maKhu", params.maKhu);
+    if (params?.tuNgay) qs.set("tuNgay", params.tuNgay);
+    if (params?.denNgay) qs.set("denNgay", params.denNgay);
+    if (params?.keyword) qs.set("keyword", params.keyword);
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return request(`/lich-su${query}`, {
+      headers: options?.silent ? { "x-silent-fetch": "1" } : undefined,
+    });
+  },
+
   getDanhSachThe: (params?: {
     maKhu?: string;
     trangThai?: string;
@@ -88,14 +144,31 @@ export const theRaVaoService = {
     return request(`/danh-sach${query}`);
   },
 
-  capLaiThe: (payload: {
-    maND: number;
-    maTheYeuCau?: number;
+  getNguoiChuaCoThe: (maKhu?: string) => {
+    const query = maKhu ? `?maKhu=${encodeURIComponent(maKhu)}` : "";
+    return request(`/chua-co-the${query}`);
+  },
+
+  getChiTietThe: (maThe: number) => request(`/chi-tiet/${maThe}`),
+
+  batDauPhienGhi: (payload: {
+    mode: "NEW" | "REISSUE";
+    maND?: number;
+    maThe?: number;
     ghiChu?: string;
   }) =>
-    request("/cap-lai", {
+    request("/phien-ghi/bat-dau", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+
+  getTrangThaiPhienGhi: (sessionId: string) =>
+    request(`/phien-ghi/${encodeURIComponent(sessionId)}`),
+
+  huyPhienGhi: (sessionId: string) =>
+    request(`/phien-ghi/${encodeURIComponent(sessionId)}/huy`, {
+      method: "POST",
+      keepalive: true,
     }),
 
   khoaThe: (maThe: number, lyDo?: string) =>
@@ -104,18 +177,8 @@ export const theRaVaoService = {
       body: JSON.stringify({ lyDo }),
     }),
 
-  getLichSuRaVao: (params?: {
-    maKhu?: string;
-    tuNgay?: string;
-    denNgay?: string;
-    keyword?: string;
-  }) => {
-    const qs = new URLSearchParams();
-    if (params?.maKhu) qs.set("maKhu", params.maKhu);
-    if (params?.tuNgay) qs.set("tuNgay", params.tuNgay);
-    if (params?.denNgay) qs.set("denNgay", params.denNgay);
-    if (params?.keyword) qs.set("keyword", params.keyword);
-    const query = qs.toString() ? `?${qs.toString()}` : "";
-    return request(`/lich-su${query}`);
-  },
+  xoaThe: (maThe: number) =>
+    request(`/${maThe}`, {
+      method: "DELETE",
+    }),
 };

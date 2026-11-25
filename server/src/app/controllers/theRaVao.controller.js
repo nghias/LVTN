@@ -25,13 +25,13 @@ const TheRaVaoController = {
   async iotXacNhanGhi(req, res) {
     try {
       const data = await TheRaVaoService.xacNhanGhiThe(req.body);
-      return res.status(200).json({ success: true, message: "Kích hoạt thẻ mới thành công", data });
+      return res.status(200).json({ success: true, message: "Kích hoạt thẻ thành công", data });
     } catch (error) {
       return res.status(error.statusCode || 500).json({ success: false, message: error.message });
     }
   },
 
-  // === Khách thuê ===
+  // === Người thuê ===
   async getTheCuaToi(req, res) {
     try {
       const data = await TheRaVaoService.getThongTinTheCuaToi(req.user, req.query);
@@ -44,9 +44,9 @@ const TheRaVaoController = {
   async yeuCauCapLai(req, res) {
     try {
       const data = await TheRaVaoService.yeuCauCapLaiThe(req.user, req.body);
-      return res.status(201).json({
+      return res.status(200).json({
         success: true,
-        message: "Đã gửi yêu cầu cấp lại thẻ tới Ban quản lý.",
+        message: "Đã gửi yêu cầu cấp lại thẻ và tạm khóa thẻ cũ.",
         data,
       });
     } catch (error) {
@@ -55,6 +55,15 @@ const TheRaVaoController = {
   },
 
   // === Chủ trọ & Quản lý ===
+  async getLichSuRaVao(req, res) {
+    try {
+      const result = await TheRaVaoService.getLichSuRaVao(req.user, req.query);
+      return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message });
+    }
+  },
+
   async getDanhSachThe(req, res) {
     try {
       const result = await TheRaVaoService.getDanhSachThe(req.user, req.query);
@@ -64,10 +73,46 @@ const TheRaVaoController = {
     }
   },
 
-  async capLaiThe(req, res) {
+  async getNguoiChuaCoThe(req, res) {
     try {
-      const data = await TheRaVaoService.batDauCapLaiThe(req.user, req.body);
+      const result = await TheRaVaoService.getNguoiChuaCoThe(req.user, req.query);
+      return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message });
+    }
+  },
+
+  async getChiTietThe(req, res) {
+    try {
+      const data = await TheRaVaoService.getChiTietThe(req.user, Number(req.params.maThe));
+      return res.status(200).json({ success: true, data });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message });
+    }
+  },
+
+  async batDauPhienGhi(req, res) {
+    try {
+      const data = await TheRaVaoService.batDauPhienGhi(req.user, req.body);
       return res.status(200).json({ success: true, ...data });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message });
+    }
+  },
+
+  async getTrangThaiPhienGhi(req, res) {
+    try {
+      const data = await TheRaVaoService.getTrangThaiPhienGhi(req.params.sessionId);
+      return res.status(200).json({ success: true, data });
+    } catch (error) {
+      return res.status(error.statusCode || 500).json({ success: false, message: error.message });
+    }
+  },
+
+  async huyPhienGhi(req, res) {
+    try {
+      const data = await TheRaVaoService.huyPhienGhi(req.params.sessionId);
+      return res.status(200).json({ success: true, data });
     } catch (error) {
       return res.status(error.statusCode || 500).json({ success: false, message: error.message });
     }
@@ -75,17 +120,17 @@ const TheRaVaoController = {
 
   async khoaThe(req, res) {
     try {
-      const data = await TheRaVaoService.khoaThe(req.user, Number(req.params.maThe), req.body.lyDo);
-      return res.status(200).json({ success: true, message: "Đã khóa thẻ thành công.", data });
+      const data = await TheRaVaoService.khoaThe(req.user, Number(req.params.maThe), req.body?.lyDo);
+      return res.status(200).json({ success: true, message: "Đã khóa thẻ thành công!", data });
     } catch (error) {
       return res.status(error.statusCode || 500).json({ success: false, message: error.message });
     }
   },
 
-  async getLichSuRaVao(req, res) {
+  async xoaThe(req, res) {
     try {
-      const result = await TheRaVaoService.getLichSuRaVao(req.user, req.query);
-      return res.status(200).json({ success: true, ...result });
+      const data = await TheRaVaoService.xoaThe(req.user, Number(req.params.maThe));
+      return res.status(200).json({ success: true, message: "Đã xóa thẻ thành công!", data });
     } catch (error) {
       return res.status(error.statusCode || 500).json({ success: false, message: error.message });
     }

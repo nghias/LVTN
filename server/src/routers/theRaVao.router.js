@@ -12,19 +12,26 @@ const verifyDeviceKey = (req, res, next) => {
   next();
 };
 
-// Nhóm API cho ESP32
+// 1. Nhóm API cho ESP32
 router.post("/iot/quet-the", verifyDeviceKey, TheRaVaoController.iotQuetThe);
 router.get("/iot/lenh-ghi", verifyDeviceKey, TheRaVaoController.iotLayLenhGhi);
 router.post("/iot/xac-nhan-ghi", verifyDeviceKey, TheRaVaoController.iotXacNhanGhi);
 
-// Nhóm API cho Người thuê (KhachThue)
+// 2. Nhóm API cho Người thuê
 router.get("/cua-toi", verifyToken, authorizeRoles("KhachThue"), TheRaVaoController.getTheCuaToi);
 router.post("/yeu-cau-cap-lai", verifyToken, authorizeRoles("KhachThue"), TheRaVaoController.yeuCauCapLai);
 
-// Nhóm API cho Chủ trọ & Quản lý
-router.get("/danh-sach", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getDanhSachThe);
-router.post("/cap-lai", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.capLaiThe);
-router.patch("/:maThe/khoa", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.khoaThe);
+// 3. Nhóm API cho Chủ trọ & Quản lý
 router.get("/lich-su", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getLichSuRaVao);
+router.get("/danh-sach", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getDanhSachThe);
+router.get("/chua-co-the", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getNguoiChuaCoThe);
+router.get("/chi-tiet/:maThe", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getChiTietThe);
+
+router.post("/phien-ghi/bat-dau", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.batDauPhienGhi);
+router.get("/phien-ghi/:sessionId", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getTrangThaiPhienGhi);
+router.post("/phien-ghi/:sessionId/huy", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.huyPhienGhi);
+
+router.patch("/:maThe/khoa", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.khoaThe);
+router.delete("/:maThe", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.xoaThe);
 
 module.exports = router;

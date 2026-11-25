@@ -4,6 +4,11 @@ const db = require("../database/db");
 const TheRaVaoModel = require("../app/models/theRaVao.model");
 const LichSuTheModel = require("../app/models/lichSuThe.model");
 
+// Quản lý phiên ghi thẻ tạm trong bộ nhớ (không sửa DB khi chưa quẹt thẻ)
+const WRITE_SESSION_TTL_MS = 60000;
+const activeSessionByKhu = new Map(); // maKhu -> sessionId
+const sessionById = new Map();        // sessionId -> sessionObject
+
 function taoMaBiMat(maKhu) {
   const rand = crypto.randomBytes(5).toString("hex").toUpperCase();
   return `K${maKhu}_${rand}`.slice(0, 16);
@@ -11,8 +16,23 @@ function taoMaBiMat(maKhu) {
 
 function tachMaUID(giaTri) {
   if (!giaTri) return null;
-  if (giaTri.startsWith("WAIT|") || giaTri.startsWith("PENDING_")) return null;
   return giaTri.includes("|") ? giaTri.split("|")[0] : giaTri;
+}
+
+function cleanupExpiredSessions() {
+  const now = Date.now();
+  for (const [sid, session] of sessionById.entries()) {
+    if (session.status === "WAITING" && now > session.expiresAt) {
+      session.status = "EXPIRED";
+      if (activeSessionByKhu.get(session.maKhu) === sid) {
+        activeSessionByKhu.delete(session.maKhu);
+      }
+    }
+    // Dọn rác các phiên kết thúc quá 10 phút
+    if (session.status !== "WAITING" && now - session.updatedAt > 10 * 60 * 1000) {
+      sessionById.delete(sid);
+    }
+  }
 }
 
 const getUserId = (user) => Number(user?.MaND ?? user?.maND);
@@ -20,7 +40,6 @@ const getUserRole = (user) => user?.Quyen ?? user?.quyen ?? user?.vaiTro;
 const isChuTro = (user) => getUserRole(user) === "ChuTro";
 const isQuanLy = (user) => getUserRole(user) === "QuanLy";
 
-// Đọc danh sách đơn bảng để ghép dữ liệu tại tầng Service (không JOIN trong Model)
 async function loadReferenceData() {
   const [[khuTros], [phongs], [hopDongs], [cthdts], [thongTinCaNhans]] =
     await Promise.all([
@@ -28,14 +47,13 @@ async function loadReferenceData() {
       db.query(`SELECT MaPhong, TenPhong, MaKhu FROM Phong`),
       db.query(`SELECT MaHDT, MaPhong, TrangThai FROM HopDongThue`),
       db.query(`SELECT MaHDT, MaND, NgayDi FROM ChiTietHopDongThue`),
-      db.query(`SELECT MaND, HoTen FROM ThongTinCaNhan`),
+      db.query(`SELECT MaND, HoTen, SDT, CCCD FROM ThongTinCaNhan`),
     ]);
 
   const khuMap = new Map(khuTros.map((k) => [Number(k.MaKhu), k]));
   const phongMap = new Map(phongs.map((p) => [Number(p.MaPhong), p]));
-  const hoTenMap = new Map(thongTinCaNhans.map((t) => [Number(t.MaND), t.HoTen]));
+  const profileMap = new Map(thongTinCaNhans.map((t) => [Number(t.MaND), t]));
 
-  // Map hợp đồng đang hiệu lực: MaND -> { MaHDT, MaPhong, TenPhong, MaKhu, TenKhu }
   const activeHdIds = new Set(
     hopDongs
       .filter((h) => ["ConHieuLuc", "HieuLuc", "DangHieuLuc"].includes(h.TrangThai))
@@ -61,7 +79,26 @@ async function loadReferenceData() {
     }
   }
 
-  return { khuTros, khuMap, hoTenMap, activeRentalByMaND };
+  return { khuTros, khuMap, profileMap, activeRentalByMaND };
+}
+
+function resolveUserContext(maND, { khuTros, profileMap, activeRentalByMaND }) {
+  const id = Number(maND);
+  const profile = profileMap.get(id);
+  const rental = activeRentalByMaND.get(id);
+  const qlKhu = khuTros.find((k) => Number(k.MaND) === id);
+
+  return {
+    MaND: id,
+    HoTen: profile?.HoTen || "Chưa cập nhật",
+    SDT: profile?.SDT || null,
+    CCCD: profile?.CCCD || null,
+    MaPhong: rental?.MaPhong || null,
+    TenPhong: rental?.TenPhong || (qlKhu ? "Quản lý cơ sở" : null),
+    MaKhu: rental?.MaKhu ?? (qlKhu ? Number(qlKhu.MaKhu) : null),
+    TenKhu: rental?.TenKhu ?? qlKhu?.TenKhu ?? null,
+    VaiTroHienThi: rental ? "Khách thuê" : qlKhu ? "Quản lý cơ sở" : "Chưa xếp phòng",
+  };
 }
 
 const TheRaVaoService = {
@@ -79,19 +116,19 @@ const TheRaVaoService = {
     if (!the) {
       return { allow: false, message: "Thẻ không tồn tại hoặc sai mã bảo mật." };
     }
+    // Chặn tuyệt đối khi thẻ bị khóa hoặc thu hồi
     if (the.TrangThai !== "HoatDong") {
-      return { allow: false, message: `Thẻ đang ở trạng thái ${the.TrangThai}.` };
+      return { allow: false, message: "Thẻ đang bị khóa hoặc không hoạt động." };
     }
 
-    const { khuTros, hoTenMap, activeRentalByMaND } = await loadReferenceData();
+    const ref = await loadReferenceData();
     const maND = Number(the.MaND);
-    const hoTen = hoTenMap.get(maND) || "Người dùng";
+    const ctx = resolveUserContext(maND, ref);
 
-    // Cho phép thẻ Quản lý khu trọ mở đúng khu mình phụ trách
-    const quanLyKhu = khuTros.find(
+    const quanLyKhu = ref.khuTros.find(
       (k) => Number(k.MaND) === maND && Number(k.MaKhu) === Number(maKhu)
     );
-    const rental = activeRentalByMaND.get(maND);
+    const rental = ref.activeRentalByMaND.get(maND);
 
     if (!quanLyKhu) {
       if (!rental) {
@@ -108,57 +145,119 @@ const TheRaVaoService = {
       allow: true,
       message: "Mở cổng thành công",
       data: {
-        hoTen,
-        tenPhong: rental ? rental.TenPhong : "Ban quản lý",
+        hoTen: ctx.HoTen,
+        tenPhong: ctx.TenPhong || "Ban quản lý",
         tenKhu: quanLyKhu ? quanLyKhu.TenKhu : rental.TenKhu,
       },
     };
   },
 
   async layLenhGhiThe(maKhu) {
-    const { hoTenMap, activeRentalByMaND } = await loadReferenceData();
-    const maNDThuocKhu = [];
-    for (const [maND, info] of activeRentalByMaND.entries()) {
-      if (Number(info.MaKhu) === Number(maKhu)) maNDThuocKhu.push(maND);
+    cleanupExpiredSessions();
+    const khuId = Number(maKhu);
+    const sid = activeSessionByKhu.get(khuId);
+    if (!sid) return { hasJob: false };
+
+    const session = sessionById.get(sid);
+    if (!session || session.status !== "WAITING") {
+      activeSessionByKhu.delete(khuId);
+      return { hasJob: false };
     }
 
-    const jobs = await TheRaVaoModel.findPendingWriteJobsByMaNDList(maNDThuocKhu);
-    if (jobs.length === 0) return { hasJob: false };
-
-    const job = jobs[0];
     return {
       hasJob: true,
-      maThe: job.MaThe,
-      secret: job.GiaTri.replace("WAIT|", ""),
-      hoTen: hoTenMap.get(Number(job.MaND)) || "",
+      sessionId: session.sessionId,
+      mode: session.mode,
+      secret: session.secret,
+      hoTen: session.hoTen,
+      remainingSec: Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 1000)),
     };
   },
 
-  async xacNhanGhiThe({ maKhu, maThe, uid, secret }) {
-    const the = await TheRaVaoModel.findById(maThe);
-    if (!the || the.TrangThai !== "DangGhiThe") {
-      const err = new Error("Không tìm thấy lệnh ghi thẻ hợp lệ.");
+  async xacNhanGhiThe({ maKhu, sessionId, uid, secret }) {
+    cleanupExpiredSessions();
+    const session = sessionById.get(String(sessionId || ""));
+
+    if (!session || session.status !== "WAITING") {
+      const err = new Error("Phiên ghi thẻ đã hết hạn hoặc bị hủy.");
       err.statusCode = 400;
       throw err;
     }
-
-    const expectedSecret = the.GiaTri.replace("WAIT|", "");
-    if (expectedSecret !== String(secret).trim()) {
+    if (Number(session.maKhu) !== Number(maKhu)) {
+      const err = new Error("Thiết bị không đúng cơ sở của phiên ghi thẻ.");
+      err.statusCode = 403;
+      throw err;
+    }
+    if (session.secret !== String(secret || "").trim()) {
       const err = new Error("Mã bí mật xác nhận không khớp.");
       err.statusCode = 400;
       throw err;
     }
 
-    const cleanUid = String(uid).trim().toUpperCase();
-    const dup = await TheRaVaoModel.findActiveByUidPrefix(cleanUid, maThe);
+    const cleanUid = String(uid || "").trim().toUpperCase();
+    if (!cleanUid) {
+      const err = new Error("Thiếu mã UID của phôi thẻ.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Kiểm tra phôi thẻ vật lý có đang thuộc về 1 bản ghi khác không
+    const excludeMaThe = session.mode === "REISSUE" ? session.maThe : 0;
+    const dup = await TheRaVaoModel.findByUidPrefix(cleanUid, excludeMaThe);
     if (dup) {
-      const err = new Error("Phôi thẻ này đang được kích hoạt cho một tài khoản khác.");
+      // Giữ nguyên phiên WAITING để người quản lý đặt phôi thẻ trắng khác mà không cần tạo lại phiên
+      session.lastError = "Phôi thẻ vừa đặt đã được gán cho tài khoản khác! Vui lòng dùng phôi thẻ trắng khác.";
+      session.updatedAt = Date.now();
+      const err = new Error(session.lastError);
       err.statusCode = 409;
       throw err;
     }
 
-    await TheRaVaoModel.activateCard(maThe, `${cleanUid}|${expectedSecret}`);
-    return { maThe, maND: the.MaND, maKhu, uid: cleanUid };
+    const giaTriMoi = `${cleanUid}|${session.secret}`;
+    let finalMaThe = session.maThe;
+
+    if (session.mode === "NEW") {
+      // Ràng buộc mỗi người chỉ 1 thẻ duy nhất
+      const existing = await TheRaVaoModel.findByMaND(session.maND);
+      if (existing.length > 0) {
+        session.status = "ERROR";
+        session.lastError = "Người dùng này đã có thẻ trên hệ thống.";
+        session.updatedAt = Date.now();
+        activeSessionByKhu.delete(session.maKhu);
+        const err = new Error(session.lastError);
+        err.statusCode = 409;
+        throw err;
+      }
+
+      finalMaThe = await TheRaVaoModel.create({
+        maND: session.maND,
+        giaTri: giaTriMoi,
+        trangThai: "HoatDong",
+        ghiChu: session.ghiChu || "Cấp thẻ mới",
+      });
+    } else {
+      // REISSUE: cập nhật trực tiếp bản ghi đã tồn tại, KHÔNG tạo dòng mới
+      await TheRaVaoModel.reissueById(session.maThe, {
+        giaTri: giaTriMoi,
+        ghiChu: session.ghiChu || "Cấp lại mã thẻ mới",
+      });
+    }
+
+    session.status = "SUCCESS";
+    session.lastError = null;
+    session.updatedAt = Date.now();
+    session.result = {
+      maThe: finalMaThe,
+      maND: session.maND,
+      uid: cleanUid,
+      trangThai: "HoatDong",
+    };
+
+    if (activeSessionByKhu.get(session.maKhu) === session.sessionId) {
+      activeSessionByKhu.delete(session.maKhu);
+    }
+
+    return session.result;
   },
 
   // =========================================================
@@ -166,7 +265,7 @@ const TheRaVaoService = {
   // =========================================================
   async getThongTinTheCuaToi(user, { tuNgay, denNgay } = {}) {
     const maND = getUserId(user);
-    const { activeRentalByMaND } = await loadReferenceData();
+    const ref = await loadReferenceData();
     const dsTheRaw = await TheRaVaoModel.findByMaND(maND);
 
     const dsThe = dsTheRaw.map((t) => ({
@@ -186,7 +285,7 @@ const TheRaVaoService = {
     });
 
     const theMap = new Map(dsThe.map((t) => [t.MaThe, t]));
-    const thongTinThue = activeRentalByMaND.get(maND) || null;
+    const thongTinThue = ref.activeRentalByMaND.get(maND) || null;
 
     const lichSu = lichSuRaw.map((ls) => ({
       MaLS: ls.MaLS,
@@ -201,10 +300,11 @@ const TheRaVaoService = {
     return { dsThe, lichSu, thongTinThue };
   },
 
-  async yeuCauCapLaiThe(user, { lyDo, khoaTheCu = true }) {
+  // Khách yêu cầu cấp lại -> cập nhật trạng thái trên chính thẻ hiện có (không tạo bản ghi thứ 2)
+  async yeuCauCapLaiThe(user, { lyDo }) {
     const maND = getUserId(user);
-    const { activeRentalByMaND } = await loadReferenceData();
-    const thongTinThue = activeRentalByMaND.get(maND);
+    const ref = await loadReferenceData();
+    const thongTinThue = ref.activeRentalByMaND.get(maND);
 
     if (!thongTinThue) {
       const err = new Error("Bạn chưa có hợp đồng thuê phòng còn hiệu lực.");
@@ -212,37 +312,40 @@ const TheRaVaoService = {
       throw err;
     }
 
-    const dangCho = await TheRaVaoModel.findPendingByMaND(maND);
-    if (dangCho) {
-      const err = new Error("Bạn đã có một yêu cầu cấp lại thẻ đang được xử lý.");
+    const dsThe = await TheRaVaoModel.findByMaND(maND);
+    if (dsThe.length === 0) {
+      const err = new Error("Bạn chưa được cấp thẻ lần đầu. Vui lòng liên hệ Quản lý cơ sở để cấp thẻ mới.");
       err.statusCode = 400;
       throw err;
     }
 
-    if (khoaTheCu) {
-      await TheRaVaoModel.lockActiveByMaND(maND, "Khóa do khách yêu cầu cấp lại");
+    const theHienTai = dsThe[0];
+    if (theHienTai.TrangThai === "ChoCapLai") {
+      const err = new Error("Yêu cầu cấp lại thẻ của bạn đang chờ Quản lý xử lý.");
+      err.statusCode = 400;
+      throw err;
     }
 
     const ghiChu = (lyDo || "Khách thuê yêu cầu cấp lại thẻ").trim();
-    const maThe = await TheRaVaoModel.create({
-      maND,
-      giaTri: `PENDING_${Date.now()}_${maND}`,
+    // Chuyển sang ChoCapLai -> đồng thời vô hiệu hóa mở cổng ngay để đảm bảo an ninh
+    await TheRaVaoModel.updateStatus(theHienTai.MaThe, "ChoCapLai", ghiChu);
+
+    return {
+      maThe: theHienTai.MaThe,
+      maKhu: thongTinThue.MaKhu,
       trangThai: "ChoCapLai",
       ghiChu,
-    });
-
-    return { maThe, maKhu: thongTinThue.MaKhu, trangThai: "ChoCapLai", ghiChu };
+    };
   },
 
   // =========================================================
   // C. CHỦ TRỌ & QUẢN LÝ
   // =========================================================
   async getDanhSachThe(user, { maKhu, trangThai, keyword } = {}) {
-    const { khuTros, hoTenMap, activeRentalByMaND } = await loadReferenceData();
-
+    const ref = await loadReferenceData();
     const khuTroList = isQuanLy(user)
-      ? khuTros.filter((k) => Number(k.MaND) === getUserId(user))
-      : khuTros;
+      ? ref.khuTros.filter((k) => Number(k.MaND) === getUserId(user))
+      : ref.khuTros;
 
     const allowedKhuIds = new Set(khuTroList.map((k) => Number(k.MaKhu)));
     const allCards = await TheRaVaoModel.findAll();
@@ -250,24 +353,21 @@ const TheRaVaoService = {
     const kw = (keyword || "").trim().toLowerCase();
     const data = allCards
       .map((t) => {
-        const maND = Number(t.MaND);
-        const rental = activeRentalByMaND.get(maND);
-        const qlKhu = khuTros.find((k) => Number(k.MaND) === maND);
-        const cardMaKhu = rental?.MaKhu ?? (qlKhu ? Number(qlKhu.MaKhu) : null);
-        const cardTenKhu = rental?.TenKhu ?? qlKhu?.TenKhu ?? null;
-
+        const ctx = resolveUserContext(t.MaND, ref);
         return {
           MaThe: t.MaThe,
-          MaND: maND,
+          MaND: ctx.MaND,
           MaUID: tachMaUID(t.GiaTri),
           NgayTao: t.NgayTao,
           TrangThai: t.TrangThai,
           GhiChu: t.GhiChu,
-          HoTen: hoTenMap.get(maND) || "Chưa cập nhật",
-          MaPhong: rental?.MaPhong || null,
-          TenPhong: rental?.TenPhong || (qlKhu ? "Quản lý cơ sở" : null),
-          MaKhu: cardMaKhu,
-          TenKhu: cardTenKhu,
+          HoTen: ctx.HoTen,
+          SDT: ctx.SDT,
+          MaPhong: ctx.MaPhong,
+          TenPhong: ctx.TenPhong,
+          MaKhu: ctx.MaKhu,
+          TenKhu: ctx.TenKhu,
+          VaiTroHienThi: ctx.VaiTroHienThi,
         };
       })
       .filter((item) => {
@@ -279,7 +379,7 @@ const TheRaVaoService = {
         }
         if (trangThai && item.TrangThai !== trangThai) return false;
         if (kw) {
-          const hay = `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""} ${item.GhiChu || ""}`.toLowerCase();
+          const hay = `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""} ${item.MaUID || ""} ${item.GhiChu || ""}`.toLowerCase();
           if (!hay.includes(kw)) return false;
         }
         return true;
@@ -291,64 +391,228 @@ const TheRaVaoService = {
     };
   },
 
-  async batDauCapLaiThe(user, { maND, maTheYeuCau, ghiChu }) {
-    const { khuTros, activeRentalByMaND } = await loadReferenceData();
-    const rental = activeRentalByMaND.get(Number(maND));
-    if (!rental) {
-      const err = new Error("Khách thuê không có hợp đồng đang hiệu lực.");
-      err.statusCode = 400;
+  // Chỉ lấy danh sách người dùng thuộc cơ sở quản lý mà CHƯA có bất kỳ thẻ nào
+  async getNguoiChuaCoThe(user, { maKhu } = {}) {
+    const ref = await loadReferenceData();
+    const khuTroList = isQuanLy(user)
+      ? ref.khuTros.filter((k) => Number(k.MaND) === getUserId(user))
+      : ref.khuTros;
+
+    const allowedKhuIds = new Set(khuTroList.map((k) => Number(k.MaKhu)));
+    const allCards = await TheRaVaoModel.findAll();
+    const usersWithCard = new Set(allCards.map((c) => Number(c.MaND)));
+
+    const candidateIds = new Set();
+    for (const [maND, rental] of ref.activeRentalByMaND.entries()) {
+      if (allowedKhuIds.has(Number(rental.MaKhu))) candidateIds.add(Number(maND));
+    }
+    for (const khu of khuTroList) {
+      if (khu.MaND) candidateIds.add(Number(khu.MaND));
+    }
+
+    const data = [];
+    for (const maND of candidateIds) {
+      if (usersWithCard.has(maND)) continue;
+      const ctx = resolveUserContext(maND, ref);
+      if (!ctx.MaKhu || !allowedKhuIds.has(Number(ctx.MaKhu))) continue;
+      if (isChuTro(user) && maKhu && Number(ctx.MaKhu) !== Number(maKhu)) continue;
+      data.push(ctx);
+    }
+
+    data.sort((a, b) =>
+      `${a.TenKhu || ""}_${a.TenPhong || ""}_${a.HoTen}`.localeCompare(
+        `${b.TenKhu || ""}_${b.TenPhong || ""}_${b.HoTen}`,
+        "vi"
+      )
+    );
+
+    return {
+      data,
+      khuTroList: khuTroList.map((k) => ({ MaKhu: k.MaKhu, TenKhu: k.TenKhu })),
+    };
+  },
+
+  async getChiTietThe(user, maThe) {
+    const the = await TheRaVaoModel.findById(maThe);
+    if (!the) {
+      const err = new Error("Không tìm thấy thông tin thẻ.");
+      err.statusCode = 404;
       throw err;
     }
 
+    const ref = await loadReferenceData();
+    const ctx = resolveUserContext(the.MaND, ref);
+
     if (isQuanLy(user)) {
-      const allowed = khuTros.some(
-        (k) => Number(k.MaND) === getUserId(user) && Number(k.MaKhu) === Number(rental.MaKhu)
+      const allowed = ref.khuTros.some(
+        (k) => Number(k.MaND) === getUserId(user) && Number(k.MaKhu) === Number(ctx.MaKhu)
       );
       if (!allowed) {
-        const err = new Error("Bạn không có quyền cấp thẻ cho khách thuộc cơ sở khác.");
+        const err = new Error("Bạn không có quyền truy cập thẻ thuộc cơ sở khác.");
         err.statusCode = 403;
         throw err;
       }
     }
 
-    // Hủy các lệnh DangGhiThe đang treo tại cùng cơ sở
-    const maNDThuocKhu = [];
-    for (const [id, info] of activeRentalByMaND.entries()) {
-      if (Number(info.MaKhu) === Number(rental.MaKhu)) maNDThuocKhu.push(id);
+    return {
+      MaThe: the.MaThe,
+      MaND: ctx.MaND,
+      MaUID: tachMaUID(the.GiaTri),
+      NgayTao: the.NgayTao,
+      TrangThai: the.TrangThai,
+      GhiChu: the.GhiChu,
+      HoTen: ctx.HoTen,
+      SDT: ctx.SDT,
+      CCCD: ctx.CCCD,
+      MaPhong: ctx.MaPhong,
+      TenPhong: ctx.TenPhong,
+      MaKhu: ctx.MaKhu,
+      TenKhu: ctx.TenKhu,
+      VaiTroHienThi: ctx.VaiTroHienThi,
+    };
+  },
+
+  // Tạo phiên ghi mới (cho cả NEW và REISSUE) — tự động thay thế phiên treo cũ mà không lỗi
+  async batDauPhienGhi(user, { mode, maND, maThe, ghiChu }) {
+    cleanupExpiredSessions();
+
+    if (!["NEW", "REISSUE"].includes(mode)) {
+      const err = new Error("Chế độ cấp thẻ không hợp lệ.");
+      err.statusCode = 400;
+      throw err;
     }
-    const hangingJobs = await TheRaVaoModel.findPendingWriteJobsByMaNDList(maNDThuocKhu);
-    for (const job of hangingJobs) {
-      await TheRaVaoModel.lockById(job.MaThe, "Hủy do tạo phiên ghi mới");
-    }
 
-    await TheRaVaoModel.lockActiveByMaND(maND, "Đã cấp thẻ mới");
+    const ref = await loadReferenceData();
+    let targetMaND = Number(maND);
+    let targetMaThe = maThe ? Number(maThe) : null;
 
-    const secret = taoMaBiMat(rental.MaKhu);
-    const giaTriCho = `WAIT|${secret}`;
-    const noteText = (ghiChu || "Quản lý cấp lại thẻ do quên/mất thẻ").trim();
-
-    let maTheMoi;
-    if (maTheYeuCau) {
-      await TheRaVaoModel.updateForWrite(maTheYeuCau, maND, {
-        giaTri: giaTriCho,
-        ghiChu: noteText,
-      });
-      maTheMoi = maTheYeuCau;
+    if (mode === "REISSUE") {
+      if (!targetMaThe) {
+        const err = new Error("Thiếu thông tin thẻ cần cấp lại.");
+        err.statusCode = 400;
+        throw err;
+      }
+      const existingCard = await TheRaVaoModel.findById(targetMaThe);
+      if (!existingCard) {
+        const err = new Error("Thẻ cần cấp lại không tồn tại.");
+        err.statusCode = 404;
+        throw err;
+      }
+      targetMaND = Number(existingCard.MaND);
     } else {
-      maTheMoi = await TheRaVaoModel.create({
-        maND,
-        giaTri: giaTriCho,
-        trangThai: "DangGhiThe",
-        ghiChu: noteText,
-      });
+      if (!targetMaND) {
+        const err = new Error("Vui lòng chọn người dùng cần cấp thẻ mới.");
+        err.statusCode = 400;
+        throw err;
+      }
+      const existingCards = await TheRaVaoModel.findByMaND(targetMaND);
+      if (existingCards.length > 0) {
+        const err = new Error(
+          "Người dùng này đã có thẻ ra vào. Mỗi người chỉ được sở hữu 1 thẻ duy nhất, vui lòng dùng chức năng Cấp lại thẻ."
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+
+    const ctx = resolveUserContext(targetMaND, ref);
+    if (!ctx.MaKhu) {
+      const err = new Error("Người dùng này chưa thuộc cơ sở nào đang hoạt động.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (isQuanLy(user)) {
+      const allowed = ref.khuTros.some(
+        (k) => Number(k.MaND) === getUserId(user) && Number(k.MaKhu) === Number(ctx.MaKhu)
+      );
+      if (!allowed) {
+        const err = new Error("Bạn không có quyền cấp thẻ cho người thuộc cơ sở khác.");
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // Nếu cơ sở này đang có 1 phiên ghi cũ bị treo do đóng trang -> hủy sạch phiên cũ, không báo lỗi
+    const oldSid = activeSessionByKhu.get(ctx.MaKhu);
+    if (oldSid && sessionById.has(oldSid)) {
+      const oldSession = sessionById.get(oldSid);
+      if (oldSession.status === "WAITING") {
+        oldSession.status = "CANCELLED";
+        oldSession.updatedAt = Date.now();
+      }
+    }
+
+    const sessionId = `S${ctx.MaKhu}_${Date.now()}_${crypto.randomBytes(2).toString("hex")}`;
+    const secret = taoMaBiMat(ctx.MaKhu);
+    const now = Date.now();
+
+    const session = {
+      sessionId,
+      mode,
+      maThe: targetMaThe,
+      maND: targetMaND,
+      hoTen: ctx.HoTen,
+      tenPhong: ctx.TenPhong,
+      maKhu: ctx.MaKhu,
+      tenKhu: ctx.TenKhu,
+      secret,
+      ghiChu: (ghiChu || (mode === "NEW" ? "Cấp thẻ mới" : "Cấp lại thẻ")).trim(),
+      status: "WAITING", // WAITING | SUCCESS | CANCELLED | EXPIRED | ERROR
+      lastError: null,
+      result: null,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: now + WRITE_SESSION_TTL_MS,
+    };
+
+    sessionById.set(sessionId, session);
+    activeSessionByKhu.set(ctx.MaKhu, sessionId);
+
+    return {
+      sessionId,
+      mode,
+      maThe: targetMaThe,
+      maKhu: ctx.MaKhu,
+      tenKhu: ctx.TenKhu,
+      timeoutSec: WRITE_SESSION_TTL_MS / 1000,
+      expiresAt: session.expiresAt,
+      message: `Đã gửi lệnh xuống đầu đọc RC522 (${ctx.TenKhu}). Vui lòng đặt phôi thẻ lên thiết bị trong 60 giây!`,
+    };
+  },
+
+  async getTrangThaiPhienGhi(sessionId) {
+    cleanupExpiredSessions();
+    const session = sessionById.get(String(sessionId || ""));
+    if (!session) {
+      return { status: "EXPIRED", remainingSec: 0, lastError: null, result: null };
     }
 
     return {
-      maThe: maTheMoi,
-      maKhu: rental.MaKhu,
-      tenKhu: rental.TenKhu,
-      message: `Đã gửi lệnh xuống đầu đọc RC522 (${rental.TenKhu}). Hãy đặt phôi thẻ trắng lên thiết bị trong 60 giây!`,
+      sessionId: session.sessionId,
+      mode: session.mode,
+      status: session.status,
+      remainingSec:
+        session.status === "WAITING"
+          ? Math.max(0, Math.ceil((session.expiresAt - Date.now()) / 1000))
+          : 0,
+      lastError: session.lastError,
+      result: session.result,
     };
+  },
+
+  async huyPhienGhi(sessionId) {
+    const session = sessionById.get(String(sessionId || ""));
+    if (!session) return { cancelled: true };
+
+    if (session.status === "WAITING") {
+      session.status = "CANCELLED";
+      session.updatedAt = Date.now();
+    }
+    if (activeSessionByKhu.get(session.maKhu) === session.sessionId) {
+      activeSessionByKhu.delete(session.maKhu);
+    }
+    return { cancelled: true };
   },
 
   async khoaThe(user, maThe, lyDo) {
@@ -360,13 +624,11 @@ const TheRaVaoService = {
     }
 
     if (isQuanLy(user)) {
-      const { khuTros, activeRentalByMaND } = await loadReferenceData();
-      const rental = activeRentalByMaND.get(Number(the.MaND));
-      const allowed =
-        rental &&
-        khuTros.some(
-          (k) => Number(k.MaND) === getUserId(user) && Number(k.MaKhu) === Number(rental.MaKhu)
-        );
+      const ref = await loadReferenceData();
+      const ctx = resolveUserContext(the.MaND, ref);
+      const allowed = ref.khuTros.some(
+        (k) => Number(k.MaND) === getUserId(user) && Number(k.MaKhu) === Number(ctx.MaKhu)
+      );
       if (!allowed) {
         const err = new Error("Bạn không có quyền khóa thẻ thuộc cơ sở khác.");
         err.statusCode = 403;
@@ -374,8 +636,46 @@ const TheRaVaoService = {
       }
     }
 
-    await TheRaVaoModel.lockById(maThe, lyDo || "Khóa thủ công bởi quản lý");
+    await TheRaVaoModel.updateStatus(
+      maThe,
+      "BiKhoa",
+      (lyDo || "Khóa thẻ bởi quản lý").trim()
+    );
     return { maThe, trangThai: "BiKhoa" };
+  },
+
+  async xoaThe(user, maThe) {
+    const the = await TheRaVaoModel.findById(maThe);
+    if (!the) {
+      const err = new Error("Không tìm thấy thẻ cần xóa.");
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (!["BiKhoa", "ThuHoi"].includes(the.TrangThai)) {
+      const err = new Error("Chỉ được xóa thẻ khi thẻ đang ở trạng thái Bị khóa!");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    if (isQuanLy(user)) {
+      const ref = await loadReferenceData();
+      const ctx = resolveUserContext(the.MaND, ref);
+      const allowed = ref.khuTros.some(
+        (k) => Number(k.MaND) === getUserId(user) && Number(k.MaKhu) === Number(ctx.MaKhu)
+      );
+      if (!allowed) {
+        const err = new Error("Bạn không có quyền xóa thẻ thuộc cơ sở khác.");
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // Xóa lịch sử quẹt thẻ gắn với MaThe trước để không vi phạm khóa ngoại
+    await LichSuTheModel.deleteByMaThe(maThe);
+    await TheRaVaoModel.deleteById(maThe);
+
+    return { maThe, deleted: true };
   },
 
   async getLichSuRaVao(user, { maKhu, tuNgay, denNgay, keyword } = {}) {
@@ -409,7 +709,7 @@ const TheRaVaoService = {
       })
       .filter((item) => {
         if (!kw) return true;
-        return `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""}`
+        return `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""} ${item.MaUID || ""}`
           .toLowerCase()
           .includes(kw);
       });

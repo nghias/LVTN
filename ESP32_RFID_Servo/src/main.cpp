@@ -12,19 +12,19 @@
 
 // ===== CẤU HÌNH CHÂN KẾT NỐI =====
 #define SS_PIN    5     // Chân SDA của RC522
-#define RST_PIN   27    // Đổi từ GPIO 22 -> GPIO 27 để nhường GPIO 22 cho LCD SCL
+#define RST_PIN   27    // Chân RST của RC522 (đã chuyển từ GPIO 22 sang 27 để nhường I2C SCL)
 #define SERVO_PIN 13    // Chân tín hiệu Servo MG90S 180°
 #define I2C_SDA   21    // Chân SDA của LCD 1602 I2C
 #define I2C_SCL   22    // Chân SCL của LCD 1602 I2C
 
-// Địa chỉ I2C phổ biến của LCD 1602 là 0x27 (nếu không hiện chữ, thử đổi thành 0x3F)
+// Địa chỉ I2C phổ biến của LCD 1602 là 0x27 (nếu không hiện chữ, đổi thành 0x3F)
 #define LCD_ADDR  0x27
 
 // ===== CẤU HÌNH GÓC & TỐC ĐỘ MỞ CỬA =====
-#define ANGLE_CLOSE    60    // Góc đóng mặc định
-#define ANGLE_OPEN     160   // Góc mở cửa
-#define STEP_DELAY_MS  10    // Xoay mượt 10ms/độ
-#define OPEN_TIME      3000  // Giữ cửa mở 3 giây (3000ms)
+#define ANGLE_CLOSE    60     // Góc đóng mặc định
+#define ANGLE_OPEN     160    // Góc mở cửa
+#define STEP_DELAY_MS  10     // Xoay mượt 10ms/độ
+#define OPEN_TIME      30000  // Giữ cửa mở 30 giây
 
 // ===== CẤU HÌNH WI-FI & BACKEND RENDER (HTTPS) =====
 const char* WIFI_SSID   = "Thanh_Nhan_2.4G";
@@ -43,14 +43,14 @@ LiquidCrystal_I2C lcd(LCD_ADDR, 16, 2);
 int currentAngle = ANGLE_CLOSE;
 bool isWriteMode = false;
 bool isRemoteWrite = false;
-int pendingMaThe = -1;
+String pendingSessionId = "";
 String dataToWrite = "";
 unsigned long writeModeStartMs = 0;
 unsigned long lastPollMs = 0;
 unsigned long lastWriteLcdMs = 0;
 bool wasWifiConnected = false;
 
-const unsigned long POLL_INTERVAL_MS = 3500;
+const unsigned long POLL_INTERVAL_MS = 2500;
 const unsigned long WRITE_TIMEOUT_MS = 60000;
 
 // ===== HÀM HIỂN THỊ LCD 1602 KHÔNG NHẤP NHÁY =====
@@ -73,7 +73,9 @@ void showDefaultScreen() {
 
 void showWriteModeScreen() {
   unsigned long elapsed = millis() - writeModeStartMs;
-  int remainSec = max(0, (int)((WRITE_TIMEOUT_MS - elapsed) / 1000));
+  int remainSec = (elapsed >= WRITE_TIMEOUT_MS)
+                    ? 0
+                    : (int)((WRITE_TIMEOUT_MS - elapsed + 999) / 1000);
   lcdShow("DUA THE VAO DE", "GHI THE MOI " + String(remainSec) + "s");
 }
 
@@ -96,7 +98,7 @@ void openDoor() {
   moveServoSmooth(ANGLE_OPEN);
 
   // Đếm ngược thời gian mở cửa trực tiếp trên LCD
-  int openSeconds = max(1, OPEN_TIME / 1000);
+  int openSeconds = max(1, (int)(OPEN_TIME / 1000));
   for (int sec = openSeconds; sec > 0; sec--) {
     lcdShow("THANH CONG!", "Mo cua con: " + String(sec) + "s");
     delay(1000);
@@ -195,7 +197,7 @@ bool readSecretFromCard(String &outSecret) {
 }
 
 // ===== GIAO TIẾP HTTPS VỚI BACKEND RENDER =====
-// Trả về: 1 = Hợp lệ, 0 = Không hợp lệ, -1 = Lỗi mạng/Server
+// Trả về: 1 = Hợp lệ, 0 = Không hợp lệ/Bị khóa, -1 = Lỗi mạng/Server
 int verifyCardWithServer(String uid, String secret) {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[LOI] Mat Wi-Fi, khong the xac thuc the!");
@@ -244,8 +246,11 @@ int verifyCardWithServer(String uid, String secret) {
   return result;
 }
 
+// Hỏi Backend phiên ghi thẻ mới / cấp lại (đồng thời bắt lệnh hủy nếu Web đóng trang)
 void pollPendingWriteCommand() {
-  if (WiFi.status() != WL_CONNECTED || isWriteMode) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+  // Không ghi đè nếu đang ghi thủ công bằng lệnh w: qua Serial
+  if (isWriteMode && !isRemoteWrite) return;
 
   WiFiClientSecure client;
   client.setInsecure();
@@ -261,17 +266,30 @@ void pollPendingWriteCommand() {
     JsonDocument resDoc;
     if (deserializeJson(resDoc, response) == DeserializationError::Ok) {
       bool hasJob = resDoc["hasJob"] | false;
-      if (hasJob) {
-        pendingMaThe = resDoc["maThe"] | -1;
-        dataToWrite  = String((const char*)(resDoc["secret"] | ""));
-        if (pendingMaThe > 0 && dataToWrite.length() > 0 && dataToWrite.length() <= 16) {
+
+      if (!hasJob) {
+        // Phiên trên Web đã bị hủy hoặc hết hạn -> tự quay về mặc định
+        if (isWriteMode && isRemoteWrite) {
+          isWriteMode      = false;
+          isRemoteWrite    = false;
+          pendingSessionId = "";
+          Serial.println("[HUY TU WEB] Phien ghi the da huy, quay ve mac dinh.");
+          showDefaultScreen();
+        }
+      } else {
+        String sid    = String((const char*)(resDoc["sessionId"] | ""));
+        String secret = String((const char*)(resDoc["secret"] | ""));
+
+        if (sid.length() > 0 && secret.length() > 0 && secret.length() <= 16 && sid != pendingSessionId) {
+          pendingSessionId = sid;
+          dataToWrite      = secret;
           isWriteMode      = true;
           isRemoteWrite    = true;
           writeModeStartMs = millis();
           lastWriteLcdMs   = 0;
           showWriteModeScreen();
           Serial.println("\n==========================================");
-          Serial.printf("[LENH TU WEB] Cap the moi (MaThe=%d) - Dat phoi the trang len RC522!\n", pendingMaThe);
+          Serial.printf("[LENH TU WEB] Phien moi (%s) - Dua the vao RC522!\n", sid.c_str());
           Serial.println("==========================================");
         }
       }
@@ -280,35 +298,37 @@ void pollPendingWriteCommand() {
   http.end();
 }
 
-bool confirmWriteToServer(int maThe, String uid, String secret) {
-  if (WiFi.status() != WL_CONNECTED) return false;
+// Trả về HTTP code: 200 = thành công, 409 = phôi thẻ đã thuộc người khác, < 0 = lỗi mạng
+int confirmWriteToServer(String sessionId, String uid, String secret) {
+  if (WiFi.status() != WL_CONNECTED) return -1;
 
   WiFiClientSecure client;
   client.setInsecure();
 
   HTTPClient http;
   http.setTimeout(10000);
-  if (!http.begin(client, SERVER_URL + "/xac-nhan-ghi")) return false;
+  if (!http.begin(client, SERVER_URL + "/xac-nhan-ghi")) return -1;
 
   http.addHeader("Content-Type", "application/json");
   http.addHeader("x-device-key", DEVICE_KEY);
 
   JsonDocument reqDoc;
-  reqDoc["maKhu"]  = MA_KHU;
-  reqDoc["maThe"]  = maThe;
-  reqDoc["uid"]    = uid;
-  reqDoc["secret"] = secret;
+  reqDoc["maKhu"]     = MA_KHU;
+  reqDoc["sessionId"] = sessionId;
+  reqDoc["uid"]       = uid;
+  reqDoc["secret"]    = secret;
 
   String payload;
   serializeJson(reqDoc, payload);
 
   int httpCode = http.POST(payload);
-  bool ok = (httpCode == 200);
   if (httpCode > 0) {
     Serial.printf("[XAC NHAN GHI %d] %s\n", httpCode, http.getString().c_str());
+  } else {
+    Serial.printf("[LOI XAC NHAN GHI] %s\n", http.errorToString(httpCode).c_str());
   }
   http.end();
-  return ok;
+  return httpCode;
 }
 
 // ===== LỆNH DEBUG QUA SERIAL =====
@@ -336,16 +356,16 @@ void handleSerialCommand() {
     }
     isWriteMode      = true;
     isRemoteWrite    = false;
-    pendingMaThe     = -1;
+    pendingSessionId = "";
     writeModeStartMs = millis();
     lastWriteLcdMs   = 0;
     showWriteModeScreen();
     Serial.print("[CHE DO GHI THU CONG] Dat the len RC522 de nap ma: ");
     Serial.println(dataToWrite);
   } else if (cmd == "c") {
-    isWriteMode   = false;
-    isRemoteWrite = false;
-    pendingMaThe  = -1;
+    isWriteMode      = false;
+    isRemoteWrite    = false;
+    pendingSessionId = "";
     Serial.println("[DA HUY] Quay ve che do kiem soat ra vao.");
     lcdShow("DA HUY GHI THE", "Quay ve mac dinh");
     delay(1200);
@@ -381,12 +401,12 @@ void loop() {
   ensureWiFiConnected();
   handleSerialCommand();
 
-  // Cập nhật đếm ngược 60s trên LCD khi đang ở chế độ ghi thẻ mới
+  // Cập nhật đếm ngược 60s trên LCD khi đang ở chế độ ghi thẻ
   if (isWriteMode) {
     if (millis() - writeModeStartMs > WRITE_TIMEOUT_MS) {
-      isWriteMode   = false;
-      isRemoteWrite = false;
-      pendingMaThe  = -1;
+      isWriteMode      = false;
+      isRemoteWrite    = false;
+      pendingSessionId = "";
       Serial.println("[HET GIO] Da huy che do cho ghi the.");
       lcdShow("HET GIO GHI THE", "Quay ve mac dinh");
       delay(1800);
@@ -397,8 +417,8 @@ void loop() {
     }
   }
 
-  // Định kỳ kiểm tra lệnh cấp lại thẻ từ Web
-  if (!isWriteMode && (millis() - lastPollMs >= POLL_INTERVAL_MS)) {
+  // Định kỳ kiểm tra lệnh mới / lệnh hủy phiên từ Web
+  if (millis() - lastPollMs >= POLL_INTERVAL_MS) {
     lastPollMs = millis();
     pollPendingWriteCommand();
   }
@@ -413,23 +433,38 @@ void loop() {
     lcdShow("DANG GHI THE...", "Giu nguyen the!");
     if (writeSecretToCard(dataToWrite)) {
       Serial.println(">>> [THANH CONG] Da nap ma bao mat vao the!");
-      if (isRemoteWrite && pendingMaThe > 0) {
+      if (isRemoteWrite && pendingSessionId.length() > 0) {
         lcdShow("DANG DONG BO...", "Vui long cho!");
-        if (confirmWriteToServer(pendingMaThe, uid, dataToWrite)) {
-          Serial.println(">>> [DONG BO] Da kich hoat the moi tren Server!");
+        int code = confirmWriteToServer(pendingSessionId, uid, dataToWrite);
+        if (code == 200) {
+          Serial.println(">>> [DONG BO] Da kich hoat the thanh cong tren Server!");
           lcdShow("GHI THE MOI", "THANH CONG!");
+          isWriteMode      = false;
+          isRemoteWrite    = false;
+          pendingSessionId = "";
+          delay(2200);
+          showDefaultScreen();
+        } else if (code == 409) {
+          // Phôi thẻ đã thuộc người khác -> giữ nguyên phiên để đặt phôi thẻ khác
+          Serial.println(">>> [TRUNG THE] Phoi the da duoc gan cho tai khoan khac!");
+          lcdShow("THE DA DUOC DUNG", "Dung the khac!");
+          delay(2200);
+          showWriteModeScreen();
         } else {
           Serial.println(">>> [CANH BAO] Loi dong bo Server.");
           lcdShow("LOI DONG BO", "Thu lai sau!");
+          isWriteMode      = false;
+          isRemoteWrite    = false;
+          pendingSessionId = "";
+          delay(2200);
+          showDefaultScreen();
         }
       } else {
         lcdShow("GHI THE MOI", "THANH CONG!");
+        isWriteMode = false;
+        delay(2200);
+        showDefaultScreen();
       }
-      isWriteMode   = false;
-      isRemoteWrite = false;
-      pendingMaThe  = -1;
-      delay(2500);
-      showDefaultScreen();
     } else {
       Serial.println(">>> [THAT BAI] Khong the ghi the, giu sat the vao RC522.");
       lcdShow("GHI THE THAT BAI", "Dat sat the lai!");

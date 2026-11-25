@@ -37,6 +37,14 @@ const LichSuTheModel = {
     );
     return rows;
   },
+
+  async deleteByMaThe(maThe) {
+    const [result] = await db.query(
+      `DELETE FROM LichSuThe WHERE MaThe = ?`,
+      [maThe]
+    );
+    return result.affectedRows;
+  },
 };
 
 module.exports = LichSuTheModel;
