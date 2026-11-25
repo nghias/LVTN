@@ -27,7 +27,7 @@ async function loadReferenceData() {
       db.query(`SELECT MaKhu, TenKhu, MaND FROM KhuTro ORDER BY MaKhu ASC`),
       db.query(`SELECT MaPhong, TenPhong, MaKhu FROM Phong`),
       db.query(`SELECT MaHDT, MaPhong, TrangThai FROM HopDongThue`),
-      db.query(`SELECT MaHDT, MaND, NgayDi FROM CTHDT`),
+      db.query(`SELECT MaHDT, MaND, NgayDi FROM ChiTietHopDongThue`),
       db.query(`SELECT MaND, HoTen FROM ThongTinCaNhan`),
     ]);
 
