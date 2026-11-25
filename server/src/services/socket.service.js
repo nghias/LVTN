@@ -9,15 +9,20 @@ const connectedUsers = new Map();
 const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.CLIENT_URL || ["http://localhost:3000", "http://127.0.0.1:3000"],
+      origin:
+        process.env.CLIENT_URL || [
+          "http://localhost:3000",
+          "http://127.0.0.1:3000",
+        ],
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
       credentials: true,
     },
   });
 
   io.on("connection", (socket) => {
-    // Client gửi MaND khi kết nối thông qua auth hoặc query
-    const maND = Number(socket.handshake.auth?.maND || socket.handshake.query?.maND);
+    const maND = Number(
+      socket.handshake.auth?.maND || socket.handshake.query?.maND
+    );
 
     if (maND) {
       const userRoom = `user_${maND}`;
@@ -28,7 +33,9 @@ const initSocket = (httpServer) => {
       }
       connectedUsers.get(maND).add(socket.id);
 
-      console.log(`[WebSocket] Người dùng MaND=${maND} đã kết nối (${socket.id})`);
+      console.log(
+        `[WebSocket] Người dùng MaND=${maND} đã kết nối (${socket.id})`
+      );
     }
 
     socket.on("disconnect", () => {
@@ -44,56 +51,58 @@ const initSocket = (httpServer) => {
   return io;
 };
 
-/**
- * Đẩy thông báo trực tiếp tới danh sách người nhận (NDNhan)
- * @param {number[]} danhSachMaND - Mảng MaND nhận thông báo
- * @param {object} payload - Dữ liệu thông báo vừa tạo
- */
+// Đẩy thông báo trực tiếp tới danh sách người nhận (NDNhan)
 const emitThongBaoMoi = (danhSachMaND, payload) => {
   if (!io || !Array.isArray(danhSachMaND) || danhSachMaND.length === 0) return;
 
-  danhSachMaND.forEach((maND) => {
-    io.to(`user_${Number(maND)}`).emit("NEW_NOTIFICATION", payload);
+  const uniqueIds = Array.from(new Set(danhSachMaND.map(Number).filter(Boolean)));
+  uniqueIds.forEach((maND) => {
+    const room = `user_${maND}`;
+    io.to(room).emit("NEW_NOTIFICATION", payload);
+    io.to(room).emit("thong_bao_moi", payload);
   });
 };
 
-/**
- * Đẩy phản hồi mới trực tiếp (Hỗ trợ truyền danh sách MaND, 1 MaND, hoặc broadcast)
- */
+// Đẩy phản hồi mới trực tiếp (Hỗ trợ truyền danh sách MaND, 1 MaND, hoặc broadcast)
 const emitPhanHoiMoi = (targetOrPayload, maybePayload) => {
   if (!io) return;
 
-  // Trường hợp 1: emitPhanHoiMoi(danhSachMaND, payload) -> Mảng người nhận
   if (Array.isArray(targetOrPayload) && maybePayload !== undefined) {
     targetOrPayload.forEach((maND) => {
-      io.to(`user_${Number(maND)}`).emit("NEW_FEEDBACK", maybePayload);
-      io.to(`user_${Number(maND)}`).emit("NEW_PHAN_HOI", maybePayload);
-      io.to(`user_${Number(maND)}`).emit("NEW_NOTIFICATION", maybePayload);
+      const room = `user_${Number(maND)}`;
+      io.to(room).emit("NEW_FEEDBACK", maybePayload);
+      io.to(room).emit("NEW_PHAN_HOI", maybePayload);
+      io.to(room).emit("NEW_NOTIFICATION", maybePayload);
+      io.to(room).emit("phan_hoi_thong_bao", maybePayload);
     });
     return;
   }
 
-  // Trường hợp 2: emitPhanHoiMoi(maND, payload) -> 1 người nhận cụ thể
-  if ((typeof targetOrPayload === "number" || typeof targetOrPayload === "string") && maybePayload !== undefined) {
+  if (
+    (typeof targetOrPayload === "number" ||
+      typeof targetOrPayload === "string") &&
+    maybePayload !== undefined
+  ) {
     const room = `user_${Number(targetOrPayload)}`;
     io.to(room).emit("NEW_FEEDBACK", maybePayload);
     io.to(room).emit("NEW_PHAN_HOI", maybePayload);
     io.to(room).emit("NEW_NOTIFICATION", maybePayload);
+    io.to(room).emit("phan_hoi_thong_bao", maybePayload);
     return;
   }
 
-  // Trường hợp 3: emitPhanHoiMoi(payload) -> Phát tới toàn bộ client hoặc theo danh sách trong payload
   const payload = targetOrPayload;
   io.emit("NEW_FEEDBACK", payload);
   io.emit("NEW_PHAN_HOI", payload);
+  io.emit("phan_hoi_thong_bao", payload);
 };
 
-/**
- * Thông báo cho các client khi một thông báo bị thu hồi/xóa
- */
+// Thông báo cho các client khi một thông báo bị thu hồi/xóa
 const emitXoaThongBao = (maTB) => {
   if (!io) return;
-  io.emit("DELETE_NOTIFICATION", { MaTB: Number(maTB) });
+  const data = { MaTB: Number(maTB) };
+  io.emit("DELETE_NOTIFICATION", data);
+  io.emit("xoa_thong_bao", data);
 };
 
 const getIO = () => io;

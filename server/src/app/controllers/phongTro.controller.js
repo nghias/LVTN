@@ -1,4 +1,4 @@
-// C:\Users\nhat nguyen\Desktop\LVTN\server\src\app\controllers\phongTro.Controller.js
+// server/src/app/controllers/phongTro.Controller.js
 const KhuTroModel = require("../models/khuTro.model");
 const PhongTroModel = require("../models/phongTro.model");
 const ChiTietTienIchModel = require("../models/chiTietTienIch.model");
@@ -22,6 +22,57 @@ class PhongTroController {
     }
   }
 
+  // Hàm nội bộ: Chuẩn hóa trạng thái phòng để hiển thị trên Trang chủ
+  resolveRoomStatusMeta(rawTrangThai) {
+    const normalized = String(rawTrangThai || "Trong")
+      .trim()
+      .toLowerCase();
+
+    if (
+      ["dangthue", "đang thuê", "dachothue", "đã cho thuê"].includes(normalized)
+    ) {
+      return {
+        TrangThaiPhong: "DangThue",
+        NhanTrangThai: "Đã cho thuê",
+        MauTrangThai: "red",
+        CoTheDatCoc: false,
+        sortOrder: 3,
+      };
+    }
+
+    if (
+      ["dadatcoc", "đã đặt cọc", "danggiucho", "đang giữ chỗ"].includes(
+        normalized
+      )
+    ) {
+      return {
+        TrangThaiPhong: "DaDatCoc",
+        NhanTrangThai: "Đang được cọc",
+        MauTrangThai: "orange",
+        CoTheDatCoc: false,
+        sortOrder: 2,
+      };
+    }
+
+    if (["baotri", "bảo trì", "đang bảo trì"].includes(normalized)) {
+      return {
+        TrangThaiPhong: "BaoTri",
+        NhanTrangThai: "Đang bảo trì",
+        MauTrangThai: "slate",
+        CoTheDatCoc: false,
+        sortOrder: 4,
+      };
+    }
+
+    return {
+      TrangThaiPhong: "Trong",
+      NhanTrangThai: "Còn trống",
+      MauTrangThai: "green",
+      CoTheDatCoc: true,
+      sortOrder: 1,
+    };
+  }
+
   // Hàm nội bộ: Kiểm tra quyền sở hữu Khu trọ của Quản lý
   async checkKhuTroPermission(maKhu, user) {
     const khuTro = await KhuTroModel.getById(maKhu);
@@ -42,12 +93,16 @@ class PhongTroController {
     return { error: null, status: 200, khuTro };
   }
 
-  // Hàm nội bộ: Chuẩn hóa danh sách tin đăng cho trang Home kèm ảnh thật từ DB
-  // Hàm nội bộ: Chuẩn hóa danh sách tin đăng cho trang Home (lấy ảnh thật từ AnhPhong)
-  async buildHomeTinDangList(tinDangRows, tienIchList = null, quanLyList = null) {
-    if (!tinDangRows || tinDangRows.length === 0) return [];
+  // Hàm nội bộ: Chuẩn hóa toàn bộ danh sách phòng cho trang Home (không dùng bảng TinDang)
+  async buildHomeRoomList(
+    rooms = [],
+    khuList = [],
+    tienIchList = null,
+    quanLyList = null
+  ) {
+    if (!rooms || rooms.length === 0) return [];
 
-    const roomIds = [...new Set(tinDangRows.map((r) => Number(r.MaPhong)))];
+    const roomIds = [...new Set(rooms.map((r) => Number(r.MaPhong)))];
 
     const [allImages, allChiTietTI, fetchedTienIch, fetchedQuanLy] =
       await Promise.all([
@@ -61,180 +116,113 @@ class PhongTroController {
           : NguoiDungModel.getDanhSachQuanLy().catch(() => []),
       ]);
 
-    return tinDangRows.map((row) => {
-      const ql = (fetchedQuanLy || []).find(
-        (u) => Number(u.MaND) === Number(row.MaQuanLyKhu),
+    const mapped = rooms.map((room) => {
+      const khu = (khuList || []).find(
+        (k) => Number(k.MaKhu) === Number(room.MaKhu)
       );
+      const ql = khu
+        ? (fetchedQuanLy || []).find(
+            (u) => Number(u.MaND) === Number(khu.MaND)
+          )
+        : null;
 
       // Lấy toàn bộ ảnh thật của phòng từ bảng AnhPhong
-      const roomImageObjs = (allImages || []).filter(
-        (img) => Number(img.MaPhong) === Number(row.MaPhong) && img.DuongDan,
-      );
+      const roomImageObjs = (allImages || [])
+        .filter((img) => Number(img.MaPhong) === Number(room.MaPhong) && img.DuongDan)
+        .map((img) => ({
+          MaAnh: Number(img.MaAnh),
+          MaPhong: Number(img.MaPhong),
+          DuongDan: String(img.DuongDan).trim(),
+          AnhChinh: Number(img.AnhChinh) === 1 ? 1 : 0,
+        }))
+        .sort((a, b) => b.AnhChinh - a.AnhChinh || a.MaAnh - b.MaAnh);
 
-      // Ưu tiên ảnh có AnhChinh = 1 -> ảnh đầu tiên trong AnhPhong -> AnhDaiDienDB
       const mainImgObj =
-        roomImageObjs.find((img) => Number(img.AnhChinh) === 1) ||
-        roomImageObjs[0];
-
-      const mainImage = mainImgObj
-        ? mainImgObj.DuongDan
-        : row.AnhDaiDienDB || null;
-
-      const roomImagePaths =
-        roomImageObjs.length > 0
-          ? roomImageObjs.map((img) => img.DuongDan)
-          : mainImage
-            ? [mainImage]
-            : [];
+        roomImageObjs.find((img) => img.AnhChinh === 1) || roomImageObjs[0];
+      const mainImage = mainImgObj ? mainImgObj.DuongDan : null;
 
       const roomMaTIs = (allChiTietTI || [])
-        .filter((ct) => Number(ct.MaPhong) === Number(row.MaPhong))
+        .filter((ct) => Number(ct.MaPhong) === Number(room.MaPhong))
         .map((ct) => Number(ct.MaTI));
 
       const roomTienIch = (fetchedTienIch || []).filter((ti) =>
-        roomMaTIs.includes(Number(ti.MaTI)),
+        roomMaTIs.includes(Number(ti.MaTI))
       );
 
       const tenQuanLy = ql
         ? ql.HoTen || ql.TenND || ql.HoVaTen || ql.TenDangNhap || "Ban quản lý"
         : "Ban quản lý";
+      const sdtQuanLy = ql && ql.SDT ? this.safeDecryptPhone(ql.SDT) : null;
 
-      let sdtQuanLy = null;
-      if (ql && ql.SDT) {
-        try {
-          sdtQuanLy = decryptAES(ql.SDT) || ql.SDT;
-        } catch {
-          sdtQuanLy = ql.SDT;
-        }
-      }
+      const statusMeta = this.resolveRoomStatusMeta(room.TrangThai);
+      const tenKhu = khu ? khu.TenKhu : "";
+      const diaChi = khu ? khu.DiaChi : "";
+      const moTaKhu = khu ? khu.MoTa || "" : "";
 
       return {
-        MaTin: Number(row.MaTin),
-        MaPhong: Number(row.MaPhong),
-        MaKhu: Number(row.MaKhu),
-        MaND: Number(row.MaND),
-        TieuDe: row.TieuDe,
-        MoTa: row.MoTa || row.MoTaKhu || "",
-        NgayDang: row.NgayDang,
-        NgayHetHan: row.NgayHetHan,
-        TrangThaiTin: row.TrangThaiTin || "DangHienThi",
-        TrangThai: row.TrangThaiTin || "DangHienThi",
-        TrangThaiPhong: row.TrangThaiPhong || "Trong",
-        TenPhong: row.TenPhong,
-        TenKhu: row.TenKhu || "",
-        DiaChi: row.DiaChi || "",
-        Gia: Number(row.Gia),
-        DienTich: Number(row.DienTich),
+        MaTin: Number(room.MaPhong), // Giữ tương thích với route chi tiết /tin-dang/[id]
+        MaPhong: Number(room.MaPhong),
+        MaKhu: Number(room.MaKhu),
+        MaND: khu ? Number(khu.MaND) : 0,
+        TieuDe: `Phòng ${room.TenPhong}${tenKhu ? ` - ${tenKhu}` : ""}`,
+        MoTa: moTaKhu,
+        NgayDang: null,
+        NgayHetHan: null,
+        TrangThai: "DangHienThi", // Giữ tương thích với các bộ lọc cũ trên FE
+        TrangThaiPhong: statusMeta.TrangThaiPhong,
+        NhanTrangThai: statusMeta.NhanTrangThai,
+        MauTrangThai: statusMeta.MauTrangThai,
+        CoTheDatCoc: statusMeta.CoTheDatCoc,
+        TenPhong: room.TenPhong,
+        TenKhu: tenKhu,
+        DiaChi: diaChi,
+        Gia: Number(room.Gia),
+        DienTich: Number(room.DienTich),
         AnhDaiDien: mainImage,
-        DanhSachAnh: roomImagePaths,
+        DanhSachAnh: roomImageObjs,
+        AnhPhongList: roomImageObjs,
         DanhSachTienIch: roomTienIch,
         TienIch: roomTienIch,
         TenQuanLy: tenQuanLy,
         SDTQuanLy: sdtQuanLy,
         TenChuTro: tenQuanLy,
         SDTChuTro: sdtQuanLy || "",
+        _sortOrder: statusMeta.sortOrder,
       };
     });
+
+    // Sắp xếp ưu tiên: Còn trống -> Đang được cọc -> Đã cho thuê -> Bảo trì
+    mapped.sort(
+      (a, b) =>
+        a._sortOrder - b._sortOrder ||
+        a.MaKhu - b.MaKhu ||
+        a.MaPhong - b.MaPhong
+    );
+
+    return mapped.map(({ _sortOrder, ...item }) => item);
   }
 
-  // 17. [GET] /api/phong-tro/public/home-data
-  async getHomeData(req, res, next) {
-    try {
-      const [
-        khuList,
-        tinDangRows,
-        tienIchList,
-        phiDichVuRows,
-        giaDienNuocRow,
-        quanLyList,
-      ] = await Promise.all([
-        KhuTroModel.getAll().catch(() => []),
-        PhongTroModel.getPublicTinDangForHome(),
-        TienIchModel.getAll().catch(() => []),
-        PhiDichVuModel.getAll().catch(() => []),
-        PhongTroModel.getLatestGiaDienNuoc().catch(() => null),
-        NguoiDungModel.getDanhSachQuanLy().catch(() => []),
-      ]);
+  // Hàm nội bộ: Lọc phòng theo query công khai (maKhu, mucGia, dienTich)
+  filterPublicRooms(rooms = [], { maKhu, mucGia, dienTich } = {}) {
+    return rooms.filter((room) => {
+      if (maKhu && maKhu !== "ALL" && Number(room.MaKhu) !== Number(maKhu)) {
+        return false;
+      }
 
-      const maKhuIds = khuList.map((k) => k.MaKhu);
-      const allRooms =
-        maKhuIds.length > 0 ? await PhongTroModel.getByMaKhuIds(maKhuIds) : [];
+      const gia = Number(room.Gia) || 0;
+      if (mucGia === "DUOI_25" && gia >= 2500000) return false;
+      if (mucGia === "TU_25_DEN_40" && (gia < 2500000 || gia > 4000000)) {
+        return false;
+      }
+      if (mucGia === "TREN_40" && gia <= 4000000) return false;
 
-      const khuTro = khuList.map((khu) => {
-        const ql = (quanLyList || []).find(
-          (u) => Number(u.MaND) === Number(khu.MaND),
-        );
-        const roomsInKhu = allRooms.filter(
-          (r) => Number(r.MaKhu) === Number(khu.MaKhu),
-        );
-        const soPhongTrong = roomsInKhu.filter(
-          (r) => r.TrangThai === "Trong",
-        ).length;
+      const dt = Number(room.DienTich) || 0;
+      if (dienTich === "DUOI_20" && dt >= 20) return false;
+      if (dienTich === "TU_20_DEN_30" && (dt < 20 || dt > 30)) return false;
+      if (dienTich === "TREN_30" && dt <= 30) return false;
 
-        let sdtQuanLy = null;
-        if (ql && ql.SDT) {
-          try {
-            sdtQuanLy = decryptAES(ql.SDT) || ql.SDT;
-          } catch {
-            sdtQuanLy = ql.SDT;
-          }
-        }
-
-        const tenQuanLy = ql
-          ? ql.HoTen || ql.TenND || ql.HoVaTen || ql.TenDangNhap || "Ban quản lý"
-          : "Ban quản lý";
-
-        return {
-          MaKhu: khu.MaKhu,
-          MaND: khu.MaND,
-          TenKhu: khu.TenKhu,
-          DiaChi: khu.DiaChi,
-          MoTa: khu.MoTa || "",
-          TenQuanLy: tenQuanLy,
-          SDTQuanLy: sdtQuanLy,
-          TongSoPhong: roomsInKhu.length,
-          SoPhongTrong: soPhongTrong,
-        };
-      });
-
-      const tinDang = await this.buildHomeTinDangList(
-        tinDangRows,
-        tienIchList,
-        quanLyList,
-      );
-
-      const phiDichVu = (phiDichVuRows || []).map((dv) => ({
-        MaDV: dv.MaDV,
-        TenDV: dv.TenDV,
-        DonGia: Number(dv.DonGia),
-        DonViTinh: dv.DonViTinh || "",
-        MoTa: dv.MoTa || "",
-      }));
-
-      const giaDienNuoc = giaDienNuocRow
-        ? {
-            MaGia: giaDienNuocRow.MaGia,
-            GiaDien: Number(giaDienNuocRow.GiaDien),
-            GiaNuoc: Number(giaDienNuocRow.GiaNuoc),
-            NgayApDung: giaDienNuocRow.NgayApDung,
-          }
-        : {
-            MaGia: 1,
-            GiaDien: 3500,
-            GiaNuoc: 15000,
-            NgayApDung: new Date().toISOString().split("T")[0],
-          };
-
-      return successResponse(res, "Lấy dữ liệu trang chủ thành công!", {
-        tinDang,
-        tienIch: tienIchList,
-        phiDichVu,
-        khuTro,
-        giaDienNuoc,
-      });
-    } catch (error) {
-      next(error);
-    }
+      return true;
+    });
   }
 
   // 1. [GET] /api/phong-tro/khu-tro
@@ -259,7 +247,7 @@ class PhongTroController {
         const ql = quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND));
         const roomsInKhu = allRooms.filter((r) => r.MaKhu === khu.MaKhu);
         const soPhongTrong = roomsInKhu.filter(
-          (r) => r.TrangThai === "Trong",
+          (r) => r.TrangThai === "Trong"
         ).length;
 
         return {
@@ -283,7 +271,7 @@ class PhongTroController {
       const maKhu = Number(req.params.maKhu);
       const { error, status, khuTro } = await this.checkKhuTroPermission(
         maKhu,
-        req.user,
+        req.user
       );
       if (error) return errorResponse(res, error, status);
 
@@ -310,7 +298,7 @@ class PhongTroController {
       return successResponse(
         res,
         "Lấy danh sách người quản lý thành công!",
-        formatted,
+        formatted
       );
     } catch (error) {
       next(error);
@@ -324,7 +312,7 @@ class PhongTroController {
         return errorResponse(
           res,
           "Chỉ Chủ trọ mới có quyền thêm khu trọ mới!",
-          403,
+          403
         );
       }
 
@@ -353,7 +341,7 @@ class PhongTroController {
       const maKhu = Number(req.params.maKhu);
       const { error, status, khuTro } = await this.checkKhuTroPermission(
         maKhu,
-        req.user,
+        req.user
       );
       if (error) return errorResponse(res, error, status);
 
@@ -392,7 +380,7 @@ class PhongTroController {
         return errorResponse(
           res,
           `Khu trọ này đang có ${roomCount} phòng hoạt động, không thể xóa!`,
-          400,
+          400
         );
       }
 
@@ -435,7 +423,7 @@ class PhongTroController {
           return errorResponse(
             res,
             "Bạn không có quyền xem phòng của khu trọ này!",
-            403,
+            403
           );
         }
         targetMaKhuIds = [filterKhuId];
@@ -462,7 +450,7 @@ class PhongTroController {
       const result = rooms.map((room) => {
         const khu = allowedKhus.find((k) => k.MaKhu === room.MaKhu);
         const roomImages = allImages.filter(
-          (img) => Number(img.MaPhong) === Number(room.MaPhong),
+          (img) => Number(img.MaPhong) === Number(room.MaPhong)
         );
         const mainImgObj =
           roomImages.find((img) => Number(img.AnhChinh) === 1) || roomImages[0];
@@ -472,7 +460,7 @@ class PhongTroController {
           .filter((ct) => ct.MaPhong === room.MaPhong)
           .map((ct) => ct.MaTI);
         const roomTienIch = allTienIch.filter((ti) =>
-          roomMaTIs.includes(ti.MaTI),
+          roomMaTIs.includes(ti.MaTI)
         );
 
         return {
@@ -504,7 +492,7 @@ class PhongTroController {
 
       const { error, status, khuTro } = await this.checkKhuTroPermission(
         room.MaKhu,
-        req.user,
+        req.user
       );
       if (error) return errorResponse(res, error, status);
 
@@ -546,26 +534,26 @@ class PhongTroController {
         return errorResponse(
           res,
           "Vui lòng nhập đầy đủ thông tin phòng trọ!",
-          400,
+          400
         );
       }
 
       const maKhuNum = Number(MaKhu);
       const { error, status } = await this.checkKhuTroPermission(
         maKhuNum,
-        req.user,
+        req.user
       );
       if (error) return errorResponse(res, error, status);
 
       const isDup = await PhongTroModel.checkDuplicateTenPhong(
         maKhuNum,
-        TenPhong,
+        TenPhong
       );
       if (isDup) {
         return errorResponse(
           res,
           `Phòng "${TenPhong}" đã tồn tại trong khu trọ này!`,
-          400,
+          400
         );
       }
 
@@ -599,7 +587,7 @@ class PhongTroController {
         res,
         "Thêm phòng trọ mới thành công!",
         createdRoom,
-        201,
+        201
       );
     } catch (error) {
       next(error);
@@ -617,7 +605,7 @@ class PhongTroController {
 
       const permCurrent = await this.checkKhuTroPermission(
         currentRoom.MaKhu,
-        req.user,
+        req.user
       );
       if (permCurrent.error)
         return errorResponse(res, permCurrent.error, permCurrent.status);
@@ -625,7 +613,7 @@ class PhongTroController {
       const targetMaKhu = Number(req.body.MaKhu || currentRoom.MaKhu);
       const permTarget = await this.checkKhuTroPermission(
         targetMaKhu,
-        req.user,
+        req.user
       );
       if (permTarget.error)
         return errorResponse(res, permTarget.error, permTarget.status);
@@ -644,20 +632,20 @@ class PhongTroController {
         return errorResponse(
           res,
           "Vui lòng nhập đầy đủ tên phòng, diện tích và giá thuê!",
-          400,
+          400
         );
       }
 
       const isDup = await PhongTroModel.checkDuplicateTenPhong(
         targetMaKhu,
         TenPhong,
-        maPhong,
+        maPhong
       );
       if (isDup) {
         return errorResponse(
           res,
           `Tên phòng "${TenPhong}" đã tồn tại trong khu trọ này!`,
-          400,
+          400
         );
       }
 
@@ -710,7 +698,7 @@ class PhongTroController {
       ) {
         await AnhPhongModel.setMainImage(
           insertedMaAnhs[Number(NewMainIndex)],
-          maPhong,
+          maPhong
         );
       } else {
         const remainImgs = await AnhPhongModel.getByMaPhong(maPhong);
@@ -723,7 +711,7 @@ class PhongTroController {
       return successResponse(
         res,
         "Cập nhật phòng trọ thành công!",
-        updatedRoom,
+        updatedRoom
       );
     } catch (error) {
       next(error);
@@ -741,7 +729,7 @@ class PhongTroController {
 
       const { error, status } = await this.checkKhuTroPermission(
         room.MaKhu,
-        req.user,
+        req.user
       );
       if (error) return errorResponse(res, error, status);
 
@@ -749,7 +737,7 @@ class PhongTroController {
         return errorResponse(
           res,
           "Không thể xóa phòng đang có khách thuê!",
-          400,
+          400
         );
       }
 
@@ -764,19 +752,19 @@ class PhongTroController {
         return errorResponse(
           res,
           "Phòng này đã có lịch sử Hợp đồng hoặc Điện nước nên không thể xóa! Vui lòng chuyển trạng thái sang Bảo trì.",
-          400,
+          400
         );
       }
 
       if (roomImages.length > 0) {
         await Promise.all(
-          roomImages.map((img) => deleteImageFromCloudinary(img.DuongDan)),
+          roomImages.map((img) => deleteImageFromCloudinary(img.DuongDan))
         );
       }
 
       return successResponse(
         res,
-        "Đã xóa phòng trọ và hình ảnh trên Cloud thành công!",
+        "Đã xóa phòng trọ và hình ảnh trên Cloud thành công!"
       );
     } catch (error) {
       next(error);
@@ -800,7 +788,7 @@ class PhongTroController {
         const ql = quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND));
         const roomsInKhu = allRooms.filter((r) => r.MaKhu === khu.MaKhu);
         const soPhongTrong = roomsInKhu.filter(
-          (r) => r.TrangThai === "Trong",
+          (r) => r.TrangThai === "Trong"
         ).length;
 
         return {
@@ -825,86 +813,35 @@ class PhongTroController {
           thongKe,
           khuTroList: formattedKhuTro,
           tienIchList,
-        },
+        }
       );
     } catch (error) {
       next(error);
     }
   }
 
-  // 14. [GET] /api/phong-tro/public/phong
+  // 14. [GET] /api/phong-tro/public/phong (Lấy TẤT CẢ phòng hiển thị Trang chủ, hỗ trợ lọc)
   async getPublicPhongList(req, res, next) {
     try {
       const { maKhu, mucGia, dienTich } = req.query;
 
-      const [allKhus, rooms] = await Promise.all([
-        KhuTroModel.getAll(),
-        PhongTroModel.getPublicListByFilters({ maKhu, mucGia, dienTich }),
-      ]);
+      const allKhus = await KhuTroModel.getAll();
+      const maKhuIds = allKhus.map((k) => k.MaKhu);
+      const allRooms =
+        maKhuIds.length > 0 ? await PhongTroModel.getByMaKhuIds(maKhuIds) : [];
 
-      if (rooms.length === 0) {
-        return successResponse(
-          res,
-          "Lấy danh sách phòng trang chủ thành công!",
-          [],
-        );
-      }
-
-      const roomIds = rooms.map((r) => Number(r.MaPhong));
-
-      const [allImages, allChiTietTI, allTienIch, quanLyList] =
-        await Promise.all([
-          PhongTroModel.getAnhByMaPhongList(roomIds),
-          ChiTietTienIchModel.getByMaPhongList(roomIds),
-          TienIchModel.getAll(),
-          NguoiDungModel.getDanhSachQuanLy(),
-        ]);
-
-      const result = rooms.map((room) => {
-        const khu = allKhus.find((k) => Number(k.MaKhu) === Number(room.MaKhu));
-        const ql = khu
-          ? quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND))
-          : null;
-
-        const roomImages = (allImages || []).filter(
-          (img) => Number(img.MaPhong) === Number(room.MaPhong) && img.DuongDan,
-        );
-        const mainImgObj =
-          roomImages.find((img) => Number(img.AnhChinh) === 1) || roomImages[0];
-        const mainImage = mainImgObj
-          ? mainImgObj.DuongDan
-          : room.AnhDaiDienDB || null;
-
-        const roomMaTIs = (allChiTietTI || [])
-          .filter((ct) => Number(ct.MaPhong) === Number(room.MaPhong))
-          .map((ct) => Number(ct.MaTI));
-        const roomTienIch = (allTienIch || []).filter((ti) =>
-          roomMaTIs.includes(Number(ti.MaTI)),
-        );
-
-        const sdt = ql && ql.SDT ? this.safeDecryptPhone(ql.SDT) : null;
-
-        return {
-          ...room,
-          TenKhu: khu ? khu.TenKhu : "",
-          DiaChi: khu ? khu.DiaChi : "",
-          MoTaKhu: khu ? khu.MoTa : "",
-          TenNguoiLienHe: ql ? ql.HoTen : "Ban quản lý",
-          SDTLienHe: sdt,
-          TenQuanLy: ql ? ql.HoTen : "Ban quản lý",
-          SDTQuanLy: sdt,
-          AnhDaiDien: mainImage,
-          DanhSachAnh: roomImages.map((img) => img.DuongDan),
-          DanhSachAnhChiTiet: roomImages,
-          TienIch: roomTienIch,
-          DanhSachTienIch: roomTienIch,
-        };
+      const filteredRooms = this.filterPublicRooms(allRooms, {
+        maKhu,
+        mucGia,
+        dienTich,
       });
+
+      const result = await this.buildHomeRoomList(filteredRooms, allKhus);
 
       return successResponse(
         res,
         "Lấy danh sách phòng trang chủ thành công!",
-        result,
+        result
       );
     } catch (error) {
       next(error);
@@ -929,15 +866,20 @@ class PhongTroController {
       ]);
 
       const ql = khuTro ? await NguoiDungModel.findById(khuTro.MaND) : null;
-
       const maTIList = chiTietTI.map((ct) => ct.MaTI);
       const roomTienIch = allTienIch.filter((ti) => maTIList.includes(ti.MaTI));
-
       const mainImgObj =
         images.find((img) => Number(img.AnhChinh) === 1) || images[0];
+      const statusMeta = this.resolveRoomStatusMeta(room.TrangThai);
 
       return successResponse(res, "Lấy chi tiết phòng thành công!", {
         ...room,
+        MaTin: Number(room.MaPhong),
+        TrangThai: "DangHienThi",
+        TrangThaiPhong: statusMeta.TrangThaiPhong,
+        NhanTrangThai: statusMeta.NhanTrangThai,
+        MauTrangThai: statusMeta.MauTrangThai,
+        CoTheDatCoc: statusMeta.CoTheDatCoc,
         TenKhu: khuTro ? khuTro.TenKhu : "",
         DiaChi: khuTro ? khuTro.DiaChi : "",
         MoTaKhu: khuTro ? khuTro.MoTa : "",
@@ -945,36 +887,19 @@ class PhongTroController {
         SDTLienHe: ql && ql.SDT ? this.safeDecryptPhone(ql.SDT) : null,
         EmailLienHe: ql ? ql.Email : null,
         AnhDaiDien: mainImgObj ? mainImgObj.DuongDan : null,
-        DanhSachAnh: images.map((img) => img.DuongDan),
-        DanhSachAnhChiTiet: images,
+        DanhSachAnh: images,
+        AnhPhongList: images,
         TienIch: roomTienIch,
+        DanhSachTienIch: roomTienIch,
       });
     } catch (error) {
       next(error);
     }
   }
 
-  // 16. [GET] /api/phong-tro/public/tin-dang (API PUBLIC LẤY TIN ĐĂNG TRANG HOME)
+  // 16. [GET] /api/phong-tro/public/tin-dang (Giữ route cũ, trả trực tiếp TẤT CẢ phòng từ bảng phong)
   async getPublicTinDangHome(req, res, next) {
-    try {
-      const { maKhu, mucGia, dienTich } = req.query;
-
-      const tinDangRows = await PhongTroModel.getPublicTinDangForHome({
-        maKhu,
-        mucGia,
-        dienTich,
-      });
-
-      const formattedTinDang = await this.buildHomeTinDangList(tinDangRows);
-
-      return successResponse(
-        res,
-        "Lấy danh sách tin đăng trang chủ thành công!",
-        formattedTinDang,
-      );
-    } catch (error) {
-      next(error);
-    }
+    return this.getPublicPhongList(req, res, next);
   }
 
   // 17. [GET] /api/phong-tro/public/home-data
@@ -982,18 +907,16 @@ class PhongTroController {
     try {
       const [
         khuList,
-        tinDangRows,
         tienIchList,
         phiDichVuRows,
         giaDienNuocRow,
         quanLyList,
       ] = await Promise.all([
-        KhuTroModel.getAll(),
-        PhongTroModel.getPublicTinDangForHome(),
-        TienIchModel.getAll(),
-        PhiDichVuModel.getAll(),
-        PhongTroModel.getLatestGiaDienNuoc(),
-        NguoiDungModel.getDanhSachQuanLy(),
+        KhuTroModel.getAll().catch(() => []),
+        TienIchModel.getAll().catch(() => []),
+        PhiDichVuModel.getAll().catch(() => []),
+        PhongTroModel.getLatestGiaDienNuoc().catch(() => null),
+        NguoiDungModel.getDanhSachQuanLy().catch(() => []),
       ]);
 
       const maKhuIds = khuList.map((k) => k.MaKhu);
@@ -1001,16 +924,19 @@ class PhongTroController {
         maKhuIds.length > 0 ? await PhongTroModel.getByMaKhuIds(maKhuIds) : [];
 
       const khuTro = khuList.map((khu) => {
-        const ql = quanLyList.find((u) => Number(u.MaND) === Number(khu.MaND));
+        const ql = (quanLyList || []).find(
+          (u) => Number(u.MaND) === Number(khu.MaND)
+        );
         const roomsInKhu = allRooms.filter(
-          (r) => Number(r.MaKhu) === Number(khu.MaKhu),
+          (r) => Number(r.MaKhu) === Number(khu.MaKhu)
         );
         const soPhongTrong = roomsInKhu.filter(
-          (r) => r.TrangThai === "Trong",
+          (r) => r.TrangThai === "Trong"
         ).length;
-
-        const sdtQuanLy =
-          ql && ql.SDT ? this.safeDecryptPhone(ql.SDT) : null;
+        const sdtQuanLy = ql && ql.SDT ? this.safeDecryptPhone(ql.SDT) : null;
+        const tenQuanLy = ql
+          ? ql.HoTen || ql.TenND || ql.HoVaTen || ql.TenDangNhap || "Ban quản lý"
+          : "Ban quản lý";
 
         return {
           MaKhu: khu.MaKhu,
@@ -1018,20 +944,22 @@ class PhongTroController {
           TenKhu: khu.TenKhu,
           DiaChi: khu.DiaChi,
           MoTa: khu.MoTa || "",
-          TenQuanLy: ql ? ql.HoTen : "Ban quản lý",
+          TenQuanLy: tenQuanLy,
           SDTQuanLy: sdtQuanLy,
           TongSoPhong: roomsInKhu.length,
           SoPhongTrong: soPhongTrong,
         };
       });
 
-      const tinDang = await this.buildHomeTinDangList(
-        tinDangRows,
+      // Lấy toàn bộ phòng (Còn trống, Đang được cọc, Đã cho thuê, Bảo trì) cho Trang chủ
+      const tinDang = await this.buildHomeRoomList(
+        allRooms,
+        khuList,
         tienIchList,
-        quanLyList,
+        quanLyList
       );
 
-      const phiDichVu = phiDichVuRows.map((dv) => ({
+      const phiDichVu = (phiDichVuRows || []).map((dv) => ({
         MaDV: dv.MaDV,
         TenDV: dv.TenDV,
         DonGia: Number(dv.DonGia),
@@ -1055,6 +983,7 @@ class PhongTroController {
 
       return successResponse(res, "Lấy dữ liệu trang chủ thành công!", {
         tinDang,
+        phongList: tinDang,
         tienIch: tienIchList,
         phiDichVu,
         khuTro,

@@ -1,7 +1,13 @@
 // src/components/home/ChiTietTinDangClient.tsx
 "use client";
 
-import { useEffect, useMemo, useState, SyntheticEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  SyntheticEvent,
+} from "react";
 import Link from "next/link";
 
 import HomeHeader from "@/components/layout/homeHeader";
@@ -28,10 +34,11 @@ import {
   TinDangItem,
   extractManagerContact,
   formatVND,
-  formatDateVN,
 } from "./home.data";
 import {
   extractRoomImageList,
+  getRoomStatusDisplay,
+  isVisiblePublicRoom,
   RoomImageObject,
 } from "./TinDangSection";
 
@@ -41,9 +48,9 @@ interface ChiTietTinDangClientProps {
 
 const DEFAULT_GIA_DIEN_NUOC: GiaDienNuocHome = {
   MaGia: 1,
-  GiaDien: 3500,
-  GiaNuoc: 15000,
-  NgayApDung: "2026-01-01",
+  GiaDien: 3800,
+  GiaNuoc: 18000,
+  NgayApDung: "2026-08-01",
 };
 
 export default function ChiTietTinDangClient({
@@ -57,10 +64,9 @@ export default function ChiTietTinDangClient({
   const [khuTroList, setKhuTroList] = useState<KhuTroWithContact[]>([]);
   const [systemTienIch, setSystemTienIch] = useState<TienIchItem[]>([]);
   const [giaDienNuoc, setGiaDienNuoc] = useState<GiaDienNuocHome>(
-    DEFAULT_GIA_DIEN_NUOC
+    DEFAULT_GIA_DIEN_NUOC,
   );
-    const [phiDichVuList, setPhiDichVuList] =
-    useState<PhiDichVuItem[]>([]);
+  const [phiDichVuList, setPhiDichVuList] = useState<PhiDichVuItem[]>([]);
   const [activeImageUrl, setActiveImageUrl] = useState<string>("");
   const [relatedFilter, setRelatedFilter] = useState<"ALL" | "SAME_KHU">("ALL");
   const [contactRoom, setContactRoom] = useState<TinDangItem | null>(null);
@@ -82,64 +88,61 @@ export default function ChiTietTinDangClient({
     showSuccess(
       `Đã sao chép số điện thoại ${phone} của ${tenNguoiLienHe}!`,
       "Sao chép thành công",
-      2
+      2,
     );
   };
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function fetchDetailAndRelated() {
-      if (!maTin || isNaN(maTin)) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const homePayload = await HomeService.getHomeData();
-        if (!isMounted) return;
-
-        const validList = (homePayload.tinDang || []).filter((t) =>
-          isAvailablePublicTinDang(t)
-        );
-        setAllTinDang(validList);
-        setKhuTroList((homePayload.khuTro || []) as KhuTroWithContact[]);
-        setSystemTienIch(homePayload.tienIch || []);
-        if (homePayload.giaDienNuoc) {
-          setGiaDienNuoc(homePayload.giaDienNuoc);
-        }
-
-        setPhiDichVuList(homePayload.phiDichVu || []);
-
-        const matchedTin =
-          validList.find((t) => Number(t.MaTin) === Number(maTin)) || null;
-
-        setCurrentTin(matchedTin);
-
-        if (matchedTin) {
-          const imgs = extractRoomImageList(
-            matchedTin as unknown as TinDangItem
-          );
-          const firstPath = imgs.length > 0 ? imgs[0].DuongDan : null;
-          setActiveImageUrl(resolveRoomImageUrl(firstPath));
-        }
-      } catch (err) {
-        console.error("Lỗi khi tải trang chi tiết tin đăng:", err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
+  const fetchDetailAndRelated = useCallback(async () => {
+    if (!maTin || isNaN(maTin)) {
+      setLoading(false);
+      return;
     }
 
+    setLoading(true);
+    try {
+      const homePayload = await HomeService.getHomeData();
+      const validList = (homePayload.tinDang || []).filter((t) =>
+        isAvailablePublicTinDang(t),
+      );
+
+      setAllTinDang(validList);
+      setKhuTroList((homePayload.khuTro || []) as KhuTroWithContact[]);
+      setSystemTienIch(homePayload.tienIch || []);
+      if (homePayload.giaDienNuoc) {
+        setGiaDienNuoc(homePayload.giaDienNuoc);
+      }
+      setPhiDichVuList(homePayload.phiDichVu || []);
+
+      const matchedTin =
+        validList.find(
+          (t) =>
+            Number(t.MaPhong) === Number(maTin) ||
+            Number(t.MaTin) === Number(maTin),
+        ) || null;
+
+      setCurrentTin(matchedTin);
+
+      if (matchedTin) {
+        const imgs = extractRoomImageList(matchedTin as unknown as TinDangItem);
+        const firstPath = imgs.length > 0 ? imgs[0].DuongDan : null;
+        setActiveImageUrl(resolveRoomImageUrl(firstPath));
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải trang chi tiết phòng:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [maTin]);
+
+  useEffect(() => {
     fetchDetailAndRelated();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [fetchDetailAndRelated]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [maTin]);
+  const currentStatus = useMemo(() => {
+    if (!currentTin) return null;
+    return getRoomStatusDisplay(currentTin as unknown as TinDangItem);
+  }, [currentTin]);
 
   const detailImageList = useMemo<RoomImageObject[]>(() => {
     if (!currentTin) return [];
@@ -150,7 +153,7 @@ export default function ChiTietTinDangClient({
     if (!currentTin) return null;
     return extractManagerContact(
       currentTin as unknown as TinDangItem,
-      khuTroList
+      khuTroList,
     );
   }, [currentTin, khuTroList]);
 
@@ -158,7 +161,7 @@ export default function ChiTietTinDangClient({
     if (!currentTin) return "";
     if (currentTin.DiaChi) return String(currentTin.DiaChi);
     const foundKhu = khuTroList.find(
-      (k) => Number(k.MaKhu) === Number(currentTin.MaKhu)
+      (k) => Number(k.MaKhu) === Number(currentTin.MaKhu),
     );
     return foundKhu?.DiaChi || "Đang cập nhật địa chỉ";
   }, [currentTin, khuTroList]);
@@ -178,14 +181,34 @@ export default function ChiTietTinDangClient({
     return systemTienIch;
   }, [currentTin, systemTienIch]);
 
+  const phongTrongCount = useMemo(() => {
+    return allTinDang.filter(
+      (t) => getRoomStatusDisplay(t as unknown as TinDangItem).key === "Trong",
+    ).length;
+  }, [allTinDang]);
+
   const otherTinDangList = useMemo(() => {
-    if (!currentTin) return allTinDang;
+    if (!currentTin) {
+      return allTinDang.filter((item) =>
+        isVisiblePublicRoom(item as unknown as TinDangItem),
+      );
+    }
 
     const others = allTinDang.filter(
-      (item) => Number(item.MaTin) !== Number(currentTin.MaTin)
+      (item) =>
+        Number(item.MaPhong) !== Number(currentTin.MaPhong) &&
+        isVisiblePublicRoom(item as unknown as TinDangItem),
     );
 
     others.sort((a, b) => {
+      const aOrder = getRoomStatusDisplay(
+        a as unknown as TinDangItem,
+      ).sortOrder;
+      const bOrder = getRoomStatusDisplay(
+        b as unknown as TinDangItem,
+      ).sortOrder;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+
       const aSameKhu = Number(a.MaKhu) === Number(currentTin.MaKhu) ? 1 : 0;
       const bSameKhu = Number(b.MaKhu) === Number(currentTin.MaKhu) ? 1 : 0;
       return bSameKhu - aSameKhu;
@@ -193,32 +216,38 @@ export default function ChiTietTinDangClient({
 
     if (relatedFilter === "SAME_KHU") {
       return others.filter(
-        (item) => Number(item.MaKhu) === Number(currentTin.MaKhu)
+        (item) => Number(item.MaKhu) === Number(currentTin.MaKhu),
       );
     }
 
     return others;
   }, [allTinDang, currentTin, relatedFilter]);
 
+  const visibleOtherCount = useMemo(() => {
+    if (!currentTin) return 0;
+    return allTinDang.filter(
+      (item) =>
+        Number(item.MaPhong) !== Number(currentTin.MaPhong) &&
+        isVisiblePublicRoom(item as unknown as TinDangItem),
+    ).length;
+  }, [allTinDang, currentTin]);
+
   const sameKhuCount = useMemo(() => {
     if (!currentTin) return 0;
     return allTinDang.filter(
       (item) =>
-        Number(item.MaTin) !== Number(currentTin.MaTin) &&
-        Number(item.MaKhu) === Number(currentTin.MaKhu)
+        Number(item.MaPhong) !== Number(currentTin.MaPhong) &&
+        Number(item.MaKhu) === Number(currentTin.MaKhu) &&
+        isVisiblePublicRoom(item as unknown as TinDangItem),
     ).length;
   }, [allTinDang, currentTin]);
-
-  const formattedNgayDang = useMemo(() => {
-    return formatDateVN(currentTin?.NgayDang).formattedDate;
-  }, [currentTin]);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
       <HomeHeader
         {...({
           khuTroCount: khuTroList.length,
-          phongTrongCount: allTinDang.length,
+          phongTrongCount,
         } as any)}
       />
 
@@ -235,8 +264,11 @@ export default function ChiTietTinDangClient({
             </li>
             <li>/</li>
             <li>
-              <Link href="/#tin-dang" className="hover:text-teal-700 transition">
-                Danh sách phòng mở thuê
+              <Link
+                href="/#tin-dang"
+                className="hover:text-teal-700 transition"
+              >
+                Danh sách phòng trọ
               </Link>
             </li>
             {currentTin && (
@@ -268,19 +300,19 @@ export default function ChiTietTinDangClient({
               <div className="h-48 bg-slate-100 rounded-2xl" />
             </div>
           </div>
-        ) : !currentTin || !detailContact ? (
+        ) : !currentTin || !detailContact || !currentStatus ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center max-w-xl mx-auto shadow-xs space-y-4">
             <span className="inline-block px-3.5 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900">
-              Tin đăng không khả dụng
+              Không tìm thấy phòng
             </span>
             <h1 className="text-xl font-bold text-slate-900">
-              Không tìm thấy thông tin phòng trọ này hoặc phòng đã được thuê
+              Không tìm thấy thông tin phòng trọ này trong hệ thống
             </h1>
             <Link
               href="/#tin-dang"
               className="inline-block px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition"
             >
-              Xem toàn bộ phòng trống tại trang chủ
+              Xem toàn bộ phòng tại trang chủ
             </Link>
           </div>
         ) : (
@@ -293,15 +325,15 @@ export default function ChiTietTinDangClient({
                 <h1 className="text-lg sm:text-xl font-bold">
                   Chi Tiết Phòng {currentTin.TenPhong}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-900/10 text-slate-900 border border-slate-900/20">
-                  Còn trống • Mã tin #{currentTin.MaTin}
-                </span>
               </div>
+
               <span
-                suppressHydrationWarning
-                className="text-xs font-bold text-slate-800"
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${currentStatus.badgeClass}`}
               >
-                Ngày đăng: {formattedNgayDang}
+                <span
+                  className={`w-2 h-2 rounded-full ${currentStatus.dotClass}`}
+                />
+                {currentStatus.label}
               </span>
             </div>
 
@@ -360,7 +392,7 @@ export default function ChiTietTinDangClient({
                   </h2>
                   <div className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 whitespace-pre-line">
                     {currentTin.MoTa ||
-                      "Chưa có mô tả chi tiết cho bài đăng này."}
+                      "Phòng sạch sẽ, thoáng mát, an ninh đảm bảo 24/7."}
                   </div>
                 </div>
               </div>
@@ -372,8 +404,10 @@ export default function ChiTietTinDangClient({
                       <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900">
                         {currentTin.TenKhu}
                       </span>
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
-                        ● Đang mở cho thuê
+                      <span
+                        className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${currentStatus.badgeClass}`}
+                      >
+                        ● {currentStatus.label}
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 pt-1">
@@ -466,6 +500,28 @@ export default function ChiTietTinDangClient({
                     )}
                   </div>
 
+                  {/* Nút Đặt cọc theo đúng trạng thái */}
+                  {currentStatus.canBook ? (
+                    <Link
+                      href={`/datPhong/${currentTin.MaPhong}`}
+                      className="block w-full px-4 py-3 bg-[#00FFCC] text-black text-xs sm:text-sm font-bold rounded-xl transition text-center no-underline shadow-xs"
+                    >
+                      Đặt cọc giữ phòng ngay
+                    </Link>
+                  ) : currentStatus.key === "DaDatCoc" ? (
+                    <div className="w-full px-4 py-3 bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold rounded-xl text-center">
+                      Phòng đang được cọc giữ chỗ — không thể đặt cọc thêm
+                    </div>
+                  ) : currentStatus.key === "DangThue" ? (
+                    <div className="w-full px-4 py-3 bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl text-center">
+                      Phòng đã cho thuê — không cho phép đặt cọc
+                    </div>
+                  ) : (
+                    <div className="w-full px-4 py-3 bg-slate-100 text-slate-500 border border-slate-200 text-xs font-bold rounded-xl text-center">
+                      Phòng đang bảo trì
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center gap-2.5">
                     {detailContact.hasPhoneFromDB && (
                       <a
@@ -484,7 +540,7 @@ export default function ChiTietTinDangClient({
                       }
                       className="flex-1 px-4 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition text-center cursor-pointer"
                     >
-                      Liên hệ thuê phòng này
+                      Liên hệ quản lý
                     </button>
                   </div>
                 </div>
@@ -498,15 +554,15 @@ export default function ChiTietTinDangClient({
           phiDichVuList={phiDichVuList}
         />
 
-        {/* DANH SÁCH CÁC TIN ĐĂNG KHÁC Ở BÊN DƯỚI */}
+        {/* DANH SÁCH CÁC PHÒNG KHÁC Ở BÊN DƯỚI */}
         <section className="space-y-6 pt-4 border-t border-slate-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-1.5">
-                Gợi ý phòng trống dành cho bạn
+                Tham khảo thêm
               </span>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-                Các Tin Đăng Phòng Trống Khác ({otherTinDangList.length})
+                Các Phòng Trọ Khác Trong Hệ Thống ({otherTinDangList.length})
               </h2>
             </div>
 
@@ -521,7 +577,7 @@ export default function ChiTietTinDangClient({
                       : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                   }`}
                 >
-                  Tất cả phòng khác ({allTinDang.length - 1})
+                  Tất cả phòng khác ({visibleOtherCount})
                 </button>
                 <button
                   type="button"
@@ -540,27 +596,30 @@ export default function ChiTietTinDangClient({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {otherTinDangList.map((tin) => {
-              const contact = extractManagerContact(
+              const statusCfg = getRoomStatusDisplay(
                 tin as unknown as TinDangItem,
-                khuTroList
               );
               const roomImageObjs = extractRoomImageList(
-                tin as unknown as TinDangItem
+                tin as unknown as TinDangItem,
               );
               const firstImgPath =
                 roomImageObjs.length > 0 ? roomImageObjs[0].DuongDan : null;
               const imageUrl = resolveRoomImageUrl(firstImgPath);
-              const itemHref = `/tinDang/${tin.MaTin}`;
+              const itemHref = `/tinDang/${tin.MaPhong || tin.MaTin}`;
 
               return (
                 <article
-                  key={tin.MaTin}
-                  className="group bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition overflow-hidden flex flex-col"
+                  key={tin.MaPhong || tin.MaTin}
+                  className="group relative bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md hover:border-teal-300 transition overflow-hidden flex flex-col cursor-pointer"
                 >
+                  {/* Lớp phủ toàn thẻ: bấm vào ảnh hoặc chữ đều xem chi tiết phòng */}
                   <Link
                     href={itemHref}
-                    className="relative h-48 w-full bg-slate-100 overflow-hidden block"
-                  >
+                    aria-label={`Xem chi tiết Phòng ${tin.TenPhong} - ${tin.TenKhu}`}
+                    className="absolute inset-0 z-10"
+                  />
+
+                  <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
                     <img
                       src={imageUrl}
                       alt={`Phòng ${tin.TenPhong}`}
@@ -568,64 +627,94 @@ export default function ChiTietTinDangClient({
                       loading="lazy"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute top-3 left-3">
-                      <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/80 text-[#00FFCC]">
+                    <div className="absolute top-3 left-3 max-w-[58%]">
+                      <span className="inline-block truncate max-w-full px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/80 text-[#00FFCC]">
                         {tin.TenKhu}
                       </span>
                     </div>
-                  </Link>
+                    <div className="absolute top-3 right-3">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusCfg.badgeClass}`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${statusCfg.dotClass}`}
+                        />
+                        {statusCfg.label}
+                      </span>
+                    </div>
+                  </div>
 
                   <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div>
                       <div className="flex items-baseline justify-between gap-2">
-                        <h3 className="text-lg font-bold text-slate-900">
-                          <Link href={itemHref} className="hover:text-teal-700">
-                            Phòng {tin.TenPhong}
-                          </Link>
+                        <h3 className="text-lg font-bold text-slate-900 group-hover:text-teal-700 transition">
+                          Phòng {tin.TenPhong}
                         </h3>
+                        <span
+                          className={`text-xs font-extrabold ${statusCfg.textClass}`}
+                        >
+                          {statusCfg.label}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-baseline justify-between gap-2">
+                        <p
+                          suppressHydrationWarning
+                          className="text-base font-bold text-teal-700"
+                        >
+                          {formatVND(tin.Gia)} / tháng
+                        </p>
                         <span className="text-xs font-semibold text-slate-500">
                           {Number(tin.DienTich)} m²
                         </span>
                       </div>
-                      <p
-                        suppressHydrationWarning
-                        className="mt-1 text-base font-bold text-teal-700"
-                      >
-                        {formatVND(tin.Gia)} / tháng
-                      </p>
-                      <h4 className="mt-2 text-sm font-bold text-slate-900 line-clamp-2">
-                        <Link href={itemHref} className="hover:text-teal-700">
-                          {tin.TieuDe}
-                        </Link>
-                      </h4>
                     </div>
 
                     <footer className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                      <Link
-                        href={itemHref}
-                        className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800"
-                      >
-                        Xem chi tiết
-                      </Link>
-                      {contact.hasPhoneFromDB && (
-                        <a
-                          href={contact.zaloUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-2 rounded-xl text-xs font-bold bg-white text-[#0068FF] border border-[#0068FF]"
-                        >
-                          Zalo
-                        </a>
-                      )}
+                      <span className="px-2.5 py-2 rounded-xl text-xs font-bold bg-slate-100 group-hover:bg-slate-200 text-slate-800 border border-slate-200 transition text-center whitespace-nowrap shrink-0">
+                        Chi tiết
+                      </span>
+
                       <button
                         type="button"
-                        onClick={() =>
-                          setContactRoom(tin as unknown as TinDangItem)
-                        }
-                        className="flex-1 px-3 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold rounded-xl cursor-pointer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setContactRoom(tin as unknown as TinDangItem);
+                        }}
+                        className="relative z-20 flex-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 transition text-center whitespace-nowrap cursor-pointer shadow-2xs"
                       >
-                        Liên hệ thuê
+                        Liên hệ
                       </button>
+
+                      {statusCfg.canBook ? (
+                        <Link
+                          href={`/datPhong/${tin.MaPhong}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="relative z-20 flex-1 px-2.5 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl text-center no-underline whitespace-nowrap transition shadow-2xs"
+                        >
+                          Đặt cọc
+                        </Link>
+                      ) : statusCfg.key === "DaDatCoc" ? (
+                        <span
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          className="relative z-20 flex-1 px-2.5 py-2 bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold rounded-xl text-center whitespace-nowrap cursor-not-allowed select-none"
+                        >
+                          Đang được cọc
+                        </span>
+                      ) : (
+                        <span
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          className="relative z-20 flex-1 px-2.5 py-2 bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl text-center whitespace-nowrap cursor-not-allowed select-none"
+                        >
+                          Đã cho thuê
+                        </span>
+                      )}
                     </footer>
                   </div>
                 </article>

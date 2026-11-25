@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import FormPageLayout from '@/components/common/FormPageLayout';
 import { FormField, FormActions } from '@/components/common/FormPrimitives';
 import {
@@ -38,6 +39,7 @@ export default function SuaPhongTroPage() {
   const [dienTich, setDienTich] = useState('');
   const [gia, setGia] = useState('');
   const [trangThai, setTrangThai] = useState<RoomStatus>('Trong');
+  const [initialTrangThai, setInitialTrangThai] = useState<RoomStatus>('Trong');
   const [selectedTienIch, setSelectedTienIch] = useState<number[]>([]);
 
   const [existingImages, setExistingImages] = useState<AnhPhongItem[]>([]);
@@ -51,6 +53,8 @@ export default function SuaPhongTroPage() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  const isLockedDepositStatus = initialTrangThai === 'DaDatCoc';
 
   const rules = useMemo(
     () => ({
@@ -95,6 +99,7 @@ export default function SuaPhongTroPage() {
           setDienTich(cleanDecimalString(room.DienTich));
           setGia(cleanDecimalString(room.Gia));
           setTrangThai(room.TrangThai);
+          setInitialTrangThai(room.TrangThai);
           setSelectedTienIch((room.TienIch || []).map((t) => t.MaTI));
 
           const imgs = room.DanhSachAnh || [];
@@ -160,7 +165,7 @@ export default function SuaPhongTroPage() {
       formData.append('TenPhong', tenPhong.trim());
       formData.append('DienTich', String(dienTich));
       formData.append('Gia', String(gia));
-      formData.append('TrangThai', trangThai);
+      formData.append('TrangThai', isLockedDepositStatus ? 'DaDatCoc' : trangThai);
       formData.append('TienIchIds', JSON.stringify(selectedTienIch));
       formData.append('DeletedMaAnhs', JSON.stringify(deletedMaAnhs));
 
@@ -170,6 +175,7 @@ export default function SuaPhongTroPage() {
       newFiles.forEach((file) => formData.append('anhPhong', file));
 
       await PhongTroService.updatePhong(maPhong, formData);
+      router.refresh();
       showSuccess('Cập nhật thông tin phòng thành công!', 'Thành công', 1.5, () => {
         router.push('/chuTro/phongTro');
       });
@@ -263,15 +269,38 @@ export default function SuaPhongTroPage() {
             <FormField label="Trạng thái phòng">
               <select
                 value={trangThai}
+                disabled={isLockedDepositStatus}
                 onChange={(e) => setTrangThai(e.target.value as RoomStatus)}
-                className="w-full px-4 py-3 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
+                className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFCC] ${
+                  isLockedDepositStatus
+                    ? 'border-orange-300 bg-orange-50 text-orange-800 font-bold cursor-not-allowed'
+                    : 'border-slate-300 bg-white'
+                }`}
               >
+                {isLockedDepositStatus && (
+                  <option value="DaDatCoc">Đang được cọc</option>
+                )}
                 <option value="Trong">Đang trống</option>
                 <option value="DangThue">Đang thuê</option>
                 <option value="BaoTri">Đang bảo trì</option>
               </select>
             </FormField>
           </div>
+
+          {isLockedDepositStatus && (
+            <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-xs text-orange-900 flex flex-wrap items-center justify-between gap-2">
+              <span>
+                Phòng đang có đơn đặt cọc giữ chỗ nên tạm khóa đổi trạng thái thủ công. Bạn vẫn có thể
+                chỉnh sửa giá, diện tích, tiện ích và hình ảnh bình thường.
+              </span>
+              <Link
+                href="/chuTro/datPhong"
+                className="font-bold text-orange-700 underline shrink-0"
+              >
+                Xử lý tại Quản lý đặt cọc →
+              </Link>
+            </div>
+          )}
 
           <TienIchSelector
             tienIchList={tienIchList}

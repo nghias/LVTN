@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import ProtectedRoute from '@/components/common/ProtectedRoute';
-import QuanLyHeader from '@/components/layout/QuanLyHeader';
-import { useAlertModal } from '@/components/common/AlertModalProvider';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import ProtectedRoute from "@/components/common/ProtectedRoute";
+import QuanLyHeader from "@/components/layout/QuanLyHeader";
+import { useAlertModal } from "@/components/common/AlertModalProvider";
 import {
   PhongTroService,
   resolveRoomImageUrl,
-} from '@/services/phongTro.service';
-import { PhongItem } from '@/types/phongTro.type';
+} from "@/services/phongTro.service";
+import { PhongItem } from "@/types/phongTro.type";
 
 export default function ChiTietPhongTroPage() {
   const params = useParams();
@@ -19,7 +19,7 @@ export default function ChiTietPhongTroPage() {
   const { showError } = useAlertModal();
 
   const [room, setRoom] = useState<PhongItem | null>(null);
-  const [activeImageUrl, setActiveImageUrl] = useState<string>('');
+  const [activeImageUrl, setActiveImageUrl] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,13 +38,13 @@ export default function ChiTietPhongTroPage() {
       })
       .catch((err: unknown) => {
         if (err instanceof Error) showError(err.message);
-        router.replace('/chuTro/phongTro');
+        router.replace("/chuTro/phongTro");
       })
       .finally(() => setLoading(false));
   }, [maPhong, router, showError]);
 
   return (
-    <ProtectedRoute allowedRoles={['ChuTro', 'QuanLy']}>
+    <ProtectedRoute allowedRoles={["ChuTro", "QuanLy"]}>
       {(user) => (
         <div className="flex-1 flex flex-col bg-white text-slate-900">
           <QuanLyHeader user={user} />
@@ -74,7 +74,9 @@ export default function ChiTietPhongTroPage() {
             </div>
 
             {loading || !room ? (
-              <p className="text-sm text-slate-500">Đang tải thông tin chi tiết phòng...</p>
+              <p className="text-sm text-slate-500">
+                Đang tải thông tin chi tiết phòng...
+              </p>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 shadow-sm">
                 {/* Cột trái: Bộ sưu tập toàn bộ ảnh phòng (AnhPhong) */}
@@ -99,7 +101,9 @@ export default function ChiTietPhongTroPage() {
                             type="button"
                             onClick={() => setActiveImageUrl(resolved)}
                             className={`relative w-20 h-16 rounded-xl overflow-hidden border-2 shrink-0 cursor-pointer transition ${
-                              isSelected ? 'border-[#00FFCC] scale-105' : 'border-slate-200 opacity-75'
+                              isSelected
+                                ? "border-[#00FFCC] scale-105"
+                                : "border-slate-200 opacity-75"
                             }`}
                           >
                             <img
@@ -127,7 +131,7 @@ export default function ChiTietPhongTroPage() {
                     </span>
                     <p className="text-xs text-slate-600">{room.DiaChi}</p>
                     <p className="text-2xl font-extrabold text-teal-700 pt-1">
-                      {Number(room.Gia).toLocaleString('vi-VN')} đ / tháng
+                      {Number(room.Gia).toLocaleString("vi-VN")} đ / tháng
                     </p>
                   </div>
 
@@ -141,11 +145,13 @@ export default function ChiTietPhongTroPage() {
                     <div className="p-3.5 rounded-xl border border-slate-200">
                       <span className="text-slate-500 block">Trạng thái</span>
                       <strong className="text-sm text-slate-900">
-                        {room.TrangThai === 'Trong'
-                          ? 'Đang trống'
-                          : room.TrangThai === 'DangThue'
-                          ? 'Đang thuê'
-                          : 'Đang bảo trì'}
+                        {room.TrangThai === "Trong"
+                          ? "Đang trống"
+                          : room.TrangThai === "DaDatCoc"
+                            ? "Đang được cọc"
+                            : room.TrangThai === "DangThue"
+                              ? "Đang thuê"
+                              : "Đang bảo trì"}
                       </strong>
                     </div>
                   </div>
@@ -162,12 +168,18 @@ export default function ChiTietPhongTroPage() {
                             className="p-3 rounded-xl bg-[#00FFCC]/15 border border-teal-200 flex items-start justify-between gap-2"
                           >
                             <div>
-                              <p className="text-xs font-bold text-slate-900">{ti.TenTI}</p>
+                              <p className="text-xs font-bold text-slate-900">
+                                {ti.TenTI}
+                              </p>
                               {ti.MoTa && (
-                                <p className="text-[11px] text-slate-600 mt-0.5">{ti.MoTa}</p>
+                                <p className="text-[11px] text-slate-600 mt-0.5">
+                                  {ti.MoTa}
+                                </p>
                               )}
                             </div>
-                            <span className="text-teal-700 font-bold text-xs">✓</span>
+                            <span className="text-teal-700 font-bold text-xs">
+                              ✓
+                            </span>
                           </div>
                         ))
                       ) : (

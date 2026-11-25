@@ -1,73 +1,21 @@
-// src/services/home.service.ts
+// client/src/services/home.service.ts
+
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+).replace(/\/+$/, "");
 
 export interface TienIchItem {
   MaTI: number;
   TenTI: string;
-  MoTa?: string;
+  MoTa?: string | null;
 }
 
 export interface PhiDichVuItem {
   MaDV: number;
   TenDV: string;
   DonGia: number;
-  DonViTinh?: string;
-  MoTa?: string;
-}
-
-export interface AnhPhongHomeItem {
-  MaAnh?: number;
-  MaPhong?: number;
-  DuongDan: string;
-  AnhChinh?: number;
-}
-
-export type TrangThaiPhongType =
-  | "Trong"
-  | "ConTrong"
-  | "Trống"
-  | "Còn trống"
-  | "DangThue"
-  | "BaoTri"
-  | string;
-
-export interface TinDangHome {
-  MaTin: number;
-  TieuDe: string;
-  MoTa: string | null;
-  NgayDang: string;
-  NgayHetHan: string | null;
-  TrangThaiTin: "DangHienThi" | "DaAn" | "HetHan" | string;
-  TrangThai?: "DangHienThi" | "DaAn" | "HetHan" | string;
-  MaPhong: number;
-  TenPhong: string;
-  DienTich: number;
-  Gia: number;
-  TrangThaiPhong: TrangThaiPhongType;
-  MaKhu: number;
-  TenKhu: string;
-  DiaChi: string;
-  TenChuTro: string;
-  SDTChuTro: string;
-  TenQuanLy?: string;
-  SDTQuanLy?: string | null;
-  AnhDaiDien?: string | null;
-  DanhSachAnh: string[];
-  AnhPhongList?: AnhPhongHomeItem[];
-  DanhSachTienIch: TienIchItem[];
-}
-
-export interface KhuTroSummary {
-  MaKhu: number;
-  MaND?: number;
-  TenKhu: string;
-  DiaChi: string;
-  MoTa: string | null;
-  TenQuanLy?: string;
-  SDTQuanLy?: string | null;
-  TenChuTro?: string;
-  SDTChuTro?: string | null;
-  TongSoPhong: number;
-  SoPhongTrong: number;
+  DonViTinh: string;
+  MoTa?: string | null;
 }
 
 export interface GiaDienNuocHome {
@@ -77,11 +25,62 @@ export interface GiaDienNuocHome {
   NgayApDung: string;
 }
 
-export interface HomeDataPayload {
+export interface KhuTroHome {
+  MaKhu: number;
+  MaND: number;
+  TenKhu: string;
+  DiaChi: string;
+  MoTa?: string | null;
+  TenQuanLy?: string;
+  SDTQuanLy?: string | null;
+  TenChuTro?: string;
+  SDTChuTro?: string | null;
+  TongSoPhong?: number;
+  SoPhongTrong?: number;
+}
+
+export interface RoomImageItem {
+  MaAnh: number;
+  MaPhong?: number;
+  DuongDan: string;
+  AnhChinh: number;
+}
+
+export interface TinDangHome {
+  MaTin: number;
+  MaPhong: number;
+  MaKhu: number;
+  MaND?: number;
+  TieuDe: string;
+  MoTa?: string | null;
+  NgayDang?: string | null;
+  NgayHetHan?: string | null;
+  TrangThai?: string;
+  TrangThaiPhong: string;
+  NhanTrangThai?: string;
+  MauTrangThai?: "green" | "orange" | "red" | "slate" | string;
+  CoTheDatCoc?: boolean;
+  TenPhong: string;
+  TenKhu: string;
+  DiaChi?: string;
+  Gia: number;
+  DienTich: number;
+  AnhDaiDien?: string | null;
+  DanhSachAnh: (string | RoomImageItem)[];
+  AnhPhongList?: RoomImageItem[];
+  TienIch?: TienIchItem[];
+  DanhSachTienIch: TienIchItem[];
+  TenQuanLy?: string;
+  SDTQuanLy?: string | null;
+  TenChuTro?: string;
+  SDTChuTro?: string;
+}
+
+export interface HomeDataResponse {
   tinDang: TinDangHome[];
   tienIch: TienIchItem[];
   phiDichVu: PhiDichVuItem[];
-  khuTro: KhuTroSummary[];
+  khuTro: KhuTroHome[];
   giaDienNuoc: GiaDienNuocHome;
 }
 
@@ -91,395 +90,225 @@ export interface HomeTinDangFilterParams {
   dienTich?: string;
 }
 
-interface OwnerInfo {
-  TenChuTro: string;
-  SDTChuTro: string;
-}
-
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
-).replace(/\/+$/, "");
-const SERVER_ORIGIN = API_URL.replace(/\/api\/?$/, "");
-
 const DEFAULT_GIA_DIEN_NUOC: GiaDienNuocHome = {
   MaGia: 1,
-  GiaDien: 3500,
-  GiaNuoc: 15000,
-  NgayApDung: new Date().toISOString().split("T")[0],
+  GiaDien: 3800,
+  GiaNuoc: 18000,
+  NgayApDung: "2026-08-01",
 };
 
-// Thông tin Chủ trọ mặc định (MaND = 1, Quyen = 'ChuTro') dùng khi API trả nhầm Quản lý vào trường Chủ trọ
-const DEFAULT_CHU_TRO: OwnerInfo = {
-  TenChuTro: "Nguyễn Thị Quỳnh Dư",
-  SDTChuTro: "0903112233",
-};
+// Xác định trạng thái phòng chuẩn hóa từ dữ liệu API
+export function getRoomStatusInfo(item: Partial<TinDangHome> | any) {
+  const raw = String(
+    item?.TrangThaiPhong ??
+      item?.PhongTrangThai ??
+      (item?.TrangThai !== "DangHienThi" ? item?.TrangThai : "Trong") ??
+      "Trong"
+  )
+    .trim()
+    .toLowerCase();
 
-const TRANG_THAI_PHONG_TRONG = ["Trong", "ConTrong", "Trống", "Còn trống"];
-
-function cleanPhone(raw?: any): string {
-  if (!raw) return "";
-  return String(raw).replace(/[^0-9]/g, "");
-}
-
-// Kiểm tra phòng đang Còn trống và tin đăng Đang hiển thị
-export function isAvailablePublicTinDang(item: Partial<TinDangHome>): boolean {
-  const trangThaiPhong = String(item.TrangThaiPhong || "").trim();
-  const trangThaiTin = String(
-    item.TrangThai || item.TrangThaiTin || ""
-  ).trim();
-
-  return (
-    TRANG_THAI_PHONG_TRONG.includes(trangThaiPhong) &&
-    trangThaiTin === "DangHienThi"
-  );
-}
-
-// Hàm chuẩn hóa đường dẫn ảnh từ DB (hỗ trợ cả URL Cloudinary lẫn đường dẫn uploads/...)
-export function resolveHomeRoomImageUrl(rawInput?: any): string | null {
-  if (!rawInput) return null;
-
-  const rawPath =
-    typeof rawInput === "string"
-      ? rawInput.trim()
-      : typeof rawInput === "object" && rawInput.DuongDan
-        ? String(rawInput.DuongDan).trim()
-        : "";
-
-  if (!rawPath) return null;
-
-  if (/^https?:\/\//i.test(rawPath)) {
-    return rawPath;
+  if (["dangthue", "đang thuê", "dachothue", "đã cho thuê"].includes(raw)) {
+    return {
+      TrangThaiPhong: "DangThue",
+      NhanTrangThai: "Đã cho thuê",
+      MauTrangThai: "red" as const,
+      CoTheDatCoc: false,
+    };
   }
 
-  const normalizedPath = rawPath.replace(/\\/g, "/").replace(/^\/+/, "");
-  return `${SERVER_ORIGIN}/${normalizedPath}`;
-}
-
-// Trích xuất thông tin Chủ trọ thực sự (Quyen = 'ChuTro'), tránh lấy nhầm Quản lý cơ sở
-function resolveTrueOwnerInfo(
-  rawHomeData?: any,
-  khuList: any[] = [],
-  tinList: any[] = []
-): OwnerInfo {
-  // 1. Nếu API home-data có trả riêng object chuTro
-  const rawChuTro = rawHomeData?.chuTro || rawHomeData?.owner;
-  if (rawChuTro && typeof rawChuTro === "object") {
-    const ten = String(
-      rawChuTro.TenChuTro || rawChuTro.HoTen || rawChuTro.TenTK || ""
-    ).trim();
-    const sdt = cleanPhone(
-      rawChuTro.SDTChuTro || rawChuTro.SDT || rawChuTro.SoDienThoai
-    );
-    if (ten && sdt) {
-      return { TenChuTro: ten, SDTChuTro: sdt };
-    }
-  }
-
-  // Tập hợp tên & SĐT của các Quản lý cơ sở để loại trừ
-  const managerNames = new Set<string>();
-  const managerPhones = new Set<string>();
-
-  for (const k of khuList) {
-    const mName = String(k?.TenQuanLy || "").trim().toLowerCase();
-    const mPhone = cleanPhone(k?.SDTQuanLy);
-    if (mName) managerNames.add(mName);
-    if (mPhone) managerPhones.add(mPhone);
-  }
-
-  for (const t of tinList) {
-    const mName = String(t?.TenQuanLy || "").trim().toLowerCase();
-    const mPhone = cleanPhone(t?.SDTQuanLy);
-    if (mName) managerNames.add(mName);
-    if (mPhone) managerPhones.add(mPhone);
-  }
-
-  // 2. Tìm trong khuList hoặc tinList bản ghi có TenChuTro/SDTChuTro KHÔNG trùng với Quản lý
-  for (const source of [...khuList, ...tinList]) {
-    const candidateName = String(source?.TenChuTro || "").trim();
-    const candidatePhone = cleanPhone(source?.SDTChuTro);
-
-    const isManagerName =
-      candidateName && managerNames.has(candidateName.toLowerCase());
-    const isManagerPhone =
-      candidatePhone && managerPhones.has(candidatePhone);
-
-    if (
-      candidateName &&
-      candidatePhone &&
-      !isManagerName &&
-      !isManagerPhone
-    ) {
+  if (
+    ["dadatcoc", "đã đặt cọc", "danggiucho", "đang giữ chỗ"].includes(raw) ||
+    item?.CoTheDatCoc === false
+  ) {
+    if (["baotri", "bảo trì", "đang bảo trì"].includes(raw)) {
       return {
-        TenChuTro: candidateName,
-        SDTChuTro: candidatePhone,
+        TrangThaiPhong: "BaoTri",
+        NhanTrangThai: "Đang bảo trì",
+        MauTrangThai: "slate" as const,
+        CoTheDatCoc: false,
       };
     }
+    return {
+      TrangThaiPhong: "DaDatCoc",
+      NhanTrangThai: "Đang được cọc",
+      MauTrangThai: "orange" as const,
+      CoTheDatCoc: false,
+    };
   }
 
-  return DEFAULT_CHU_TRO;
-}
-
-function normalizeTinDangItem(
-  item: any,
-  ownerInfo: OwnerInfo = DEFAULT_CHU_TRO,
-  khuMap?: Map<number, KhuTroSummary>
-): TinDangHome {
-  // 1. Chuẩn hóa danh sách AnhPhongList (nếu BE trả về từ bảng AnhPhong)
-  const rawAnhPhongList: any[] = Array.isArray(item?.AnhPhongList)
-    ? item.AnhPhongList
-    : [];
-
-  const normalizedAnhPhongList: AnhPhongHomeItem[] = rawAnhPhongList
-    .map((img): AnhPhongHomeItem | null => {
-      const fullUrl = resolveHomeRoomImageUrl(img);
-      if (!fullUrl) return null;
-      return {
-        MaAnh: img?.MaAnh ? Number(img.MaAnh) : undefined,
-        MaPhong: img?.MaPhong ? Number(img.MaPhong) : Number(item?.MaPhong),
-        DuongDan: fullUrl,
-        AnhChinh: Number(img?.AnhChinh) === 1 ? 1 : 0,
-      };
-    })
-    .filter((img): img is AnhPhongHomeItem => img !== null);
-
-  // 2. Chuẩn hóa danh sách DanhSachAnh
-  const rawDanhSachAnh: any[] = Array.isArray(item?.DanhSachAnh)
-    ? item.DanhSachAnh
-    : [];
-
-  const urlsFromDanhSachAnh = rawDanhSachAnh
-    .map((img) => resolveHomeRoomImageUrl(img))
-    .filter((url): url is string => Boolean(url));
-
-  const urlsFromAnhPhongList = normalizedAnhPhongList.map((img) => img.DuongDan);
-
-  const mainImage =
-    resolveHomeRoomImageUrl(item?.AnhDaiDien) ||
-    urlsFromAnhPhongList[0] ||
-    urlsFromDanhSachAnh[0] ||
-    null;
-
-  // 3. Gộp tất cả ảnh và loại bỏ trùng lặp sau khi đã chuẩn hóa thành full URL
-  const allUniqueImages = Array.from(
-    new Set([
-      ...urlsFromAnhPhongList,
-      ...urlsFromDanhSachAnh,
-      ...(mainImage ? [mainImage] : []),
-    ])
-  );
-
-  const maKhu = Number(item?.MaKhu || 0);
-  const matchedKhu = khuMap?.get(maKhu);
-
-  // 4. Tách bạch thông tin Quản lý cơ sở và Chủ trọ
-  const rawTenQuanLy = String(
-    item?.TenQuanLy || matchedKhu?.TenQuanLy || ""
-  ).trim();
-  const rawSDTQuanLy = cleanPhone(
-    item?.SDTQuanLy || matchedKhu?.SDTQuanLy
-  );
-
-  const rawTenChuTro = String(item?.TenChuTro || "").trim();
-  const rawSDTChuTro = cleanPhone(item?.SDTChuTro);
-
-  // Kiểm tra xem trường TenChuTro/SDTChuTro từ BE có đang bị lấy nhầm thành Quản lý không
-  const isOwnerFieldActuallyManager =
-    (rawTenQuanLy &&
-      rawTenChuTro.toLowerCase() === rawTenQuanLy.toLowerCase()) ||
-    (rawSDTQuanLy && rawSDTChuTro === rawSDTQuanLy) ||
-    item?.Quyen === "QuanLy" ||
-    item?.QuyenNguoiDang === "QuanLy";
-
-  // Nếu BE chưa trả TenQuanLy mà lại đổ tên Quản lý vào TenChuTro thì giữ lại cho TenQuanLy
-  const finalTenQuanLy =
-    rawTenQuanLy ||
-    (rawTenChuTro && rawTenChuTro !== ownerInfo.TenChuTro
-      ? rawTenChuTro
-      : undefined);
-
-  const finalSDTQuanLy =
-    rawSDTQuanLy ||
-    (rawSDTChuTro && rawSDTChuTro !== ownerInfo.SDTChuTro
-      ? rawSDTChuTro
-      : null);
-
-  const finalTenChuTro =
-    !isOwnerFieldActuallyManager &&
-    rawTenChuTro &&
-    rawTenChuTro.toLowerCase() !== (finalTenQuanLy || "").toLowerCase()
-      ? rawTenChuTro
-      : ownerInfo.TenChuTro;
-
-  const finalSDTChuTro =
-    !isOwnerFieldActuallyManager &&
-    rawSDTChuTro &&
-    rawSDTChuTro !== (finalSDTQuanLy || "")
-      ? rawSDTChuTro
-      : ownerInfo.SDTChuTro;
-
-  const trangThaiTin = String(
-    item?.TrangThai || item?.TrangThaiTin || "DangHienThi"
-  ).trim();
-  const trangThaiPhong = String(item?.TrangThaiPhong || "Trong").trim();
+  if (["baotri", "bảo trì", "đang bảo trì"].includes(raw)) {
+    return {
+      TrangThaiPhong: "BaoTri",
+      NhanTrangThai: "Đang bảo trì",
+      MauTrangThai: "slate" as const,
+      CoTheDatCoc: false,
+    };
+  }
 
   return {
-    ...item,
-    MaTin: Number(item.MaTin),
-    MaPhong: Number(item.MaPhong),
-    MaKhu: maKhu,
-    DienTich: Number(item.DienTich || 0),
-    Gia: Number(item.Gia || 0),
-    TrangThaiTin: trangThaiTin,
-    TrangThai: trangThaiTin,
-    TrangThaiPhong: trangThaiPhong,
-    TenQuanLy: finalTenQuanLy,
-    SDTQuanLy: finalSDTQuanLy,
-    TenChuTro: finalTenChuTro,
-    SDTChuTro: finalSDTChuTro,
-    AnhDaiDien: mainImage,
-    DanhSachAnh: allUniqueImages,
-    AnhPhongList:
-      normalizedAnhPhongList.length > 0
-        ? normalizedAnhPhongList
-        : allUniqueImages.map((url, idx) => ({
-            MaPhong: Number(item.MaPhong),
-            DuongDan: url,
-            AnhChinh: idx === 0 ? 1 : 0,
-          })),
-    DanhSachTienIch: Array.isArray(item.DanhSachTienIch)
-      ? item.DanhSachTienIch
-      : Array.isArray(item.TienIch)
-        ? item.TienIch
-        : [],
+    TrangThaiPhong: "Trong",
+    NhanTrangThai: "Còn trống",
+    MauTrangThai: "green" as const,
+    CoTheDatCoc: true,
   };
 }
 
-// Trích xuất mảng tin đăng từ nhiều định dạng response khác nhau của BE
-function extractRawTinDangArray(json: any): any[] {
+// Giữ tên hàm cũ để tương thích các file đang import: cho phép hiển thị TẤT CẢ phòng hợp lệ trên Trang chủ
+export function isAvailablePublicTinDang(tin: any): boolean {
+  return Boolean(tin && (Number(tin.MaPhong) > 0 || Number(tin.MaTin) > 0));
+}
+
+// Kiểm tra phòng có thể bấm đặt cọc hay không (chỉ phòng Còn trống & chưa đặt cọc)
+export function isRoomBookable(tin: any): boolean {
+  return getRoomStatusInfo(tin).CoTheDatCoc;
+}
+
+function extractRawRoomArray(json: any): any[] {
   if (!json) return [];
-  if (Array.isArray(json.data)) return json.data;
+  if (Array.isArray(json.data?.phongList)) return json.data.phongList;
   if (Array.isArray(json.data?.tinDangList)) return json.data.tinDangList;
   if (Array.isArray(json.data?.tinDang)) return json.data.tinDang;
+  if (Array.isArray(json.data)) return json.data;
+  if (Array.isArray(json)) return json;
   return [];
 }
 
+function normalizeImageList(raw: any): RoomImageItem[] {
+  const source = Array.isArray(raw?.AnhPhongList)
+    ? raw.AnhPhongList
+    : Array.isArray(raw?.DanhSachAnh)
+      ? raw.DanhSachAnh
+      : [];
+
+  const result: RoomImageItem[] = [];
+  source.forEach((img: any, idx: number) => {
+    if (img && typeof img === "object" && typeof img.DuongDan === "string" && img.DuongDan.trim()) {
+      result.push({
+        MaAnh: Number(img.MaAnh) || idx + 1,
+        MaPhong: Number(img.MaPhong || raw?.MaPhong || 0) || undefined,
+        DuongDan: img.DuongDan.trim(),
+        AnhChinh: Number(img.AnhChinh) === 1 ? 1 : 0,
+      });
+    } else if (typeof img === "string" && img.trim()) {
+      result.push({
+        MaAnh: idx + 1,
+        MaPhong: Number(raw?.MaPhong || 0) || undefined,
+        DuongDan: img.trim(),
+        AnhChinh: idx === 0 ? 1 : 0,
+      });
+    }
+  });
+
+  if (result.length === 0 && typeof raw?.AnhDaiDien === "string" && raw.AnhDaiDien.trim()) {
+    result.push({
+      MaAnh: 1,
+      MaPhong: Number(raw?.MaPhong || 0) || undefined,
+      DuongDan: raw.AnhDaiDien.trim(),
+      AnhChinh: 1,
+    });
+  }
+
+  result.sort((a, b) => b.AnhChinh - a.AnhChinh);
+  return result;
+}
+
+export function normalizeTinDangItem(raw: any): TinDangHome {
+  const maPhong = Number(raw?.MaPhong || raw?.MaTin || 0);
+  const images = normalizeImageList(raw);
+  const tienIchList: TienIchItem[] = Array.isArray(raw?.TienIch)
+    ? raw.TienIch
+    : Array.isArray(raw?.DanhSachTienIch)
+      ? raw.DanhSachTienIch
+      : [];
+
+  const statusMeta = getRoomStatusInfo(raw);
+  const tenPhong = String(raw?.TenPhong || `P.${maPhong}`);
+  const tenKhu = String(raw?.TenKhu || "");
+
+  return {
+    MaTin: maPhong,
+    MaPhong: maPhong,
+    MaKhu: Number(raw?.MaKhu || 0),
+    MaND: Number(raw?.MaND || raw?.MaQuanLy || 0) || undefined,
+    TieuDe:
+      String(raw?.TieuDe || "").trim() ||
+      `Phòng ${tenPhong}${tenKhu ? ` - ${tenKhu}` : ""}`,
+    MoTa: raw?.MoTa || raw?.MoTaKhu || "",
+    NgayDang: raw?.NgayDang || null,
+    NgayHetHan: raw?.NgayHetHan || null,
+    TrangThai: "DangHienThi",
+    TrangThaiPhong: statusMeta.TrangThaiPhong,
+    NhanTrangThai: raw?.NhanTrangThai || statusMeta.NhanTrangThai,
+    MauTrangThai: raw?.MauTrangThai || statusMeta.MauTrangThai,
+    CoTheDatCoc:
+      typeof raw?.CoTheDatCoc === "boolean"
+        ? raw.CoTheDatCoc
+        : statusMeta.CoTheDatCoc,
+    TenPhong: tenPhong,
+    TenKhu: tenKhu,
+    DiaChi: raw?.DiaChi || "",
+    Gia: Number(raw?.Gia) || 0,
+    DienTich: Number(raw?.DienTich) || 0,
+    AnhDaiDien:
+      images.length > 0 ? images[0].DuongDan : raw?.AnhDaiDien || null,
+    DanhSachAnh: images,
+    AnhPhongList: images,
+    TienIch: tienIchList,
+    DanhSachTienIch: tienIchList,
+    TenQuanLy: raw?.TenQuanLy || raw?.TenNguoiLienHe || "Ban quản lý",
+    SDTQuanLy: raw?.SDTQuanLy || raw?.SDTLienHe || null,
+    TenChuTro: raw?.TenChuTro || raw?.TenQuanLy || "Ban quản lý",
+    SDTChuTro: raw?.SDTChuTro || raw?.SDTQuanLy || "",
+  };
+}
+
 export class HomeService {
-  // 1. Lấy toàn bộ dữ liệu khởi tạo trang Home (Kết hợp /phong-tro/public/home-data và /tin-dang/public để có đủ ảnh)
-  static async getHomeData(): Promise<HomeDataPayload> {
+  // 1. Lấy toàn bộ dữ liệu trang chủ (bao gồm TẤT CẢ phòng ở các cơ sở)
+  static async getHomeData(): Promise<HomeDataResponse> {
     try {
-      const [homeRes, publicTinRes] = await Promise.allSettled([
+      const [homeRes, publicRoomsRes] = await Promise.all([
         fetch(`${API_URL}/phong-tro/public/home-data`, {
           method: "GET",
           cache: "no-store",
-        }),
-        fetch(`${API_URL}/tin-dang/public`, {
+        }).catch(() => null),
+        fetch(`${API_URL}/phong-tro/public/phong`, {
           method: "GET",
           cache: "no-store",
-        }),
+        }).catch(() => null),
       ]);
 
-      let homeJson: any = null;
-      if (homeRes.status === "fulfilled" && homeRes.value.ok) {
-        homeJson = await homeRes.value.json().catch(() => null);
-      }
-
-      let publicTinJson: any = null;
-      if (publicTinRes.status === "fulfilled" && publicTinRes.value.ok) {
-        publicTinJson = await publicTinRes.value.json().catch(() => null);
-      }
-
+      const homeJson = homeRes && homeRes.ok ? await homeRes.json().catch(() => null) : null;
       const rawHomeData = homeJson?.data || {};
-      const rawKhuList: any[] = Array.isArray(rawHomeData.khuTro)
-        ? rawHomeData.khuTro
-        : [];
-      const rawHomeTinList: any[] = Array.isArray(rawHomeData.tinDang)
-        ? rawHomeData.tinDang
-        : [];
-      const rawPublicTinList: any[] = extractRawTinDangArray(publicTinJson);
 
-      // Xác định đúng thông tin Chủ trọ (MaND = 1, Quyen = 'ChuTro')
-      const ownerInfo = resolveTrueOwnerInfo(
-        rawHomeData,
-        rawKhuList,
-        [...rawHomeTinList, ...rawPublicTinList]
+      const homeRoomList = extractRawRoomArray({
+        data: rawHomeData.phongList || rawHomeData.tinDang || [],
+      }).map(normalizeTinDangItem);
+
+      const publicJson =
+        publicRoomsRes && publicRoomsRes.ok
+          ? await publicRoomsRes.json().catch(() => null)
+          : null;
+      const publicRoomList = extractRawRoomArray(publicJson).map(
+        normalizeTinDangItem
       );
 
-      // Chuẩn hóa danh sách KhuTrọ kèm thông tin Quản lý & Chủ trọ
-      const normalizedKhuTro: KhuTroSummary[] = rawKhuList.map((k: any) => ({
-        ...k,
-        MaKhu: Number(k.MaKhu),
-        MaND: k.MaND ? Number(k.MaND) : undefined,
-        TenKhu: String(k.TenKhu || "").trim(),
-        DiaChi: String(k.DiaChi || "").trim(),
-        MoTa: k.MoTa ?? null,
-        TenQuanLy: k.TenQuanLy || k.HoTen || undefined,
-        SDTQuanLy: cleanPhone(k.SDTQuanLy || k.SDT || k.SoDienThoai) || null,
-        TenChuTro: ownerInfo.TenChuTro,
-        SDTChuTro: ownerInfo.SDTChuTro,
-        TongSoPhong: Number(k.TongSoPhong || 0),
-        SoPhongTrong: Number(k.SoPhongTrong || 0),
-      }));
-
-      const khuMap = new Map<number, KhuTroSummary>(
-        normalizedKhuTro.map((k) => [k.MaKhu, k])
-      );
-
-      const homeTinList = rawHomeTinList.map((item) =>
-        normalizeTinDangItem(item, ownerInfo, khuMap)
-      );
-      const publicTinList = rawPublicTinList.map((item) =>
-        normalizeTinDangItem(item, ownerInfo, khuMap)
-      );
-
-      // Gộp dữ liệu ảnh đầy đủ từ /tin-dang/public với thông tin tiện ích từ /home-data
-      let mergedTinDang: TinDangHome[] = [];
-
-      if (publicTinList.length > 0 && homeTinList.length > 0) {
-        const homeTinMap = new Map<number, TinDangHome>(
-          homeTinList.map((t: TinDangHome) => [t.MaTin, t])
-        );
-        mergedTinDang = publicTinList.map((pubTin) => {
-          const matchedHomeTin = homeTinMap.get(pubTin.MaTin);
-          if (!matchedHomeTin) return pubTin;
-
-          const combinedImages = Array.from(
-            new Set([...pubTin.DanhSachAnh, ...matchedHomeTin.DanhSachAnh])
-          );
-
-          return {
-            ...matchedHomeTin,
-            ...pubTin,
-            TenQuanLy: pubTin.TenQuanLy || matchedHomeTin.TenQuanLy,
-            SDTQuanLy: pubTin.SDTQuanLy || matchedHomeTin.SDTQuanLy,
-            TenChuTro: ownerInfo.TenChuTro,
-            SDTChuTro: ownerInfo.SDTChuTro,
-            AnhDaiDien: pubTin.AnhDaiDien || matchedHomeTin.AnhDaiDien,
-            DanhSachAnh: combinedImages,
-            AnhPhongList:
-              pubTin.AnhPhongList && pubTin.AnhPhongList.length > 0
-                ? pubTin.AnhPhongList
-                : matchedHomeTin.AnhPhongList,
-            DanhSachTienIch:
-              pubTin.DanhSachTienIch.length > 0
-                ? pubTin.DanhSachTienIch
-                : matchedHomeTin.DanhSachTienIch,
-          };
-        });
-      } else if (publicTinList.length > 0) {
-        mergedTinDang = publicTinList;
-      } else if (homeTinList.length > 0) {
-        mergedTinDang = homeTinList;
+      let finalRooms: TinDangHome[] = [];
+      if (homeRoomList.length > 0) {
+        finalRooms = homeRoomList;
+      } else if (publicRoomList.length > 0) {
+        finalRooms = publicRoomList;
       } else {
-        mergedTinDang = await HomeService.getPublicTinDang().catch(() => []);
+        finalRooms = await HomeService.getPublicTinDang().catch(() => []);
       }
 
       return {
-        tinDang: mergedTinDang.filter(isAvailablePublicTinDang),
+        tinDang: finalRooms.filter(isAvailablePublicTinDang),
         tienIch: Array.isArray(rawHomeData.tienIch) ? rawHomeData.tienIch : [],
         phiDichVu: Array.isArray(rawHomeData.phiDichVu)
           ? rawHomeData.phiDichVu
           : [],
-        khuTro: normalizedKhuTro,
+        khuTro: Array.isArray(rawHomeData.khuTro) ? rawHomeData.khuTro : [],
         giaDienNuoc: rawHomeData.giaDienNuoc || DEFAULT_GIA_DIEN_NUOC,
       };
     } catch (error) {
@@ -494,7 +323,7 @@ export class HomeService {
     }
   }
 
-  // 2. API lấy danh sách tin đăng công khai (Hỗ trợ cả /tin-dang/public và /phong-tro/public/tin-dang)
+  // 2. Lấy danh sách toàn bộ phòng công khai (hỗ trợ lọc khu / giá / diện tích)
   static async getPublicTinDang(
     params?: HomeTinDangFilterParams
   ): Promise<TinDangHome[]> {
@@ -514,94 +343,58 @@ export class HomeService {
       const queryString = query.toString();
       const suffix = queryString ? `?${queryString}` : "";
 
-      const primaryRes = await fetch(`${API_URL}/tin-dang/public${suffix}`, {
-        method: "GET",
-        cache: "no-store",
-      }).catch(() => null);
-
-      if (primaryRes && primaryRes.ok) {
-        const primaryJson = await primaryRes.json().catch(() => null);
-        const rawList = extractRawTinDangArray(primaryJson);
-        if (rawList.length > 0 || primaryJson?.success) {
-          const ownerInfo = resolveTrueOwnerInfo(primaryJson?.data, [], rawList);
-          return rawList
-            .map((item) => normalizeTinDangItem(item, ownerInfo))
-            .filter(isAvailablePublicTinDang);
-        }
-      }
-
-      const fallbackRes = await fetch(
-        `${API_URL}/phong-tro/public/tin-dang${suffix}`,
+      const primaryRes = await fetch(
+        `${API_URL}/phong-tro/public/phong${suffix}`,
         {
           method: "GET",
           cache: "no-store",
         }
-      );
+      ).catch(() => null);
 
-      const fallbackJson = await fallbackRes.json().catch(() => null);
-      if (!fallbackRes.ok || !fallbackJson || fallbackJson.success === false) {
-        return [];
+      if (primaryRes && primaryRes.ok) {
+        const primaryJson = await primaryRes.json().catch(() => null);
+        const rawList = extractRawRoomArray(primaryJson);
+        if (rawList.length > 0 || primaryJson?.success) {
+          return rawList
+            .map(normalizeTinDangItem)
+            .filter(isAvailablePublicTinDang);
+        }
       }
 
-      const fallbackRawList = extractRawTinDangArray(fallbackJson);
-      const ownerInfo = resolveTrueOwnerInfo(
-        fallbackJson?.data,
-        [],
-        fallbackRawList
-      );
-
-      return fallbackRawList
-        .map((item) => normalizeTinDangItem(item, ownerInfo))
-        .filter(isAvailablePublicTinDang);
-    } catch (error) {
-      console.error("Lỗi khi tải danh sách tin đăng trang chủ:", error);
-      return [];
-    }
-  }
-
-  // 3. Lấy chi tiết 1 phòng & toàn bộ ảnh theo MaTin (Hỗ trợ fallback từ getHomeData)
-  static async getPublicTinDangDetail(
-    maTin: number
-  ): Promise<TinDangHome | null> {
-    try {
-      const homeData = await HomeService.getHomeData();
-      const khuMap = new Map<number, KhuTroSummary>(
-        homeData.khuTro.map((k) => [k.MaKhu, k])
-      );
-      const ownerInfo: OwnerInfo = {
-        TenChuTro:
-          homeData.khuTro[0]?.TenChuTro || DEFAULT_CHU_TRO.TenChuTro,
-        SDTChuTro:
-          homeData.khuTro[0]?.SDTChuTro || DEFAULT_CHU_TRO.SDTChuTro,
-      };
-
-      const res = await fetch(`${API_URL}/tin-dang/public/${maTin}`, {
+      // Fallback sang /tin-dang/public nếu có
+      const fallbackRes = await fetch(`${API_URL}/tin-dang/public${suffix}`, {
         method: "GET",
         cache: "no-store",
       }).catch(() => null);
 
-      if (res && res.ok) {
-        const json = await res.json().catch(() => null);
-        const rawTin = json?.data?.tinDang || json?.data;
-        if (rawTin && typeof rawTin === "object" && !Array.isArray(rawTin)) {
-          const normalized = normalizeTinDangItem(rawTin, ownerInfo, khuMap);
-          if (isAvailablePublicTinDang(normalized)) {
-            return normalized;
-          }
-        }
-      }
+      if (!fallbackRes || !fallbackRes.ok) return [];
+      const fallbackJson = await fallbackRes.json().catch(() => null);
+      if (!fallbackJson || fallbackJson.success === false) return [];
 
-      // Fallback: Tìm trong danh sách tổng hợp của HomeData nếu endpoint lẻ không trả về
-      const matched = homeData.tinDang.find(
-        (item) => Number(item.MaTin) === Number(maTin)
-      );
-      return matched || null;
+      return extractRawRoomArray(fallbackJson)
+        .map(normalizeTinDangItem)
+        .filter(isAvailablePublicTinDang);
     } catch (error) {
-      console.error("Lỗi khi tải chi tiết tin đăng:", error);
+      console.error("Lỗi khi tải danh sách phòng trang chủ:", error);
+      return [];
+    }
+  }
+
+  // 3. Lấy chi tiết 1 phòng công khai theo MaPhong
+  static async getPublicRoomDetail(
+    maPhong: number
+  ): Promise<TinDangHome | null> {
+    try {
+      const res = await fetch(`${API_URL}/phong-tro/public/phong/${maPhong}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success || !json?.data) return null;
+      return normalizeTinDangItem(json.data);
+    } catch (error) {
+      console.error("Lỗi khi tải chi tiết phòng:", error);
       return null;
     }
   }
 }
-
-export const getPublicHomeTinDang = (params?: HomeTinDangFilterParams) =>
-  HomeService.getPublicTinDang(params);

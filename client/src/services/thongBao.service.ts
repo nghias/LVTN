@@ -7,7 +7,10 @@ import {
   ThongBaoReplyItem,
 } from "../types/thongBao.type";
 
-const RAW_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const RAW_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api")
+  .replace(/\/auth\/?$/, "")
+  .replace(/\/+$/, "");
+
 const API_BASE = RAW_BASE.endsWith("/api")
   ? `${RAW_BASE}/thong-bao`
   : `${RAW_BASE}/api/thong-bao`;
@@ -26,6 +29,7 @@ export const thongBaoService = {
     const res = await fetch(`${API_BASE}/metadata`, {
       headers: getAuthHeaders(),
       credentials: "include",
+      cache: "no-store",
     });
     const json = await res.json();
     if (!res.ok || !json.success)
@@ -46,6 +50,7 @@ export const thongBaoService = {
     const res = await fetch(`${API_BASE}?${query.toString()}`, {
       headers: getAuthHeaders(),
       credentials: "include",
+      cache: "no-store",
     });
     const json = await res.json();
     if (!res.ok || !json.success)
@@ -53,7 +58,6 @@ export const thongBaoService = {
     return json.data;
   },
 
-// Lấy danh sách thông báo cho NotificationBell & Trang Người thuê
   async getThongBaoCuaToi(
     params:
       | number
@@ -91,6 +95,7 @@ export const thongBaoService = {
     const res = await fetch(`${API_BASE}/cua-toi?${query.toString()}`, {
       headers: getAuthHeaders(),
       credentials: "include",
+      cache: "no-store",
     });
     const json = await res.json();
     if (!res.ok || !json.success)
@@ -98,7 +103,6 @@ export const thongBaoService = {
     return json.data;
   },
 
-  // Khách thuê gửi phản ánh / báo cáo sự cố
   async guiPhanAnh(payload: {
     maLTB: number;
     tieuDe: string;
@@ -116,11 +120,11 @@ export const thongBaoService = {
     return json;
   },
 
-  // Xem chi tiết thông báo + danh sách phản hồi
   async getChiTiet(maTB: number): Promise<ThongBaoChiTiet> {
     const res = await fetch(`${API_BASE}/${maTB}/chi-tiet`, {
       headers: getAuthHeaders(),
       credentials: "include",
+      cache: "no-store",
     });
     const json = await res.json();
     if (!res.ok || !json.success)
@@ -128,7 +132,6 @@ export const thongBaoService = {
     return json.data;
   },
 
-  // Gửi phản hồi / trả lời thông báo
   async traLoiThongBao(
     maTB: number,
     noiDung: string
@@ -145,7 +148,6 @@ export const thongBaoService = {
     return json.data;
   },
 
-  // Đánh dấu đã đọc 1 thông báo
   async danhDauDaDoc(maTB: number): Promise<void> {
     const res = await fetch(`${API_BASE}/${maTB}/da-doc`, {
       method: "PATCH",
@@ -157,7 +159,6 @@ export const thongBaoService = {
       throw new Error(json.message || "Lỗi đánh dấu đã đọc");
   },
 
-  // Đánh dấu đã đọc tất cả
   async danhDauDaDocTatCa(): Promise<void> {
     const res = await fetch(`${API_BASE}/da-doc-tat-ca`, {
       method: "PATCH",

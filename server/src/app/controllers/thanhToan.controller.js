@@ -4,6 +4,7 @@ const db = require('../../database/db');
 const HoaDonModel = require('../models/hoaDon.model');
 const ThanhToanModel = require('../models/thanhToan.model');
 const ThongTinThanhToanModel = require('../models/thongTinThanhToan.model');
+const DatPhongController = require('./datPhong.controller');
 
 // Hàm lấy bộ khóa PayOS đang hoạt động: Ưu tiên đọc từ DB (ThongTinThanhToan) -> Fallback về .env
 function resolvePayOSCredentials(thongTinNH) {
@@ -927,6 +928,14 @@ const ThanhToanController = {
       const { orderCode, reference } = body.data;
       if (!orderCode) {
         return res.status(200).json({ error: 0, success: true });
+      }
+      
+      const bookingCheck = await DatPhongController.xacNhanThanhToanCocTuDong(orderCode);
+      if (bookingCheck.found) {
+        return res.status(200).json({
+          success: true,
+          message: 'Đã xử lý Webhook PayOS cho đơn đặt cọc giữ phòng.',
+        });
       }
 
       const rawThongTinNH = await ThongTinThanhToanModel.getPrimary();

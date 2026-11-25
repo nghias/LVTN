@@ -17,6 +17,7 @@ export interface TinDangItem {
   MaND: number;
   TieuDe: string;
   MoTa: string | null;
+  DiaChi?: string;
   NgayDang: string;
   NgayHetHan: string | null;
   TrangThai: TrangThaiTin;

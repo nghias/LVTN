@@ -1,4 +1,4 @@
-export type RoomStatus = 'Trong' | 'DangThue' | 'BaoTri';
+export type RoomStatus = 'Trong' | 'DaDatCoc' | 'DangThue' | 'BaoTri';
 
 export interface KhuTroItem {
   MaKhu: number;
@@ -10,6 +10,7 @@ export interface KhuTroItem {
   SDTQuanLy?: string;
   TongSoPhong?: number;
   SoPhongTrong?: number;
+  SoPhongDaDatCoc?: number;
 }
 
 export interface TienIchItem {
@@ -32,6 +33,7 @@ export interface PhongItem {
   DienTich: number;
   Gia: number;
   TrangThai: RoomStatus;
+  CoTheDatCoc?: boolean;
   TenKhu: string;
   DiaChi: string;
   MaQuanLyKhu: number;

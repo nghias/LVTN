@@ -12,12 +12,13 @@ import {
 } from "@/services/home.service";
 
 import {
-  PUBLIC_TIN_DANG_URL,
   TinDangItem,
   KhuTroWithContact,
 } from "@/components/home/home.data";
 import HeroSection from "@/components/home/HeroSection";
-import TinDangSection from "@/components/home/TinDangSection";
+import TinDangSection, {
+  getRoomStatusDisplay,
+} from "@/components/home/TinDangSection";
 import KhuTroSection from "@/components/home/KhuTroSection";
 import BangGiaSection from "@/components/home/BangGiaSection";
 import ContactRoomModal from "@/components/home/ContactRoomModal";
@@ -43,7 +44,6 @@ export default function HomePageClient({
 }: HomePageClientProps) {
   const { showSuccess } = useAlertModal();
 
-  // Khởi tạo State ngay từ dữ liệu Server để HTML trả về có sẵn danh sách phòng cho Googlebot
   const [tinDangList, setTinDangList] =
     useState<TinDangItem[]>(initialTinDangList);
   const [tienIchList, setTienIchList] =
@@ -55,7 +55,6 @@ export default function HomePageClient({
   const [giaDienNuoc, setGiaDienNuoc] =
     useState<GiaDienNuocHome>(initialGiaDienNuoc);
 
-  // Nếu Server đã lấy được dữ liệu thì loading = false ngay từ đầu (rất quan trọng cho SEO)
   const [loading, setLoading] = useState<boolean>(!hasServerData);
 
   // State bộ lọc đa tiêu chí
@@ -67,42 +66,14 @@ export default function HomePageClient({
   const [contactRoom, setContactRoom] = useState<TinDangItem | null>(null);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
-  // Hàm tải dữ liệu dự phòng ở Client (chỉ kích hoạt nếu SSR bị lỗi kết nối nội bộ)
-  const fetchHomeAndTinDang = useCallback(async () => {
+  // Tải toàn bộ danh sách phòng (Còn trống, Đang được cọc, Đã cho thuê) và dữ liệu trang chủ
+  const fetchHomeRooms = useCallback(async () => {
     try {
       setLoading(true);
-
-      const [tinDangResponse, homeData] = await Promise.all([
-        fetch(PUBLIC_TIN_DANG_URL, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          cache: "no-store",
-        }).catch(() => null),
-        HomeService.getHomeData().catch(() => null),
-      ]);
-
-      let loadedFromPublicRoute = false;
-
-      if (tinDangResponse && tinDangResponse.ok) {
-        const result = await tinDangResponse.json().catch(() => null);
-        const rawList =
-          result?.data?.tinDangList ||
-          (Array.isArray(result?.data) ? result.data : null);
-
-        if (result?.success && Array.isArray(rawList)) {
-          const danhSachCongKhai = (rawList as TinDangItem[]).filter(
-            (tin) => !tin.TrangThai || tin.TrangThai === "DangHienThi",
-          );
-          setTinDangList(danhSachCongKhai);
-          loadedFromPublicRoute = true;
-        }
-      }
-
-      if (!loadedFromPublicRoute && homeData?.tinDang) {
-        setTinDangList(homeData.tinDang as unknown as TinDangItem[]);
-      }
+      const homeData = await HomeService.getHomeData();
 
       if (homeData) {
+        setTinDangList((homeData.tinDang as unknown as TinDangItem[]) || []);
         setTienIchList(homeData.tienIch || []);
         setPhiDichVuList(homeData.phiDichVu || []);
         setKhuTroList((homeData.khuTro as KhuTroWithContact[]) || []);
@@ -111,20 +82,26 @@ export default function HomePageClient({
         }
       }
     } catch (error) {
-      console.error("Lỗi khi tải dữ liệu trang chủ & tin đăng:", error);
+      console.error("Lỗi khi tải dữ liệu trang chủ & danh sách phòng:", error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // Chỉ fetch lại dưới Client nếu Server chưa nạp được dữ liệu
     if (!hasServerData) {
-      fetchHomeAndTinDang();
+      fetchHomeRooms();
     }
-  }, [hasServerData, fetchHomeAndTinDang]);
+  }, [hasServerData, fetchHomeRooms]);
 
-  // Lọc danh sách tin đăng theo đa tiêu chí
+  // Đếm chính xác số phòng đang Còn trống (chưa đặt cọc, chưa cho thuê) cho HeroSection
+  const soPhongConTrong = useMemo(() => {
+    return tinDangList.filter(
+      (tin) => getRoomStatusDisplay(tin).key === "Trong"
+    ).length;
+  }, [tinDangList]);
+
+  // Lọc danh sách phòng theo đa tiêu chí
   const filteredTinDangList = useMemo(() => {
     return tinDangList.filter((tin) => {
       if (selectedKhu !== "ALL" && String(tin.MaKhu) !== selectedKhu) {
@@ -173,7 +150,7 @@ export default function HomePageClient({
     showSuccess(
       `Đã sao chép số điện thoại ${phone} của ${tenQuanLy}!`,
       "Sao chép thành công",
-      2,
+      2
     );
   };
 
@@ -184,7 +161,7 @@ export default function HomePageClient({
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-12">
         <HeroSection
           soKhuTro={khuTroList.length}
-          soPhongMo={tinDangList.length}
+          soPhongMo={soPhongConTrong}
           giaDienNuoc={giaDienNuoc}
           onScrollToSection={scrollToSection}
           onOpenChat={() => setIsChatOpen(true)}
@@ -204,6 +181,7 @@ export default function HomePageClient({
           onChangeDienTich={setSelectedDienTich}
           onResetFilters={handleResetFilters}
           onSelectContactRoom={setContactRoom}
+
         />
 
         <KhuTroSection
@@ -236,7 +214,8 @@ export default function HomePageClient({
         khuTroList={khuTroList}
         giaDienNuoc={giaDienNuoc}
       />
-       <Appfooter />
+
+      <Appfooter />
     </div>
   );
 }

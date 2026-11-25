@@ -1,4 +1,4 @@
-// src/app/page.tsx
+// client/src/app/page.tsx
 import type { Metadata } from "next";
 import { cache } from "react";
 import {
@@ -8,32 +8,21 @@ import {
   GiaDienNuocHome,
 } from "@/services/home.service";
 import {
-  PUBLIC_TIN_DANG_URL,
   TinDangItem,
   KhuTroWithContact,
-  formatVND,
 } from "@/components/home/home.data";
 import HomePageClient from "@/components/home/HomePageClient";
+
+export const dynamic = "force-dynamic";
 
 export type { TrangThaiTin, TinDangItem } from "@/components/home/home.data";
 
 const DEFAULT_GIA_DIEN_NUOC: GiaDienNuocHome = {
   MaGia: 1,
-  GiaDien: 3500,
-  GiaNuoc: 15000,
-  NgayApDung: "2026-01-01",
+  GiaDien: 3800,
+  GiaNuoc: 18000,
+  NgayApDung: "2026-08-01",
 };
-
-function resolveServerFetchUrl(url: string): string {
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url;
-  }
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    "http://localhost:3000";
-  return `${baseUrl.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
-}
 
 const getServerHomeData = cache(async () => {
   let tinDangList: TinDangItem[] = [];
@@ -44,47 +33,18 @@ const getServerHomeData = cache(async () => {
   let hasServerData = false;
 
   try {
-    const targetTinDangUrl = resolveServerFetchUrl(PUBLIC_TIN_DANG_URL);
-
-    const [tinDangResponse, homeData] = await Promise.all([
-      fetch(targetTinDangUrl, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        next: { revalidate: 60 },
-      }).catch(() => null),
-      HomeService.getHomeData().catch(() => null),
-    ]);
-
-    let loadedFromPublicRoute = false;
-
-    if (tinDangResponse && tinDangResponse.ok) {
-      const result = await tinDangResponse.json().catch(() => null);
-      const rawList =
-        result?.data?.tinDangList ||
-        (Array.isArray(result?.data) ? result.data : null);
-
-      if (result?.success && Array.isArray(rawList)) {
-        tinDangList = (rawList as TinDangItem[]).filter(
-          (tin) => !tin.TrangThai || tin.TrangThai === "DangHienThi"
-        );
-        loadedFromPublicRoute = true;
-        hasServerData = true;
-      }
-    }
-
-    if (!loadedFromPublicRoute && homeData?.tinDang) {
-      tinDangList = homeData.tinDang as unknown as TinDangItem[];
-      hasServerData = true;
-    }
+    const homeData = await HomeService.getHomeData().catch(() => null);
 
     if (homeData) {
+      tinDangList = (homeData.tinDang as unknown as TinDangItem[]) || [];
       tienIchList = homeData.tienIch || [];
       phiDichVuList = homeData.phiDichVu || [];
       khuTroList = (homeData.khuTro as KhuTroWithContact[]) || [];
       if (homeData.giaDienNuoc) {
         giaDienNuoc = homeData.giaDienNuoc;
       }
-      hasServerData = true;
+      // Chỉ coi là đã có dữ liệu SSR đầy đủ khi tải được danh sách phòng
+      hasServerData = tinDangList.length > 0;
     }
   } catch (error) {
     console.error("SSR Fetch Error (sẽ fallback sang Client fetch):", error);
@@ -104,20 +64,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const { tinDangList, khuTroList, giaDienNuoc } = await getServerHomeData();
 
   const validRooms = tinDangList.filter(
-    (tin) =>
-      tin.TrangThaiPhong === "Trong" &&
-      (!tin.TrangThai || tin.TrangThai === "DangHienThi")
+    (tin) => String((tin as any).TrangThaiPhong || "").trim() === "Trong"
   );
 
   const soPhongTrong = validRooms.length;
   const soKhu = khuTroList.length;
 
-  const prices = validRooms
+  const prices = tinDangList
     .map((r) => Number(r.Gia))
     .filter((p) => !isNaN(p) && p > 0);
   const minPriceText =
     prices.length > 0
-      ? `chỉ từ ${formatVND(Math.min(...prices))}/tháng`
+      ? `chỉ từ ${Math.min(...prices).toLocaleString("vi-VN")}đ/tháng`
       : "giá tốt chính chủ";
 
   const tenCacKhu = khuTroList
@@ -128,15 +86,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const title =
     soPhongTrong > 0
       ? `Cho Thuê Phòng Trọ Chính Chủ (${soPhongTrong} Phòng Đang Trống) | Tra Cứu Trực Tuyến`
-      : "Hệ Thống Cho Thuê Phòng Trọ Thông Minh - Tra Cứu Phòng Trống Trực Tuyến";
+      : "Hệ Thống Cho Thuê Phòng Trọ Thông Minh - Tra Cứu Phòng Trực Tuyến";
 
   const description = `Hiện có ${soPhongTrong} phòng trọ đang trống tại ${
     soKhu || "các"
   } cơ sở (${
     tenCacKhu || "hệ thống nhà trọ thông minh"
-  }), giá thuê ${minPriceText}. Trang bị đồng hồ điện nước IoT (${formatVND(
+  }), giá thuê ${minPriceText}. Trang bị đồng hồ điện nước IoT (${Number(
     giaDienNuoc.GiaDien
-  )}/kWh), khóa vân tay, Wifi tốc độ cao, liên hệ trực tiếp Zalo quản lý.`;
+  ).toLocaleString("vi-VN")}đ/kWh), khóa thẻ từ, Wifi tốc độ cao.`;
 
   return {
     title,
@@ -186,7 +144,7 @@ export default async function HomePage() {
     "@type": "RealEstateAgent",
     name: "Hệ Thống Quản Lý & Cho Thuê Phòng Trọ Thông Minh",
     description:
-      "Hệ thống phòng trọ trang bị đồng hồ điện nước IoT, kiểm soát ra vào vân tay và tra cứu phòng trống trực tuyến.",
+      "Hệ thống phòng trọ trang bị đồng hồ điện nước IoT, kiểm soát ra vào thẻ từ và tra cứu phòng trực tuyến.",
     numberOfEmployees: khuTroList.length || 1,
     areaServed: khuTroList.map((khu) => ({
       "@type": "Place",
@@ -199,7 +157,6 @@ export default async function HomePage() {
     <>
       <script
         type="application/ld+json"
-        suppressHydrationWarning
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(organizationJsonLd),
         }}

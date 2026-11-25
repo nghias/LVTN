@@ -79,6 +79,15 @@ export default function QuanLyKhuTroVaPhongPage() {
   };
 
   const handleDeletePhong = (room: PhongItem) => {
+    if (room.TrangThai === 'DaDatCoc') {
+      showError(
+        `Phòng ${room.TenPhong} đang có khách đặt cọc giữ chỗ. Vui lòng xử lý hoàn cọc tại mục "Đặt cọc giữ phòng" trước khi xóa.`,
+        'Không thể xóa phòng',
+        4
+      );
+      return;
+    }
+
     showConfirm(
       `Bạn có chắc chắn muốn xóa phòng "${room.TenPhong}" (${room.TenKhu}) không?`,
       'Xác nhận xóa Phòng trọ',
@@ -103,6 +112,13 @@ export default function QuanLyKhuTroVaPhongPage() {
         </span>
       );
     }
+    if (trangThai === 'DaDatCoc') {
+      return (
+        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-300">
+          Đang được cọc
+        </span>
+      );
+    }
     if (trangThai === 'DangThue') {
       return (
         <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300">
@@ -111,7 +127,7 @@ export default function QuanLyKhuTroVaPhongPage() {
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300">
         Đang bảo trì
       </span>
     );
@@ -124,7 +140,7 @@ export default function QuanLyKhuTroVaPhongPage() {
           <QuanLyHeader user={user} />
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-            {/* 1. Tiêu đề trang & Cụm nút Thêm mới (Mở trang mới) */}
+            {/* 1. Tiêu đề trang & Cụm nút Thêm mới */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
@@ -160,7 +176,7 @@ export default function QuanLyKhuTroVaPhongPage() {
               </div>
             </div>
 
-            {/* 2. Thanh chọn Khu trọ (Tab ngang cuộn mượt trên điện thoại) */}
+            {/* 2. Thanh chọn Khu trọ */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 overflow-x-auto pb-2">
                 {khuTroList.length > 1 && (
@@ -236,8 +252,8 @@ export default function QuanLyKhuTroVaPhongPage() {
             </div>
 
             {/* 3. Bộ lọc & Tìm kiếm phòng */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="sm:col-span-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="lg:col-span-5">
                 <input
                   type="text"
                   value={keyword}
@@ -247,10 +263,11 @@ export default function QuanLyKhuTroVaPhongPage() {
                 />
               </div>
 
-              <div className="sm:col-span-6 flex flex-wrap items-center gap-2">
+              <div className="lg:col-span-7 flex flex-wrap items-center gap-2">
                 {[
                   { value: '', label: 'Tất cả trạng thái' },
                   { value: 'Trong', label: 'Đang trống' },
+                  { value: 'DaDatCoc', label: 'Đang được cọc' },
                   { value: 'DangThue', label: 'Đang thuê' },
                   { value: 'BaoTri', label: 'Bảo trì' },
                 ].map((st) => (
@@ -260,7 +277,9 @@ export default function QuanLyKhuTroVaPhongPage() {
                     onClick={() => setStatusFilter(st.value)}
                     className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                       statusFilter === st.value
-                        ? 'bg-[#00FFCC] text-slate-900'
+                        ? st.value === 'DaDatCoc'
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-[#00FFCC] text-slate-900'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -270,7 +289,7 @@ export default function QuanLyKhuTroVaPhongPage() {
               </div>
             </div>
 
-            {/* 4. Lưới Thẻ Phòng Trọ (Chỉ hiển thị Ảnh chính AnhChinh = 1) */}
+            {/* 4. Lưới Thẻ Phòng Trọ */}
             {loading ? (
               <div className="py-16 text-center text-sm text-slate-500">
                 Đang tải danh sách phòng trọ...
@@ -281,7 +300,7 @@ export default function QuanLyKhuTroVaPhongPage() {
                   Không tìm thấy phòng trọ nào phù hợp!
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  Hãy thử thay đổi bộ lọc hoặc bấm &quot;+ Thêm Phòng Mới&quot; để khởi tạo phòng.
+                  Hãy thử thay đổi bộ lọc hoặc bấm &quot;Thêm Phòng Mới&quot; để khởi tạo phòng.
                 </p>
               </div>
             ) : (
@@ -324,6 +343,21 @@ export default function QuanLyKhuTroVaPhongPage() {
                           {Number(room.Gia).toLocaleString('vi-VN')} đ / tháng
                         </p>
 
+                        {/* Ghi chú nhanh khi phòng đang được đặt cọc */}
+                        {room.TrangThai === 'DaDatCoc' && (
+                          <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-orange-50 border border-orange-200 px-3 py-1.5 text-[11px]">
+                            <span className="font-semibold text-orange-800">
+                              Phòng đang giữ chỗ cọc
+                            </span>
+                            <Link
+                              href="/chuTro/datPhong"
+                              className="font-bold text-orange-700 hover:underline no-underline shrink-0"
+                            >
+                              Xem đơn cọc →
+                            </Link>
+                          </div>
+                        )}
+
                         {/* Danh sách Tiện ích */}
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {room.TienIch && room.TienIch.length > 0 ? (
@@ -343,7 +377,7 @@ export default function QuanLyKhuTroVaPhongPage() {
                         </div>
                       </div>
 
-                      {/* Cụm nút điều hướng sang Trang mới */}
+                      {/* Cụm nút điều hướng */}
                       <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
                         <Link
                           href={`/chuTro/phongTro/chiTiet/${room.MaPhong}`}

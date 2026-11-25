@@ -1,3 +1,4 @@
+// client/src/components/layout/UserHeaderActions.tsx
 'use client';
 
 import Link from 'next/link';
@@ -13,6 +14,8 @@ interface UserHeaderActionsProps {
   mobileMenuOpen: boolean;
   onToggleMobileMenu: () => void;
   onCloseMobileMenu: () => void;
+  dashboardHref?: string;
+  dashboardLabel?: string;
 }
 
 export default function UserHeaderActions({
@@ -21,6 +24,8 @@ export default function UserHeaderActions({
   mobileMenuOpen,
   onToggleMobileMenu,
   onCloseMobileMenu,
+  dashboardHref,
+  dashboardLabel,
 }: UserHeaderActionsProps) {
   const router = useRouter();
   const { showConfirm, showSuccess, showError } = useAlertModal();
@@ -83,7 +88,7 @@ export default function UserHeaderActions({
         )}
       </button>
 
-      {/* 3. Menu Tài khoản trên Máy tính (Hover xổ xuống 4 mục riêng biệt) */}
+      {/* 3. Menu Tài khoản trên Máy tính (Hover xổ xuống) */}
       <div className="hidden lg:block relative group">
         <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-2xl hover:bg-slate-100 border border-transparent hover:border-slate-200 transition cursor-pointer select-none whitespace-nowrap">
           <div className="text-right">
@@ -112,8 +117,35 @@ export default function UserHeaderActions({
           </svg>
         </div>
 
-        <div className="absolute right-0 top-full pt-2 w-52 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 z-50">
+        <div className="absolute right-0 top-full pt-2 w-56 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-150 z-50">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden py-1.5">
+            {dashboardHref && dashboardLabel && (
+              <>
+                <Link
+                  href={dashboardHref}
+                  className="w-full px-4 py-2.5 text-left text-xs font-bold text-slate-900 bg-[#00FFCC]/20 hover:bg-[#00FFCC]/45 flex items-center gap-2.5 transition no-underline whitespace-nowrap"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    className="w-4 h-4 text-teal-700 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                    />
+                  </svg>
+                  <span>{dashboardLabel}</span>
+                </Link>
+                <div className="my-1 border-t border-slate-100" />
+              </>
+            )}
+
             <Link
               href="/taiKhoan/thongTin"
               className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-[#00FFCC]/25 hover:text-slate-900 flex items-center gap-2.5 transition no-underline whitespace-nowrap"

@@ -17,10 +17,7 @@ router.get('/public', TinDangController.getPublicList);
 router.use(verifyToken);
 router.use(authorizeRoles('ChuTro', 'QuanLy'));
 
-router.get('/', TinDangController.getList);
-router.post('/', TinDangController.create);
-router.put('/:maTin', TinDangController.update);
-router.delete('/:maTin', TinDangController.remove);
-router.get('/public/:maTin', TinDangController.getPublicDetail);
+router.get('/public', TinDangController.getPublicList);
+router.get('/public/:maPhong', TinDangController.getPublicDetail);
 
 module.exports = router;
