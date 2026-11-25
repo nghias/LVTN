@@ -27,7 +27,7 @@ export interface GiaDienNuocHome {
 
 export interface KhuTroHome {
   MaKhu: number;
-  MaND: number;
+  MaND?: number;
   TenKhu: string;
   DiaChi: string;
   MoTa?: string | null;
@@ -38,6 +38,8 @@ export interface KhuTroHome {
   TongSoPhong?: number;
   SoPhongTrong?: number;
 }
+
+export type KhuTroSummary = KhuTroHome;
 
 export interface RoomImageItem {
   MaAnh: number;
@@ -397,4 +399,10 @@ export class HomeService {
       return null;
     }
   }
+  
 }
+export type AnhPhongHomeItem = RoomImageItem;
+export type HomeDataPayload = HomeDataResponse;
+
+export const getPublicHomeTinDang = (params?: HomeTinDangFilterParams) =>
+  HomeService.getPublicTinDang(params);
