@@ -44,6 +44,11 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
       matchPaths: ['/nguoiThue/hoaDon', '/nguoiThue/thanhToan'],
     },
     {
+      label: 'Thẻ ra vào',
+      href: '/nguoiThue/theRaVao',
+      matchPaths: ['/nguoiThue/theRaVao'],
+    },
+    {
       label: 'Thông báo & Sự cố',
       href: '/nguoiThue/thongBao',
       matchPaths: ['/nguoiThue/thongBao'],
@@ -99,14 +104,14 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
         </Link>
 
         {/* Thanh điều hướng Desktop */}
-        <nav className="hidden lg:flex items-center gap-1.5 shrink-0">
+        <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0">
           {navItems.map((item) => {
             const isActive = checkIsActive(item.matchPaths);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition no-underline ${
+                className={`px-3 xl:px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition no-underline ${
                   isActive
                     ? 'bg-[#00FFCC] text-slate-900 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-[#00FFCC]/20'

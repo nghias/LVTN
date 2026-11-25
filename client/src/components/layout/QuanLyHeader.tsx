@@ -46,6 +46,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
       items: [
         { label: 'Khách thuê', href: '/chuTro/khachThue' },
         { label: 'Hợp đồng', href: '/chuTro/hopDong' },
+        { label: 'Thẻ ra vào', href: '/chuTro/theRaVao' },
       ],
     },
     {
@@ -68,6 +69,7 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
     { label: 'Đăng tin', href: '/chuTro/tinDang' },
     { label: 'Khách thuê', href: '/chuTro/khachThue' },
     { label: 'Hợp đồng', href: '/chuTro/hopDong' },
+    { label: 'Thẻ ra vào', href: '/chuTro/theRaVao' },
     { label: 'Điện nước', href: '/chuTro/dienNuoc' },
     { label: 'Hóa đơn', href: '/chuTro/hoaDon' },
     { label: 'Thanh toán', href: '/chuTro/thanhToan' },

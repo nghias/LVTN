@@ -13,6 +13,8 @@ const hoaDonRouter = require('./hoaDon.router');
 const thanhToanRouter = require('./thanhToan.router');
 const aiChatRouter = require('./aiChat.router');
 const thongKeRouter = require('./thongKe.router');
+const theRaVaoRouter = require('./theRaVao.router');
+
 
 
 
@@ -28,6 +30,8 @@ router.use('/dich-vu', dichVuRouter);
 router.use('/dien-nuoc', dienNuocRouter);
 router.use('/hoa-don', hoaDonRouter);
 router.use('/thanh-toan', thanhToanRouter);
+router.use('/the-ra-vao', theRaVaoRouter);
+
 
 router.get('/ping', (req, res) => {
   return res.status(200).json({
