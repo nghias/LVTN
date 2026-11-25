@@ -215,11 +215,6 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
                 : "Theo dõi thẻ từ RFID cá nhân, gửi yêu cầu cấp lại thẻ và xem lịch sử ra vào của bạn."}
             </p>
           </div>
-
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-emerald-800 self-start sm:self-auto">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Tự động cập nhật{lastUpdated ? ` • ${lastUpdated}` : ""}</span>
-          </div>
         </div>
 
         {/* 1. Thông tin thẻ hiện tại & Yêu cầu cấp lại */}

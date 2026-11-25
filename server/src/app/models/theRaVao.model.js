@@ -1,5 +1,5 @@
 // server/src/app/models/theRaVao.model.js
-const db = require("../../database/db");
+const db = require('../../database/db');
 
 const TheRaVaoModel = {
   async findAll() {
@@ -44,7 +44,6 @@ const TheRaVaoModel = {
     return rows;
   },
 
-  // Kiểm tra phôi thẻ (UID) có đang thuộc về 1 bản ghi thẻ khác không
   async findByUidPrefix(uid, excludeMaThe = 0) {
     const [rows] = await db.query(
       `SELECT MaThe, MaND
@@ -56,7 +55,7 @@ const TheRaVaoModel = {
     return rows[0] || null;
   },
 
-  async create({ maND, giaTri, trangThai = "HoatDong", ghiChu }) {
+  async create({ maND, giaTri, trangThai = 'HoatDong', ghiChu }) {
     const [result] = await db.query(
       `INSERT INTO TheRaVao (MaND, GiaTri, NgayTao, TrangThai, GhiChu)
        VALUES (?, ?, CURDATE(), ?, ?)`,
@@ -65,7 +64,6 @@ const TheRaVaoModel = {
     return result.insertId;
   },
 
-  // Cấp lại thẻ: cập nhật trực tiếp bản ghi đã có, không tạo dòng mới
   async reissueById(maThe, { giaTri, ghiChu }) {
     const [result] = await db.query(
       `UPDATE TheRaVao
@@ -85,7 +83,7 @@ const TheRaVaoModel = {
              ELSE GhiChu
            END
        WHERE MaThe = ?`,
-      [trangThai, ghiChu || "", ghiChu || "", ghiChu || "", maThe]
+      [trangThai, ghiChu || '', ghiChu || '', ghiChu || '', maThe]
     );
     return result.affectedRows > 0;
   },

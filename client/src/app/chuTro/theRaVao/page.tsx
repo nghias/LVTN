@@ -195,11 +195,7 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-emerald-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Trực tiếp{lastUpdated ? ` • ${lastUpdated}` : ""}</span>
-            </div>
-
+            
             <Link
               href="/chuTro/theRaVao/danhSach"
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-400 text-xs font-bold shadow-xs transition no-underline"

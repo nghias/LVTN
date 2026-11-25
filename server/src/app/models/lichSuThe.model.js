@@ -1,5 +1,5 @@
 // server/src/app/models/lichSuThe.model.js
-const db = require("../../database/db");
+const db = require('../../database/db');
 
 const LichSuTheModel = {
   async create(maThe) {
@@ -13,7 +13,7 @@ const LichSuTheModel = {
 
   async findByMaTheList(maTheList, { tuNgay, denNgay, limit = 200 } = {}) {
     if (!maTheList || maTheList.length === 0) return [];
-    const conditions = [`MaThe IN (${maTheList.map(() => "?").join(",")})`];
+    const conditions = [`MaThe IN (${maTheList.map(() => '?').join(',')})`];
     const params = [...maTheList];
 
     if (tuNgay) {
@@ -30,7 +30,7 @@ const LichSuTheModel = {
     const [rows] = await db.query(
       `SELECT MaLS, MaThe, NgayQuetThe, GioQuetThe
        FROM LichSuThe
-       WHERE ${conditions.join(" AND ")}
+       WHERE ${conditions.join(' AND ')}
        ORDER BY NgayQuetThe DESC, GioQuetThe DESC
        LIMIT ?`,
       params

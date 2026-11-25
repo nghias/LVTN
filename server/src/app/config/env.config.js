@@ -1,5 +1,9 @@
+// server/src/app/config/env.config.js
 const path = require('path');
 require('dotenv').config();
+
+// Ép tiến trình Node.js chạy mặc định theo giờ Việt Nam (UTC+7)
+process.env.TZ = process.env.TZ || 'Asia/Ho_Chi_Minh';
 
 module.exports = {
   port: process.env.PORT || 5000,
@@ -12,6 +16,7 @@ module.exports = {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     enableSsl: process.env.DB_ENABLE_SSL === 'true',
+    timezone: process.env.DB_TIMEZONE || '+07:00',
     // Trỏ trực tiếp tới file isrgrootx1.pem nằm cùng thư mục config
     caPath: path.join(__dirname, 'isrgrootx1.pem'),
   },
@@ -27,6 +32,7 @@ module.exports = {
     apiSecret: process.env.CLOUDINARY_API_SECRET,
   },
   aesSecretKey: process.env.AES_SECRET_KEY,
+  iotDeviceKey: process.env.IOT_DEVICE_KEY,
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
     model: process.env.GEMINI_MODEL || 'gemini-3.0-flash',
