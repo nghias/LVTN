@@ -470,9 +470,9 @@ export default function QuanLyDatPhongPage() {
                                   item.TrangThaiPhong === "DaDatCoc" && (
                                     <Link
                                       href={`/chuTro/hopDong/them?maPhong=${item.MaPhong}`}
-                                      className="rounded-lg bg-slate-900 hover:bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-[#00FFCC]"
+                                      className="rounded-lg bg-[#00FFCC] hover:bg-[#00E0B0] px-2.5 py-1 text-[11px] font-bold text-slate-900 cursor-pointer"
                                     >
-                                      + Lập Hợp đồng ngay
+                                      Lập Hợp đồng
                                     </Link>
                                   )}
                               </div>

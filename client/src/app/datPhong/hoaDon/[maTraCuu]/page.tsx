@@ -7,6 +7,28 @@ import Link from 'next/link';
 import { datPhongService } from '@/services/datPhong.service';
 import { DatPhongItem, TrangThaiDatPhong } from '@/types/datPhong.type';
 
+const getApiBaseUrl = () => {
+  const raw = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  const trimmed = raw.replace(/\/auth\/?$/, '').replace(/\/+$/, '');
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
+const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (typeof window !== 'undefined') {
+    const token =
+      localStorage.getItem('token') ||
+      localStorage.getItem('accessToken') ||
+      sessionStorage.getItem('token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
 const formatVND = (amount?: number | null) =>
   `${Math.round(Number(amount || 0)).toLocaleString('vi-VN')}đ`;
 
@@ -82,6 +104,39 @@ function HoaDonDatCocContent() {
   const [booking, setBooking] = useState<DatPhongItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isManager, setIsManager] = useState<boolean>(false);
+
+  // Kiểm tra ngầm vai trò người dùng hiện tại (nếu là ChuTro / QuanLy thì đổi link quay về)
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkManagerRole = async () => {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/auth/profile`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+
+        const result = await res.json();
+        const profile = result?.data?.user || result?.data || result?.user || null;
+        const role = String(profile?.Quyen || '').trim();
+
+        if (isMounted && (role === 'ChuTro' || role === 'QuanLy')) {
+          setIsManager(true);
+        }
+      } catch {
+        // Khách vãng lai chưa đăng nhập -> giữ mặc định quay về Trang chủ
+      }
+    };
+
+    checkManagerRole();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const fetchReceipt = useCallback(
     async (code: string, auth: { token?: string; sdt?: string }) => {
@@ -113,6 +168,15 @@ function HoaDonDatCocContent() {
       sdt: sdtParam || undefined,
     });
   }, [maTraCuuParam, tokenParam, sdtParam, fetchReceipt]);
+
+  // Nếu muốn quay về trang Tổng quan thống kê thay vì Quản lý đặt phòng, đổi '/chuTro/datPhong' thành '/chuTro/thongKe'
+  const backHref = isManager ? '/chuTro/datPhong' : '/';
+  const backLabel = isManager
+    ? '← Quay về Trang Quản lý'
+    : '← Quay về Trang chủ';
+  const errorBackLabel = isManager
+    ? 'Về Trang Quản lý đặt phòng'
+    : 'Về trang chủ Xóm Trọ';
 
   // Tải trực tiếp file hóa đơn về máy (.html chuẩn in A4, mở offline được trên mọi thiết bị)
   const handleDownloadInvoice = () => {
@@ -237,10 +301,10 @@ function HoaDonDatCocContent() {
         {/* Thanh công cụ phía trên */}
         <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-xs">
           <Link
-            href="/"
+            href={backHref}
             className="text-xs sm:text-sm font-bold text-slate-600 hover:text-teal-700 transition no-underline"
           >
-            ← Quay về Trang chủ Xóm Trọ
+            {backLabel}
           </Link>
 
           <div className="flex flex-wrap items-center gap-2.5">
@@ -263,13 +327,6 @@ function HoaDonDatCocContent() {
                 >
                   ⬇ Tải hóa đơn về máy
                 </button>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] border border-teal-300 px-4 py-2 text-xs font-bold text-slate-900 shadow-2xs transition cursor-pointer"
-                >
-                  🖨 In / Xuất PDF
-                </button>
               </>
             )}
           </div>
@@ -288,13 +345,13 @@ function HoaDonDatCocContent() {
           <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-center space-y-3">
             <p className="text-sm font-bold text-rose-800">{errorMsg}</p>
             <p className="text-xs text-rose-700">
-              Vui lòng mở lại trực tiếp từ đường dẫn biên lai trong Email xác nhận hoặc quay về trang chủ.
+              Vui lòng mở lại trực tiếp từ đường dẫn biên lai trong Email xác nhận hoặc quay lại trang trước.
             </p>
             <Link
-              href="/"
+              href={backHref}
               className="inline-block rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] border border-teal-300 px-5 py-2 text-xs font-bold text-slate-900 transition no-underline"
             >
-              Về trang chủ Xóm Trọ
+              {errorBackLabel}
             </Link>
           </div>
         )}

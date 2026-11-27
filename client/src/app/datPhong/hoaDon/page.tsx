@@ -412,14 +412,7 @@ function ThanhToanPayOSContent() {
                           Nếu không hoàn tất trong <b>15 phút</b>, giao dịch sẽ tự động hủy để khách khác có thể đặt phòng.
                         </p>
 
-                        <a
-                          href={qrResult.payos.checkoutUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block w-full rounded-xl border border-slate-300 bg-white hover:bg-slate-50 py-2.5 text-center text-xs font-bold text-slate-800 no-underline"
-                        >
-                          Mở cổng thanh toán PayOS ↗
-                        </a>
+
                       </div>
                     </div>
                   ) : (

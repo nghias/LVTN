@@ -432,49 +432,7 @@ const DatPhongModel = {
     return rows;
   },
 
-  // 11. Tạo thông báo nội bộ (MaLTB = 6, NDGui = 1 -> gửi Chủ trọ + Quản lý khu)
-  createInternalNotification: async ({
-    tieuDe,
-    noiDung,
-    maQuanLyKhu,
-    maLTB = 6,
-  }) => {
-    const conn = await db.getConnection();
-    try {
-      await conn.beginTransaction();
-
-      // NDGui = 1 (đại diện hệ thống/Chủ trọ vì khách đặt cọc là khách vãng lai)
-      const [tbRes] = await conn.execute(
-        `INSERT INTO thongbao (MaTBGoc, NDGui, MaLTB, TieuDe, NoiDung, NgayGui)
-         VALUES (NULL, 1, ?, ?, ?, NOW())`,
-        [Number(maLTB), tieuDe, noiDung],
-      );
-      const maTB = tbRes.insertId;
-
-      const recipients = new Set([1]);
-      if (maQuanLyKhu && Number(maQuanLyKhu) > 0) {
-        recipients.add(Number(maQuanLyKhu));
-      }
-
-      for (const ndNhan of recipients) {
-        await conn.execute(
-          `INSERT INTO nhanthongbao (MaTB, NDNhan, TrangThai)
-           VALUES (?, ?, 'ChuaDoc')`,
-          [maTB, ndNhan],
-        );
-      }
-
-      await conn.commit();
-      return maTB;
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
-    }
-  },
-
-  // 12. Dành cho Cron Job (chạy mỗi 5 phút): Hủy QR quá 15p & xử lý đơn quá hạn giữ chỗ
+  // 11. Dành cho Cron Job (chạy mỗi 5 phút): Hủy QR quá 15p & xử lý đơn quá hạn giữ chỗ
   processExpiredBookings: async () => {
     const conn = await db.getConnection();
     const expiredHoldList = [];
@@ -740,7 +698,7 @@ const DatPhongModel = {
       conn.release();
     }
   },
-  // 13. Xóa vĩnh viễn đơn đặt cọc đã hủy hoặc quá hạn mất cọc
+  // 12. Xóa vĩnh viễn đơn đặt cọc đã hủy hoặc quá hạn mất cọc
   deleteExpiredOrCancelledById: async (maDP) => {
     const sql = `
       DELETE FROM datphong

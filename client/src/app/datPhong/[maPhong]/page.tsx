@@ -11,6 +11,10 @@ import { datPhongService } from '@/services/datPhong.service';
 const formatVND = (amount: number) =>
   `${Math.round(amount || 0).toLocaleString('vi-VN')}đ`;
 
+const MIN_DEPOSIT_CONFIG = Number(
+  process.env.NEXT_PUBLIC_BOOKING_MIN_DEPOSIT || 1000
+);
+
 // Khung giờ hành chính, phút chỉ chọn :00 hoặc :30
 const MORNING_SLOTS = [
   '08:00',
@@ -194,9 +198,10 @@ export default function DatPhongPage() {
       .then((res) => {
         setRoom(res.data);
         const gia = Number(res.data.Gia) || 0;
-        const minDep = gia > 0 ? Math.min(100000, gia) : 100000;
-        const suggest = Math.max(minDep, Math.round((gia * 0.1) / 10000) * 10000);
-        setSoTienCoc(String(gia > 0 ? Math.min(suggest, gia) : minDep));
+        const minDep =
+          gia > 0 ? Math.min(MIN_DEPOSIT_CONFIG, gia) : MIN_DEPOSIT_CONFIG;
+        // Điền sẵn mức tối thiểu (1.000đ) để test nhanh
+        setSoTienCoc(String(minDep));
       })
       .catch((err: any) => {
         setRoomError(err?.message || 'Không tìm thấy phòng trọ.');
@@ -205,19 +210,19 @@ export default function DatPhongPage() {
   }, [maPhong]);
 
   const minDeposit = useMemo(() => {
-    if (!room) return 100000;
+    if (!room) return MIN_DEPOSIT_CONFIG;
     const gia = Number(room.Gia) || 0;
-    return gia > 0 ? Math.min(100000, gia) : 100000;
+    return gia > 0 ? Math.min(MIN_DEPOSIT_CONFIG, gia) : MIN_DEPOSIT_CONFIG;
   }, [room]);
 
   const suggestedDeposits = useMemo(() => {
-    if (!room) return [100000, 200000, 300000, 500000];
+    if (!room) return [1000, 2000, 10000, 100000];
     const gia = Number(room.Gia) || 0;
     const tenPercent = Math.max(
       minDeposit,
       Math.round((gia * 0.1) / 10000) * 10000
     );
-    const list = [minDeposit, tenPercent, 300000, 500000].filter(
+    const list = [minDeposit, 2000, 10000, tenPercent, 300000].filter(
       (v) => v >= minDeposit && (gia === 0 || v <= gia)
     );
     return Array.from(new Set(list)).sort((a, b) => a - b);

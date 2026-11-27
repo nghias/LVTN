@@ -1,7 +1,7 @@
 // server/src/jobs/datPhong.cron.js
 const cron = require('node-cron');
 const DatPhongModel = require('../app/models/datPhong.model');
-const MailUtil = require('../utils/mailDatPhong.util');
+const MailUtil = require('../utils/mail.util');
 const { emitThongBaoMoi, getIO } = require('../services/socket.service');
 
 let isRunning = false;
@@ -37,7 +37,6 @@ async function runDatPhongCleanup(io = null) {
       );
     }
 
-    const activeIo = io || (typeof getIO === 'function' ? getIO() : null);
 
     for (const item of expiredList) {
       // 1. Tạo thông báo nội bộ (MaLTB = 6, gửi Chủ trọ + Quản lý khu)

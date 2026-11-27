@@ -4,23 +4,26 @@ const db = require("../../database/db");
 const DatPhongModel = require("../models/datPhong.model");
 const { emitThongBaoMoi } = require("../../services/socket.service");
 
-// Tải mail util an toàn
+// Tải mail.util.js (kèm log rõ ràng nếu lỗi đường dẫn/cú pháp)
 let MailUtil = null;
 try {
   MailUtil = require("../../utils/mail.util");
 } catch (err) {
-  console.warn("[DatPhong] Không tìm thấy mail.util.js:", err.message);
+  console.error("[DatPhong] Lỗi nạp ../../utils/mail.util:", err);
 }
 
 const PAYOS_BASE_URL = "https://api-merchant.payos.vn/v2/payment-requests";
 const QR_EXPIRE_MINUTES = 15;
 const HOLD_HOURS = Number(process.env.BOOKING_HOLD_HOURS || 48);
-const MIN_DEPOSIT_AMOUNT = Number(process.env.BOOKING_MIN_DEPOSIT || 100000);
+const MIN_DEPOSIT_AMOUNT = Number(process.env.BOOKING_MIN_DEPOSIT || 1000);
 const CLIENT_URL = (
   process.env.CLIENT_URL ||
   process.env.FRONTEND_URL ||
   "http://localhost:3000"
 ).replace(/\/+$/, "");
+
+// Khóa chống chạy song song khi PayOS Webhook và Polling 3 giây gọi cùng lúc
+const inFlightConfirmations = new Map();
 
 // =========================================================================
 // CÁC HÀM HELPER NỘI BỘ
@@ -213,67 +216,83 @@ async function cancelBookingAndReleaseRoom(maDP, maPhong, reason) {
   }
 }
 
-// Phát thông báo Socket.IO real-time tới Quản lý khu trọ & Chủ trọ
-function emitNotificationRealtime(io, { tieuDe, noiDung, dsNguoiNhan }) {
-  if (!io || !Array.isArray(dsNguoiNhan) || dsNguoiNhan.length === 0) return;
-  const payload = {
-    MaLTB: 6,
-    TieuDe: tieuDe,
-    NoiDung: noiDung,
-    NgayGui: new Date().toISOString(),
-    dsNguoiNhan,
-  };
-  dsNguoiNhan.forEach((ndId) => {
-    io.to(`user_${ndId}`).emit("thong_bao_moi", payload);
-    io.to(String(ndId)).emit("thong_bao_moi", payload);
-  });
-  io.emit("thong_bao_dat_coc_moi", payload);
-}
-
-// Gửi Email hóa đơn đặt cọc / trùng cọc / hoàn cọc qua Brevo
+// Gửi Email hóa đơn đặt cọc / trùng cọc / hoàn cọc qua mail.util.js (Brevo)
 async function dispatchBookingEmail(type, booking) {
-  if (!booking?.Email || !MailUtil) return;
-  const receiptUrl = `${CLIENT_URL}/datPhong/hoaDon/${encodeURIComponent(
-    booking.MaTraCuu,
-  )}?token=${encodeURIComponent(booking.TokenTraCuu)}`;
+  if (!booking) {
+    console.warn(`[DatPhong][Mail] Không có dữ liệu booking để gửi (${type}).`);
+    return { sent: false, reason: "NO_BOOKING" };
+  }
 
-  const payosConfig = await DatPhongModel.getPayOSConfig();
-  const enrichedBooking = {
-    ...booking,
-    receiptUrl,
-    ThongTinNganHangNhan: payosConfig
-      ? {
-          TenNganHang: payosConfig.TenNganHang,
-          STK: payosConfig.STK,
-          ChuTaiKhoan: payosConfig.ChuTaiKhoan,
-        }
-      : null,
-  };
+  const recipientEmail = String(booking.Email || booking.email || "").trim();
+  if (!recipientEmail) {
+    console.warn(
+      `[DatPhong][Mail] Đơn ${booking.MaTraCuu} không có Email khách hàng -> bỏ qua gửi mail (${type}).`,
+    );
+    return { sent: false, reason: "NO_EMAIL" };
+  }
+
+  if (!MailUtil) {
+    console.error(
+      `[DatPhong][Mail] Không thể gửi mail (${type}) cho ${booking.MaTraCuu} vì mail.util.js chưa nạp được.`,
+    );
+    return { sent: false, reason: "MAIL_UTIL_MISSING" };
+  }
 
   try {
+    const receiptUrl = `${CLIENT_URL}/datPhong/hoaDon/${encodeURIComponent(
+      booking.MaTraCuu || "",
+    )}?token=${encodeURIComponent(booking.TokenTraCuu || "")}`;
+
+    let payosConfig = null;
+    try {
+      payosConfig = await DatPhongModel.getPayOSConfig();
+    } catch (cfgErr) {
+      console.warn(
+        "[DatPhong][Mail] Không lấy được thông tin ngân hàng nhận cọc:",
+        cfgErr.message,
+      );
+    }
+
+    const enrichedBooking = {
+      ...booking,
+      Email: recipientEmail,
+      DiaChiKhu: booking.DiaChiKhu || booking.DiaChi || "",
+      receiptUrl,
+      ThongTinNganHangNhan: payosConfig
+        ? {
+            TenNganHang: payosConfig.TenNganHang,
+            STK: payosConfig.STK,
+            ChuTaiKhoan: payosConfig.ChuTaiKhoan,
+          }
+        : null,
+    };
+
+    console.log(
+      `[DatPhong][Mail] Đang gửi email (${type}) cho đơn ${booking.MaTraCuu} -> ${recipientEmail}`,
+    );
+
     if (
       type === "RECEIPT" &&
       typeof MailUtil.sendBookingReceiptEmail === "function"
     ) {
-      await MailUtil.sendBookingReceiptEmail(enrichedBooking);
-      return;
+      const res = await MailUtil.sendBookingReceiptEmail(enrichedBooking);
+      return { sent: true, response: res };
     }
     if (
       type === "DUPLICATE" &&
       typeof MailUtil.sendBookingDuplicateEmail === "function"
     ) {
-      await MailUtil.sendBookingDuplicateEmail(enrichedBooking);
-      return;
+      const res = await MailUtil.sendBookingDuplicateEmail(enrichedBooking);
+      return { sent: true, response: res };
     }
     if (
       type === "REFUND" &&
       typeof MailUtil.sendBookingRefundEmail === "function"
     ) {
-      await MailUtil.sendBookingRefundEmail(enrichedBooking);
-      return;
+      const res = await MailUtil.sendBookingRefundEmail(enrichedBooking);
+      return { sent: true, response: res };
     }
 
-    // Fallback nếu mail.util.js chỉ export hàm tổng quát sendEmail
     if (typeof MailUtil.sendEmail === "function") {
       const subjectMap = {
         RECEIPT: `[Xóm Trọ] Xác nhận đặt cọc thành công & Hóa đơn phòng ${booking.TenPhong} - ${booking.MaTraCuu}`,
@@ -309,19 +328,26 @@ async function dispatchBookingEmail(type, booking) {
           <p>Xem lại biên lai: <a href="${receiptUrl}">${receiptUrl}</a></p>
         `,
       };
-      await MailUtil.sendEmail({
-        to: booking.Email,
+      const res = await MailUtil.sendEmail({
+        to: recipientEmail,
         toName: booking.HoTenKhach,
         subject: subjectMap[type],
         html: htmlMap[type],
         htmlContent: htmlMap[type],
       });
+      return { sent: true, response: res };
     }
+
+    console.error(
+      `[DatPhong][Mail] mail.util.js không export hàm gửi mail phù hợp cho loại "${type}".`,
+    );
+    return { sent: false, reason: "NO_HANDLER" };
   } catch (mailErr) {
     console.error(
-      `[DatPhong] Lỗi gửi Email (${type}) cho ${booking.MaTraCuu}:`,
-      mailErr.message,
+      `[DatPhong][Mail] Lỗi gửi Email (${type}) cho ${booking.MaTraCuu}:`,
+      mailErr,
     );
+    return { sent: false, error: mailErr.message };
   }
 }
 
@@ -332,124 +358,123 @@ async function dispatchBookingEmail(type, booking) {
 const DatPhongController = {
   // -----------------------------------------------------------------------
   // HÀM DÙNG CHUNG: Xác nhận thanh toán cọc tự động
-  // Gọi từ cả API Polling 3 giây lẫn Webhook trong thanhToan.controller.js
+  // Gọi từ cả API Polling 3 giây lẫn Webhook trong ThanhToanController.js
   // -----------------------------------------------------------------------
   xacNhanThanhToanCocTuDong: async (orderCode, io = null) => {
-    const txResult = await DatPhongModel.confirmPaymentTransaction(orderCode, {
-      holdHours: HOLD_HOURS,
-    });
-
-    if (!txResult.found) {
-      return { found: false };
+    const lockKey = String(orderCode);
+    if (inFlightConfirmations.has(lockKey)) {
+      return inFlightConfirmations.get(lockKey);
     }
 
-    const booking = await DatPhongModel.getById(txResult.maDP);
+    const workPromise = (async () => {
+      const txResult = await DatPhongModel.confirmPaymentTransaction(
+        orderCode,
+        {
+          holdHours: HOLD_HOURS,
+        },
+      );
 
-    // Nếu là lần đầu xác nhận thành công -> gửi thông báo nội bộ & Email hóa đơn
-    if (!txResult.alreadyProcessed && booking) {
-      const isDuplicate = txResult.outcome === "TrungLapCanHoan";
-
-      const tieuDe = isDuplicate
-        ? `[Trùng cọc cần hoàn] ${booking.TenPhong} - ${booking.MaTraCuu}`
-        : `[Đặt cọc giữ phòng] ${booking.TenPhong} - ${booking.HoTenKhach}`;
-
-      const noiDung = isDuplicate
-        ? `Khách ${booking.HoTenKhach} (SĐT: ${booking.SDT}, Email: ${booking.Email}) thanh toán ${formatVND(
-            booking.SoTienCoc,
-          )} nhưng phòng ${booking.TenPhong} (${booking.TenKhu}) đã được giữ trước đó. Mã đơn: ${
-            booking.MaTraCuu
-          }. Vui lòng liên hệ hoàn 100% tiền cọc.`
-        : `Khách ${booking.HoTenKhach} (SĐT: ${booking.SDT}, Email: ${booking.Email}) đã thanh toán cọc ${formatVND(
-            booking.SoTienCoc,
-          )} giữ phòng ${booking.TenPhong} (${booking.TenKhu}). Hẹn xem: ${
-            booking.NgayHenXem
-          }. Mã tra cứu: ${booking.MaTraCuu}.`;
-
-      // 1. Lưu thông báo vào bảng thongbao & nhanthongbao (MaLTB = 6 -> ChuTro + QuanLy khu đó)
-      try {
-        await DatPhongModel.createInternalNotification({
-          maLTB: 6,
-          maQuanLyKhu: booking.MaQuanLyKhu,
-          tieuDe,
-          noiDung,
-        });
-
-        try {
-          const tieuDe = isDuplicate
-            ? `[Trùng cọc cần hoàn] ${booking.TenPhong} - ${booking.MaTraCuu}`
-            : `[Đặt cọc giữ phòng] ${booking.TenPhong} - ${booking.HoTenKhach}`;
-          const noiDung = isDuplicate
-            ? `Khách ${booking.HoTenKhach} (${booking.SDT}) thanh toán ${formatVND(
-                booking.SoTienCoc,
-              )} nhưng phòng ${booking.TenPhong} (${booking.TenKhu}) đã được giữ trước đó. Mã đơn: ${
-                booking.MaTraCuu
-              }. Vui lòng liên hệ hoàn 100% tiền cọc.`
-            : `Khách ${booking.HoTenKhach} (${booking.SDT}) đã thanh toán cọc ${formatVND(
-                booking.SoTienCoc,
-              )} giữ phòng ${booking.TenPhong} (${booking.TenKhu}). Hẹn xem: ${
-                booking.NgayHenXem
-              }. Mã tra cứu: ${booking.MaTraCuu}.`;
-
-          const maTB = await DatPhongModel.createInternalNotification({
-            maLTB: 6,
-            maQuanLyKhu: booking.MaQuanLyKhu,
-            tieuDe,
-            noiDung,
-          });
-
-          // Đẩy realtime qua đúng hàm emitThongBaoMoi của socket.service.js
-          const dsNguoiNhan = Array.from(
-            new Set([
-              1,
-              ...(booking.MaQuanLyKhu ? [Number(booking.MaQuanLyKhu)] : []),
-            ]),
-          );
-
-          emitThongBaoMoi(dsNguoiNhan, {
-            MaTB: maTB,
-            MaTBGoc: null,
-            NDGui: 1,
-            TenNguoiGui: "Hệ thống Đặt cọc tự động",
-            QuyenNguoiGui: "ChuTro",
-            MaLTB: 6,
-            TenLTB: "Đặt cọc giữ phòng",
-            TieuDe: tieuDe,
-            NoiDung: noiDung,
-            NgayGui: new Date().toISOString(),
-            TrangThai: "ChuaDoc",
-          });
-        } catch (notiErr) {
-          console.error(
-            "[DatPhong] Lỗi tạo thông báo nội bộ:",
-            notiErr.message,
-          );
-        }
-
-        const recipients = Array.from(
-          new Set([1, Number(booking.MaQuanLyKhu)].filter((id) => id > 0)),
-        );
-        emitNotificationRealtime(io || global.io, {
-          tieuDe,
-          noiDung,
-          dsNguoiNhan: recipients,
-        });
-      } catch (notiErr) {
-        console.error("[DatPhong] Lỗi tạo thông báo nội bộ:", notiErr.message);
+      if (!txResult.found) {
+        return { found: false };
       }
 
-      // 2. Gửi Email hóa đơn kèm thông tin liên hệ quản lý qua Brevo
-      await dispatchBookingEmail(
-        isDuplicate ? "DUPLICATE" : "RECEIPT",
-        booking,
-      );
-    }
+      const booking = await DatPhongModel.getById(txResult.maDP);
+      let emailResult = null;
 
-    return {
-      found: true,
-      alreadyProcessed: txResult.alreadyProcessed,
-      outcome: txResult.outcome,
-      booking,
-    };
+      // Nếu là lần đầu xác nhận thành công -> gửi thông báo nội bộ & Email hóa đơn
+      if (!txResult.alreadyProcessed && booking) {
+        const isDuplicate = txResult.outcome === "TrungLapCanHoan";
+
+        const tieuDe = isDuplicate
+          ? `[Trùng cọc cần hoàn] ${booking.TenPhong} - ${booking.MaTraCuu}`
+          : `[Đặt cọc giữ phòng] ${booking.TenPhong} - ${booking.HoTenKhach}`;
+
+        const noiDung = isDuplicate
+          ? `Khách ${booking.HoTenKhach} (SĐT: ${booking.SDT}, Email: ${booking.Email}) thanh toán ${formatVND(
+              booking.SoTienCoc,
+            )} nhưng phòng ${booking.TenPhong} (${booking.TenKhu}) đã được giữ trước đó. Mã đơn: ${
+              booking.MaTraCuu
+            }. Vui lòng liên hệ hoàn 100% tiền cọc.`
+          : `Khách ${booking.HoTenKhach} (SĐT: ${booking.SDT}, Email: ${booking.Email}) đã thanh toán cọc ${formatVND(
+              booking.SoTienCoc,
+            )} giữ phòng ${booking.TenPhong} (${booking.TenKhu}). Hẹn xem: ${
+              booking.NgayHenXem
+            }. Mã tra cứu: ${booking.MaTraCuu}.`;
+
+        // 1. Lưu thông báo vào bảng thongbao & nhanthongbao (chống trùng tuyệt đối theo MaTraCuu / OrderCode)
+        try {
+          const [existingNotiRows] = await db.execute(
+            `SELECT MaTB FROM thongbao
+             WHERE MaLTB = 6
+               AND (
+                 NoiDung LIKE ?
+                 OR TieuDe LIKE ?
+                 OR NoiDung LIKE ?
+               )
+               AND TieuDe NOT LIKE '%Hết hạn%'
+             LIMIT 1`,
+            [
+              `%${booking.MaTraCuu}%`,
+              `%${booking.MaTraCuu}%`,
+              `%${booking.OrderCode}%`,
+            ],
+          );
+
+          if (existingNotiRows.length === 0) {
+            const maTB = await DatPhongModel.createInternalNotification({
+              maLTB: 6,
+              maQuanLyKhu: booking.MaQuanLyKhu,
+              tieuDe,
+              noiDung,
+            });
+
+            const dsNguoiNhan = Array.from(
+              new Set([
+                1,
+                ...(booking.MaQuanLyKhu ? [Number(booking.MaQuanLyKhu)] : []),
+              ]),
+            );
+
+            emitThongBaoMoi(dsNguoiNhan, {
+              MaTB: maTB,
+              MaTBGoc: null,
+              NDGui: 1,
+              TenNguoiGui: "Hệ thống Đặt cọc tự động",
+              QuyenNguoiGui: "ChuTro",
+              MaLTB: 6,
+              TenLTB: "Đặt cọc giữ phòng",
+              TieuDe: tieuDe,
+              NoiDung: noiDung,
+              NgayGui: new Date().toISOString(),
+              TrangThai: "ChuaDoc",
+            });
+          }
+        } catch (notiErr) {
+          console.error("[DatPhong] Lỗi tạo thông báo nội bộ:", notiErr.message);
+        }
+
+        // 2. Gửi Email hóa đơn kèm thông tin liên hệ quản lý qua Brevo
+        emailResult = await dispatchBookingEmail(
+          isDuplicate ? "DUPLICATE" : "RECEIPT",
+          booking,
+        );
+      }
+
+      return {
+        found: true,
+        alreadyProcessed: txResult.alreadyProcessed,
+        outcome: txResult.outcome,
+        booking,
+        emailResult,
+      };
+    })();
+
+    inFlightConfirmations.set(lockKey, workPromise);
+    try {
+      return await workPromise;
+    } finally {
+      inFlightConfirmations.delete(lockKey);
+    }
   },
 
   // -----------------------------------------------------------------------
@@ -749,6 +774,7 @@ const DatPhongController = {
             tokenTraCuu: result.booking.TokenTraCuu,
             thoiGianThanhToan: result.booking.ThoiGianThanhToan,
             thoiGianHetHanGiu: result.booking.ThoiGianHetHanGiu,
+            emailSent: Boolean(result.emailResult?.sent),
           },
         });
       }
@@ -1131,7 +1157,6 @@ const DatPhongController = {
       }
 
       const updatedBooking = await DatPhongModel.getById(maDP);
-
       await dispatchBookingEmail("REFUND", updatedBooking);
 
       return res.status(200).json({
@@ -1190,8 +1215,11 @@ const DatPhongController = {
       });
     }
   },
-  // 6. [DELETE] /api/dat-phong/:maDP (ChuTro, QuanLy)
+
+  // -----------------------------------------------------------------------
+  // 8. [DELETE] /api/dat-phong/:maDP (ChuTro, QuanLy)
   // Chỉ cho phép xóa đơn có TrangThai = 'DaHuy' hoặc 'QuaHanMatCoc'
+  // -----------------------------------------------------------------------
   xoaDatPhong: async (req, res) => {
     try {
       const user = await getCurrentUserFromDB(req);
@@ -1225,7 +1253,6 @@ const DatPhongController = {
         });
       }
 
-      // Kiểm tra phạm vi khu trọ của Quản lý
       const { allowedRoomIds } = await getAccessibleRoomsAndKhu(user);
       if (!allowedRoomIds.includes(Number(existing.MaPhong))) {
         return res.status(403).json({
@@ -1234,7 +1261,6 @@ const DatPhongController = {
         });
       }
 
-      // Chỉ cho xóa đơn Đã hủy hoặc Quá hạn mất cọc
       if (!["DaHuy", "QuaHanMatCoc"].includes(existing.TrangThai)) {
         return res.status(409).json({
           success: false,

@@ -112,12 +112,6 @@ export function ThongBaoHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-        <Link
-          href="/chuTro/datPhong"
-          className="px-5 py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-[#00FFCC] text-xs font-bold transition shadow-xs no-underline"
-        >
-          Quản Lý Đặt Cọc
-        </Link>
 
         <Link
           href="/chuTro/thongBao/guiTin"
@@ -562,7 +556,7 @@ export function ThongBaoList({
                           onClick={() => handleGoToDatPhong(item)}
                           className="px-4 py-1.5 rounded-full text-xs font-bold text-slate-900 bg-[#00ffd5] hover:bg-[#00e6c0] transition cursor-pointer shadow-xs"
                         >
-                          Xử lý đặt cọc →
+                          Xử lý đặt cọc
                         </button>
                       ) : (
                         <button
