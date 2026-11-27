@@ -35,7 +35,7 @@ const SELECT_BOOKING_DETAIL_SQL = `
     k.MaND AS MaQuanLyKhu,
     COALESCE(ql_tt.HoTen, ql_nd.TenTK) AS TenQuanLy,
     ql_tt.SDT AS SDTQuanLy,
-    ql_tt.Email AS EmailQuanLy,
+    COALESCE(ql_tt.Email, ql_nd.TenTK) AS EmailQuanLy,
     COALESCE(xl_tt.HoTen, xl_nd.TenTK) AS TenNguoiXuLy,
     (
       SELECT ap.DuongDan
@@ -163,13 +163,11 @@ const DatPhongModel = {
   },
 
   // 8. TRANSACTION XÁC NHẬN THANH TOÁN TỰ ĐỘNG (Idempotent + Chống Race Condition)
-  // Dùng chung cho cả Webhook PayOS và API Polling 3 giây
   confirmPaymentTransaction: async (orderCode, { holdHours = 48 } = {}) => {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
 
-      // Khóa dòng đơn đặt phòng để chống Webhook & Polling xử lý trùng thời điểm
       const [dpRows] = await conn.execute(
         `SELECT * FROM datphong WHERE OrderCode = ? FOR UPDATE`,
         [Number(orderCode)],
@@ -181,7 +179,6 @@ const DatPhongModel = {
         return { found: false };
       }
 
-      // Idempotency: Đã được xử lý trước đó rồi -> thoát sớm an toàn
       if (booking.TrangThai !== "ChoThanhToan") {
         await conn.commit();
         return {
@@ -192,7 +189,6 @@ const DatPhongModel = {
         };
       }
 
-      // Khóa dòng phòng để chống 2 người thanh toán gần như cùng lúc (Race Condition)
       const [roomRows] = await conn.execute(
         `SELECT MaPhong, MaKhu, TenPhong, TrangThai FROM phong WHERE MaPhong = ? FOR UPDATE`,
         [Number(booking.MaPhong)],
@@ -207,35 +203,53 @@ const DatPhongModel = {
       let outcome = "DaDatCoc";
 
       if (String(room.TrangThai).trim() === "Trong") {
-        // Phòng còn trống -> Chốt giữ chỗ (phong.TrangThai = 'DaDatCoc')
-        await conn.execute(
-          `UPDATE phong SET TrangThai = 'DaDatCoc' WHERE MaPhong = ?`,
-          [Number(booking.MaPhong)],
-        );
-
-        await conn.execute(
+        const [updateDp] = await conn.execute(
           `UPDATE datphong
            SET TrangThai = 'DaDatCoc',
                ThoiGianThanhToan = NOW(),
                ThoiGianHetHanGiu = DATE_ADD(NOW(), INTERVAL ? HOUR)
-           WHERE MaDP = ?`,
+           WHERE MaDP = ? AND TrangThai = 'ChoThanhToan'`,
           [Number(holdHours), Number(booking.MaDP)],
+        );
+
+        if (updateDp.affectedRows === 0) {
+          await conn.rollback();
+          return {
+            found: true,
+            alreadyProcessed: true,
+            outcome: "DaDatCoc",
+            maDP: booking.MaDP,
+          };
+        }
+
+        await conn.execute(
+          `UPDATE phong SET TrangThai = 'DaDatCoc' WHERE MaPhong = ?`,
+          [Number(booking.MaPhong)],
         );
         outcome = "DaDatCoc";
       } else {
-        // Phòng vừa bị người khác đặt cọc trước đó -> Chuyển TrungLapCanHoan để hoàn 100%
-        await conn.execute(
+        const [updateDup] = await conn.execute(
           `UPDATE datphong
            SET TrangThai = 'TrungLapCanHoan',
                ThoiGianThanhToan = NOW(),
                ThoiGianHetHanGiu = NULL,
                GhiChuHoanCoc = ?
-           WHERE MaDP = ?`,
+           WHERE MaDP = ? AND TrangThai = 'ChoThanhToan'`,
           [
             `Trùng lặp thanh toán do phòng ${room.TenPhong} đã ở trạng thái ${room.TrangThai}, chờ hoàn 100% tiền cọc`,
             Number(booking.MaDP),
           ],
         );
+
+        if (updateDup.affectedRows === 0) {
+          await conn.rollback();
+          return {
+            found: true,
+            alreadyProcessed: true,
+            outcome: "TrungLapCanHoan",
+            maDP: booking.MaDP,
+          };
+        }
         outcome = "TrungLapCanHoan";
       }
 
@@ -290,7 +304,6 @@ const DatPhongModel = {
               "Chỉ đơn ở trạng thái TrungLapCanHoan mới được hoàn cọc trùng lặp.",
           };
         }
-        // Chuyển về DaHoanCoc_KhongThue và KHÔNG mở lại phòng (vì người đến trước vẫn đang giữ)
         nextBookingStatus = "DaHoanCoc_KhongThue";
         shouldReopenRoom = false;
       } else if (ketQua === "KhongThue") {
@@ -315,7 +328,6 @@ const DatPhongModel = {
               "Chỉ đơn ở trạng thái DaDatCoc mới có thể xác nhận hoàn cọc chốt thuê.",
           };
         }
-        // Giữ nguyên phong.TrangThai = 'DaDatCoc' cho đến khi lập hợp đồng thủ công
         nextBookingStatus = "DaHoanCoc_ChotThue";
         shouldReopenRoom = false;
       } else {
@@ -348,7 +360,6 @@ const DatPhongModel = {
       );
 
       if (shouldReopenRoom && room && room.TrangThai === "DaDatCoc") {
-        // Kiểm tra chắc chắn không còn đơn DaDatCoc nào khác của phòng này
         const [otherActive] = await conn.execute(
           `SELECT MaDP FROM datphong WHERE MaPhong = ? AND MaDP != ? AND TrangThai = 'DaDatCoc' LIMIT 1`,
           [Number(booking.MaPhong), Number(maDP)],
@@ -432,100 +443,11 @@ const DatPhongModel = {
     return rows;
   },
 
-  // 11. Dành cho Cron Job (chạy mỗi 5 phút): Hủy QR quá 15p & xử lý đơn quá hạn giữ chỗ
-  processExpiredBookings: async () => {
-    const conn = await db.getConnection();
-    const expiredHoldList = [];
-    let cancelledQrCount = 0;
-
-    try {
-      await conn.beginTransaction();
-
-      // (a) Hủy các đơn ChoThanhToan đã quá ThoiGianHetHanQR
-      const [cancelRes] = await conn.execute(
-        `UPDATE datphong
-         SET TrangThai = 'DaHuy',
-             GhiChuHoanCoc = 'Tự động hủy do quá 15 phút chưa thanh toán'
-         WHERE TrangThai = 'ChoThanhToan'
-           AND ThoiGianHetHanQR <= NOW()`,
-      );
-      cancelledQrCount = cancelRes.affectedRows;
-
-      // (b) Tìm các đơn DaDatCoc đã quá ThoiGianHetHanGiu và khóa dòng
-      const [expiredRows] = await conn.execute(
-        `SELECT dp.MaDP, dp.MaTraCuu, dp.MaPhong, dp.HoTenKhach, dp.SDT, dp.SoTienCoc,
-                p.TenPhong, k.TenKhu, k.MaND AS MaQuanLyKhu
-         FROM datphong dp
-         INNER JOIN phong p ON dp.MaPhong = p.MaPhong
-         INNER JOIN khutro k ON p.MaKhu = k.MaKhu
-         WHERE dp.TrangThai = 'DaDatCoc'
-           AND dp.ThoiGianHetHanGiu IS NOT NULL
-           AND dp.ThoiGianHetHanGiu <= NOW()
-         FOR UPDATE`,
-      );
-
-      for (const item of expiredRows) {
-        await conn.execute(
-          `UPDATE datphong
-           SET TrangThai = 'QuaHanMatCoc',
-               GhiChuHoanCoc = 'Tự động chuyển quá hạn mất cọc do khách không đến xem phòng đúng hẹn'
-           WHERE MaDP = ?`,
-          [Number(item.MaDP)],
-        );
-
-        // Mở lại phòng về Trong nếu phòng vẫn đang ở trạng thái DaDatCoc
-        const [otherActive] = await conn.execute(
-          `SELECT MaDP FROM datphong WHERE MaPhong = ? AND MaDP != ? AND TrangThai = 'DaDatCoc' LIMIT 1`,
-          [Number(item.MaPhong), Number(item.MaDP)],
-        );
-        if (otherActive.length === 0) {
-          await conn.execute(
-            `UPDATE phong SET TrangThai = 'Trong' WHERE MaPhong = ? AND TrangThai = 'DaDatCoc'`,
-            [Number(item.MaPhong)],
-          );
-        }
-        expiredHoldList.push(item);
-      }
-
-      await conn.commit();
-      return { cancelledQrCount, expiredHoldList };
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
-    }
-  },
-
-  // Bổ sung / cập nhật các hàm sau trong server/src/app/models/datPhong.model.js
-
-  // 1. Lấy chi tiết đơn đặt phòng kèm đầy đủ thông tin Quản lý khu trọ
-  async getBookingDetail(whereClause, params) {
-    const [rows] = await db.execute(
-      `SELECT dp.*,
-            p.TenPhong, p.DienTich, p.Gia AS GiaPhong, p.TrangThai AS TrangThaiPhong, p.MaKhu,
-            k.TenKhu, k.DiaChi AS DiaChiKhu, k.MaND AS MaQuanLyKhu,
-            COALESCE(ttql.HoTen, ndql.TenTK) AS TenQuanLy,
-            ttql.SDT AS SDTQuanLy,
-            COALESCE(ttql.Email, ndql.TenTK) AS EmailQuanLy,
-            COALESCE(ttxl.HoTen, ndxl.TenTK) AS TenNguoiXuLy
-     FROM datphong dp
-     INNER JOIN phong p ON dp.MaPhong = p.MaPhong
-     INNER JOIN khutro k ON p.MaKhu = k.MaKhu
-     LEFT JOIN nguoidung ndql ON k.MaND = ndql.MaND
-     LEFT JOIN thongtincanhan ttql ON k.MaND = ttql.MaND
-     LEFT JOIN nguoidung ndxl ON dp.NguoiXuLy = ndxl.MaND
-     LEFT JOIN thongtincanhan ttxl ON dp.NguoiXuLy = ttxl.MaND
-     WHERE ${whereClause}
-     LIMIT 1`,
-      params,
-    );
-    return rows[0] || null;
-  },
-
-  // 2. Tạo thông báo nội bộ (MaLTB = 6) gửi cho Quản lý khu trọ đó và Chủ trọ
-  async createBookingNotification({ maQuanLyKhu, tieuDe, noiDung }, conn = db) {
-    // Tìm toàn bộ Chủ trọ (Quyen = 'ChuTro') để cùng nhận thông báo
+  // 11. Tạo thông báo nội bộ (MaLTB = 6) gửi cho Chủ trọ và Quản lý khu trọ
+  createBookingNotification: async (
+    { maLTB = 6, maQuanLyKhu, tieuDe, noiDung },
+    conn = db,
+  ) => {
     const [chuTroRows] = await conn.execute(
       `SELECT MaND FROM nguoidung WHERE Quyen = 'ChuTro'`,
     );
@@ -537,20 +459,19 @@ const DatPhongModel = {
     const dsNguoiNhan = Array.from(recipientSet).filter((id) => id > 0);
     if (dsNguoiNhan.length === 0) return { maTB: null, dsNguoiNhan: [] };
 
-    // NDGui là khóa ngoại NOT NULL tới nguoidung(MaND) -> dùng Chủ trọ (MaND = 1) làm người đại diện hệ thống
     const ndGui = Number(chuTroRows[0]?.MaND || maQuanLyKhu || 1);
 
     const [tbRes] = await conn.execute(
       `INSERT INTO thongbao (MaTBGoc, NDGui, MaLTB, TieuDe, NoiDung, NgayGui)
-     VALUES (NULL, ?, 6, ?, ?, NOW())`,
-      [ndGui, tieuDe, noiDung],
+       VALUES (NULL, ?, ?, ?, ?, NOW())`,
+      [ndGui, Number(maLTB) || 6, tieuDe, noiDung],
     );
 
     const maTB = tbRes.insertId;
     for (const ndNhan of dsNguoiNhan) {
       await conn.execute(
         `INSERT IGNORE INTO nhanthongbao (MaTB, NDNhan, TrangThai)
-       VALUES (?, ?, 'ChuaDoc')`,
+         VALUES (?, ?, 'ChuaDoc')`,
         [maTB, ndNhan],
       );
     }
@@ -558,17 +479,29 @@ const DatPhongModel = {
     return { maTB, dsNguoiNhan };
   },
 
-  // 3. Hủy đơn QR quá 15 phút theo OrderCode và đảm bảo phòng ở trạng thái 'Trong' (không có cọc)
-  async cancelExpiredQrByOrderCode(orderCode) {
+  // Alias trả về trực tiếp maTB để khớp với datPhong.controller.js
+  createInternalNotification: async (
+    { maLTB = 6, maQuanLyKhu, tieuDe, noiDung },
+    conn = db,
+  ) => {
+    const result = await DatPhongModel.createBookingNotification(
+      { maLTB, maQuanLyKhu, tieuDe, noiDung },
+      conn,
+    );
+    return result.maTB;
+  },
+
+  // 12. Hủy đơn QR quá 15 phút theo OrderCode và đảm bảo phòng về 'Trong'
+  cancelExpiredQrByOrderCode: async (orderCode) => {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
 
       const [rows] = await conn.execute(
         `SELECT MaDP, MaPhong, TrangThai, ThoiGianHetHanQR
-       FROM datphong
-       WHERE OrderCode = ?
-       FOR UPDATE`,
+         FROM datphong
+         WHERE OrderCode = ?
+         FOR UPDATE`,
         [Number(orderCode)],
       );
 
@@ -585,25 +518,24 @@ const DatPhongModel = {
 
       await conn.execute(
         `UPDATE datphong
-       SET TrangThai = 'DaHuy',
-           GhiChuHoanCoc = 'Tự động hủy do quá 15 phút chưa hoàn tất thanh toán'
-       WHERE MaDP = ?`,
+         SET TrangThai = 'DaHuy',
+             GhiChuHoanCoc = 'Tự động hủy do quá 15 phút chưa hoàn tất thanh toán'
+         WHERE MaDP = ?`,
         [dp.MaDP],
       );
 
-      // Đảm bảo phòng trở về 'Trong' nếu hiện không bị khóa bởi đơn DaDatCoc nào khác
       const [activeDeposits] = await conn.execute(
         `SELECT COUNT(*) AS cnt
-       FROM datphong
-       WHERE MaPhong = ? AND TrangThai IN ('DaDatCoc', 'DaHoanCoc_ChotThue')`,
+         FROM datphong
+         WHERE MaPhong = ? AND TrangThai IN ('DaDatCoc', 'DaHoanCoc_ChotThue')`,
         [dp.MaPhong],
       );
 
       if (Number(activeDeposits[0]?.cnt || 0) === 0) {
         await conn.execute(
           `UPDATE phong
-         SET TrangThai = 'Trong'
-         WHERE MaPhong = ? AND TrangThai = 'DaDatCoc'`,
+           SET TrangThai = 'Trong'
+           WHERE MaPhong = ? AND TrangThai = 'DaDatCoc'`,
           [dp.MaPhong],
         );
       }
@@ -618,79 +550,80 @@ const DatPhongModel = {
     }
   },
 
-  // 4. Cron Job xử lý hàng loạt: hủy đơn QR quá 15 phút + mở lại phòng không có cọc
-  async processExpiredBookings() {
+  // 13. Cron Job xử lý hàng loạt: hủy đơn QR quá 15 phút + mở lại phòng quá hạn giữ 48h
+  processExpiredBookings: async () => {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
 
-      // 4.1. Hủy toàn bộ đơn ChoThanhToan đã quá 15 phút
       const [expiredQrRows] = await conn.execute(
         `SELECT MaDP, MaPhong
-       FROM datphong
-       WHERE TrangThai = 'ChoThanhToan'
-         AND ThoiGianHetHanQR <= NOW()
-       FOR UPDATE`,
+         FROM datphong
+         WHERE TrangThai = 'ChoThanhToan'
+           AND ThoiGianHetHanQR <= NOW()
+         FOR UPDATE`,
       );
 
       let cancelledQrCount = 0;
       for (const row of expiredQrRows) {
         await conn.execute(
           `UPDATE datphong
-         SET TrangThai = 'DaHuy',
-             GhiChuHoanCoc = 'Tự động hủy do quá 15 phút chưa hoàn tất thanh toán'
-         WHERE MaDP = ?`,
+           SET TrangThai = 'DaHuy',
+               GhiChuHoanCoc = 'Tự động hủy do quá 15 phút chưa hoàn tất thanh toán'
+           WHERE MaDP = ?`,
           [row.MaDP],
         );
         cancelledQrCount++;
 
-        // Nếu phòng đang ở DaDatCoc nhưng không có đơn cọc hợp lệ nào -> mở về Trong
         const [cntRows] = await conn.execute(
           `SELECT COUNT(*) AS cnt
-         FROM datphong
-         WHERE MaPhong = ? AND TrangThai IN ('DaDatCoc', 'DaHoanCoc_ChotThue')`,
+           FROM datphong
+           WHERE MaPhong = ? AND TrangThai IN ('DaDatCoc', 'DaHoanCoc_ChotThue')`,
           [row.MaPhong],
         );
         if (Number(cntRows[0]?.cnt || 0) === 0) {
           await conn.execute(
             `UPDATE phong SET TrangThai = 'Trong'
-           WHERE MaPhong = ? AND TrangThai = 'DaDatCoc'`,
+             WHERE MaPhong = ? AND TrangThai = 'DaDatCoc'`,
             [row.MaPhong],
           );
         }
       }
 
-      // 4.2. Xử lý các đơn DaDatCoc đã quá hạn giữ phòng (48h) -> QuaHanMatCoc & mở phòng về Trong
       const [expiredHoldRows] = await conn.execute(
         `SELECT dp.MaDP, dp.MaTraCuu, dp.MaPhong, dp.HoTenKhach, dp.SDT, dp.Email, dp.SoTienCoc,
-              DATE_FORMAT(dp.ThoiGianHetHanGiu, '%Y-%m-%d %H:%i:%s') AS ThoiGianHetHanGiu,
-              p.TenPhong, k.TenKhu, k.MaND AS MaQuanLyKhu
-       FROM datphong dp
-       INNER JOIN phong p ON dp.MaPhong = p.MaPhong
-       INNER JOIN khutro k ON p.MaKhu = k.MaKhu
-       WHERE dp.TrangThai = 'DaDatCoc'
-         AND dp.ThoiGianHetHanGiu IS NOT NULL
-         AND dp.ThoiGianHetHanGiu <= NOW()
-       FOR UPDATE`,
+                DATE_FORMAT(dp.ThoiGianHetHanGiu, '%Y-%m-%d %H:%i:%s') AS ThoiGianHetHanGiu,
+                p.TenPhong, k.TenKhu, k.MaND AS MaQuanLyKhu
+         FROM datphong dp
+         INNER JOIN phong p ON dp.MaPhong = p.MaPhong
+         INNER JOIN khutro k ON p.MaKhu = k.MaKhu
+         WHERE dp.TrangThai = 'DaDatCoc'
+           AND dp.ThoiGianHetHanGiu IS NOT NULL
+           AND dp.ThoiGianHetHanGiu <= NOW()
+         FOR UPDATE`,
       );
 
       for (const row of expiredHoldRows) {
         await conn.execute(
           `UPDATE datphong
-         SET TrangThai = 'QuaHanMatCoc',
-             GhiChuHoanCoc = 'Quá thời hạn giữ chỗ mà khách không đến xem phòng'
-         WHERE MaDP = ?`,
+           SET TrangThai = 'QuaHanMatCoc',
+               GhiChuHoanCoc = 'Quá thời hạn giữ chỗ mà khách không đến xem phòng'
+           WHERE MaDP = ?`,
           [row.MaDP],
         );
         await conn.execute(
           `UPDATE phong SET TrangThai = 'Trong'
-         WHERE MaPhong = ? AND TrangThai = 'DaDatCoc'`,
+           WHERE MaPhong = ? AND TrangThai = 'DaDatCoc'`,
           [row.MaPhong],
         );
       }
 
       await conn.commit();
-      return { cancelledQrCount, expiredHoldRows };
+      return {
+        cancelledQrCount,
+        expiredHoldRows,
+        expiredHoldList: expiredHoldRows,
+      };
     } catch (err) {
       await conn.rollback();
       throw err;
@@ -698,7 +631,8 @@ const DatPhongModel = {
       conn.release();
     }
   },
-  // 12. Xóa vĩnh viễn đơn đặt cọc đã hủy hoặc quá hạn mất cọc
+
+  // 14. Xóa vĩnh viễn đơn đặt cọc đã hủy hoặc quá hạn mất cọc
   deleteExpiredOrCancelledById: async (maDP) => {
     const sql = `
       DELETE FROM datphong

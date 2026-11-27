@@ -6,6 +6,25 @@ const {
   emitXoaThongBao,
 } = require("../../services/socket.service");
 
+const MA_LTB_DAT_COC = 6;
+
+// Chuẩn hóa người gửi cho thông báo đặt cọc tự động (tránh hiện tên Chủ trọ do mượn NDGui = 1)
+const normalizeNotificationSender = (item) => {
+  if (!item || typeof item !== "object") return item;
+
+  const isDepositNoti =
+    Number(item.MaLTB) === MA_LTB_DAT_COC ||
+    String(item.TenLTB || "").toLowerCase().includes("đặt cọc");
+
+  if (!isDepositNoti) return item;
+
+  return {
+    ...item,
+    TenNguoiGui: "Hệ thống Đặt cọc",
+    QuyenNguoiGui: "HeThong",
+  };
+};
+
 const ThongBaoController = {
   // GET /api/thong-bao/metadata
   async getMetadata(req, res) {
@@ -15,7 +34,8 @@ const ThongBaoController = {
     } catch (error) {
       return res.status(error.statusCode || 500).json({
         success: false,
-        message: error.message || "Lỗi máy chủ khi tải dữ liệu phân quyền thông báo.",
+        message:
+          error.message || "Lỗi máy chủ khi tải dữ liệu phân quyền thông báo.",
       });
     }
   },
@@ -24,7 +44,10 @@ const ThongBaoController = {
   async getDanhSach(req, res) {
     try {
       const data = await ThongBaoService.searchThongBao(req.user, req.query);
-      return res.status(200).json({ success: true, data });
+      const normalized = Array.isArray(data)
+        ? data.map(normalizeNotificationSender)
+        : data;
+      return res.status(200).json({ success: true, data: normalized });
     } catch (error) {
       return res.status(error.statusCode || 500).json({
         success: false,
@@ -33,11 +56,18 @@ const ThongBaoController = {
     }
   },
 
-// GET /api/thong-bao/cua-toi
+  // GET /api/thong-bao/cua-toi
   async getThongBaoCuaToi(req, res) {
     try {
       const data = await ThongBaoService.getThongBaoCuaToi(req.user, req.query);
-      return res.status(200).json({ success: true, data });
+      const normalized =
+        data && Array.isArray(data.items)
+          ? {
+              ...data,
+              items: data.items.map(normalizeNotificationSender),
+            }
+          : data;
+      return res.status(200).json({ success: true, data: normalized });
     } catch (error) {
       return res.status(error.statusCode || 500).json({
         success: false,
@@ -72,7 +102,8 @@ const ThongBaoController = {
     try {
       const maTB = Number(req.params.maTB);
       const data = await ThongBaoService.getChiTietThongBao(req.user, maTB);
-      return res.status(200).json({ success: true, data });
+      const normalized = normalizeNotificationSender(data);
+      return res.status(200).json({ success: true, data: normalized });
     } catch (error) {
       return res.status(error.statusCode || 500).json({
         success: false,
@@ -86,7 +117,7 @@ const ThongBaoController = {
     try {
       const { thongBao, dsNguoiNhan } = await ThongBaoService.createThongBao(
         req.user,
-        req.body
+        req.body,
       );
 
       emitThongBaoMoi(dsNguoiNhan, thongBao);
@@ -161,7 +192,10 @@ const ThongBaoController = {
   async xoaThongBao(req, res) {
     try {
       const { maTB } = req.params;
-      const result = await ThongBaoService.deleteThongBao(req.user, Number(maTB));
+      const result = await ThongBaoService.deleteThongBao(
+        req.user,
+        Number(maTB),
+      );
 
       emitXoaThongBao(result.MaTB);
 

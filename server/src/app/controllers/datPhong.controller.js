@@ -401,7 +401,7 @@ const DatPhongController = {
               booking.NgayHenXem
             }. Mã tra cứu: ${booking.MaTraCuu}.`;
 
-        // 1. Lưu thông báo vào bảng thongbao & nhanthongbao (chống trùng tuyệt đối theo MaTraCuu / OrderCode)
+        // 1. Lưu thông báo vào bảng thongbao & nhanthongbao (chống trùng theo MaTraCuu / OrderCode)
         try {
           const [existingNotiRows] = await db.execute(
             `SELECT MaTB FROM thongbao
@@ -421,21 +421,73 @@ const DatPhongController = {
           );
 
           if (existingNotiRows.length === 0) {
-            const maTB = await DatPhongModel.createInternalNotification({
-              maLTB: 6,
-              maQuanLyKhu: booking.MaQuanLyKhu,
-              tieuDe,
-              noiDung,
-            });
+            // Đảm bảo luôn lấy được MaQuanLyKhu kể cả khi getById bị thiếu cột
+            let maQuanLyKhu = booking.MaQuanLyKhu
+              ? Number(booking.MaQuanLyKhu)
+              : null;
+
+            if (!maQuanLyKhu && booking.MaPhong) {
+              const [khuRows] = await db.execute(
+                `SELECT k.MaND AS MaQuanLyKhu
+                 FROM phong p
+                 INNER JOIN khutro k ON p.MaKhu = k.MaKhu
+                 WHERE p.MaPhong = ?
+                 LIMIT 1`,
+                [Number(booking.MaPhong)],
+              );
+              maQuanLyKhu = khuRows[0]?.MaQuanLyKhu
+                ? Number(khuRows[0].MaQuanLyKhu)
+                : null;
+            }
 
             const dsNguoiNhan = Array.from(
-              new Set([
-                1,
-                ...(booking.MaQuanLyKhu ? [Number(booking.MaQuanLyKhu)] : []),
-              ]),
+              new Set([1, ...(maQuanLyKhu ? [maQuanLyKhu] : [])]),
             );
 
-            emitThongBaoMoi(dsNguoiNhan, {
+            let maTB = null;
+
+            // Tương thích mọi phiên bản DatPhongModel + có fallback SQL trực tiếp
+            if (typeof DatPhongModel.createInternalNotification === "function") {
+              maTB = await DatPhongModel.createInternalNotification({
+                maLTB: 6,
+                maQuanLyKhu,
+                tieuDe,
+                noiDung,
+              });
+            } else if (
+              typeof DatPhongModel.createBookingNotification === "function"
+            ) {
+              const notiRes = await DatPhongModel.createBookingNotification({
+                maQuanLyKhu,
+                tieuDe,
+                noiDung,
+              });
+              maTB = notiRes?.maTB ?? notiRes;
+            } else {
+              const [insTb] = await db.execute(
+                `INSERT INTO thongbao (MaTBGoc, NDGui, MaLTB, TieuDe, NoiDung, NgayGui)
+                 VALUES (NULL, 1, 6, ?, ?, NOW())`,
+                [tieuDe, noiDung],
+              );
+              maTB = insTb.insertId;
+            }
+
+            // Đảm bảo tất cả người nhận (Chủ trọ = 1 & Quản lý khu) đều có trong nhanthongbao
+            if (maTB && dsNguoiNhan.length > 0) {
+              for (const ndId of dsNguoiNhan) {
+                await db.execute(
+                  `INSERT IGNORE INTO nhanthongbao (MaTB, NDNhan, TrangThai)
+                   VALUES (?, ?, 'ChuaDoc')`,
+                  [Number(maTB), Number(ndId)],
+                );
+              }
+            }
+
+            console.log(
+              `[DatPhong][Noti] Đã tạo MaTB=${maTB} cho đơn ${booking.MaTraCuu} -> NDNhan=${dsNguoiNhan.join(",")}`,
+            );
+
+            const socketPayload = {
               MaTB: maTB,
               MaTBGoc: null,
               NDGui: 1,
@@ -447,10 +499,22 @@ const DatPhongController = {
               NoiDung: noiDung,
               NgayGui: new Date().toISOString(),
               TrangThai: "ChuaDoc",
-            });
+            };
+
+            if (typeof emitThongBaoMoi === "function") {
+              emitThongBaoMoi(dsNguoiNhan, socketPayload);
+            } else if (io) {
+              dsNguoiNhan.forEach((ndId) => {
+                io.to(`user_${ndId}`).emit("NEW_NOTIFICATION", socketPayload);
+                io.to(`user_${ndId}`).emit("thong_bao_moi", socketPayload);
+              });
+            }
           }
         } catch (notiErr) {
-          console.error("[DatPhong] Lỗi tạo thông báo nội bộ:", notiErr.message);
+          console.error(
+            `[DatPhong][Noti] Lỗi tạo thông báo nội bộ cho ${booking.MaTraCuu}:`,
+            notiErr,
+          );
         }
 
         // 2. Gửi Email hóa đơn kèm thông tin liên hệ quản lý qua Brevo
