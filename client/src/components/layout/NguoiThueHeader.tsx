@@ -40,11 +40,10 @@ export default function NguoiThueHeader({ user }: NguoiThueHeaderProps) {
     {
       label: 'Hóa đơn & Thanh toán',
       href: '/nguoiThue/hoaDon',
-      // Sáng menu khi ở trang danh sách hóa đơn hoặc trang chi tiết thanh toán [maHD]
       matchPaths: ['/nguoiThue/hoaDon', '/nguoiThue/thanhToan'],
     },
     {
-      label: 'Thẻ ra vào',
+      label: 'Quản lý ra vào',
       href: '/nguoiThue/theRaVao',
       matchPaths: ['/nguoiThue/theRaVao'],
     },

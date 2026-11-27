@@ -91,6 +91,8 @@ export const PhongTroService = {
     TenKhu: string;
     DiaChi: string;
     MoTa: string;
+    MatKhau?: string;
+    MaMoCua?: string;
   }) =>
     requestJson<ApiResponse<KhuTroItem>>('/khu-tro', {
       method: 'POST',
@@ -99,11 +101,30 @@ export const PhongTroService = {
 
   updateKhuTro: (
     maKhu: number,
-    payload: { MaND?: number; TenKhu: string; DiaChi: string; MoTa: string }
+    payload: {
+      MaND?: number;
+      TenKhu: string;
+      DiaChi: string;
+      MoTa: string;
+      MatKhau?: string;
+      MaMoCua?: string;
+    }
   ) =>
     requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
+    }),
+
+  updateMatKhauCua: (maKhu: number, matKhau: string) =>
+    requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}/mat-khau`, {
+      method: 'PUT',
+      body: JSON.stringify({ MatKhau: matKhau }),
+    }),
+
+  updateMaMoCua: (maKhu: number, maMoCua: string) =>
+    requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}/ma-mo-cua`, {
+      method: 'PUT',
+      body: JSON.stringify({ MaMoCua: maMoCua }),
     }),
 
   deleteKhuTro: (maKhu: number) =>

@@ -11,7 +11,7 @@ import {
 } from '../../../services/phongTro.service';
 import { KhuTroItem, PhongItem } from '../../../types/phongTro.type';
 
-export default function QuanLyKhuTroVaPhongPage() {
+export default function QuanLyPhongTroPage() {
   const { showSuccess, showError, showConfirm } = useAlertModal();
 
   const [khuTroList, setKhuTroList] = useState<KhuTroItem[]>([]);
@@ -28,7 +28,6 @@ export default function QuanLyKhuTroVaPhongPage() {
       const khus = khuRes.data || [];
       setKhuTroList(khus);
 
-      // Nếu là Quản lý chỉ có 1 khu trọ thì tự động chọn luôn khu đó
       const defaultKhu = khus.length === 1 ? khus[0].MaKhu : 0;
       setSelectedMaKhu((prev) => (prev === 0 && khus.length === 1 ? defaultKhu : prev));
     } catch (err: unknown) {
@@ -59,35 +58,7 @@ export default function QuanLyKhuTroVaPhongPage() {
     fetchRooms();
   }, [fetchRooms]);
 
-  const activeKhu = khuTroList.find((k) => k.MaKhu === selectedMaKhu);
-
-  const handleDeleteKhuTro = (khu: KhuTroItem) => {
-    showConfirm(
-      `Bạn có chắc chắn muốn xóa "${khu.TenKhu}" không? Hành động này chỉ thực hiện được khi khu trọ chưa có phòng nào.`,
-      'Xác nhận xóa Khu trọ',
-      async () => {
-        try {
-          await PhongTroService.deleteKhuTro(khu.MaKhu);
-          showSuccess('Đã xóa khu trọ thành công!');
-          setSelectedMaKhu(0);
-          fetchInitialData();
-        } catch (err: unknown) {
-          if (err instanceof Error) showError(err.message);
-        }
-      }
-    );
-  };
-
   const handleDeletePhong = (room: PhongItem) => {
-    if (room.TrangThai === 'DaDatCoc') {
-      showError(
-        `Phòng ${room.TenPhong} đang có khách đặt cọc giữ chỗ. Vui lòng xử lý hoàn cọc tại mục "Đặt cọc giữ phòng" trước khi xóa.`,
-        'Không thể xóa phòng',
-        4
-      );
-      return;
-    }
-
     showConfirm(
       `Bạn có chắc chắn muốn xóa phòng "${room.TenPhong}" (${room.TenKhu}) không?`,
       'Xác nhận xóa Phòng trọ',
@@ -112,13 +83,6 @@ export default function QuanLyKhuTroVaPhongPage() {
         </span>
       );
     }
-    if (trangThai === 'DaDatCoc') {
-      return (
-        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-300">
-          Đang được cọc
-        </span>
-      );
-    }
     if (trangThai === 'DangThue') {
       return (
         <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300">
@@ -127,7 +91,7 @@ export default function QuanLyKhuTroVaPhongPage() {
       );
     }
     return (
-      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300">
+      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
         Đang bảo trì
       </span>
     );
@@ -140,29 +104,20 @@ export default function QuanLyKhuTroVaPhongPage() {
           <QuanLyHeader user={user} />
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-            {/* 1. Tiêu đề trang & Cụm nút Thêm mới */}
+            {/* 1. Tiêu đề trang & Nút Thêm Phòng Mới */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-                  Quản Lý Cơ Sở & Phòng Trọ
+                  Quản Lý Phòng Trọ
                 </h1>
                 <p className="text-xs text-slate-500 mt-1">
                   {user.Quyen === 'ChuTro'
-                    ? 'Chủ trọ quản lý toàn bộ các khu trọ và danh sách phòng trên hệ thống'
-                    : 'Quản lý cơ sở và danh sách phòng trọ thuộc phạm vi phụ trách của bạn'}
+                    ? 'Chủ trọ quản lý danh sách phòng trọ trên toàn bộ hệ thống'
+                    : 'Quản lý danh sách phòng trọ thuộc phạm vi cơ sở phụ trách của bạn'}
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2.5">
-                {user.Quyen === 'ChuTro' && (
-                  <Link
-                    href="/chuTro/phongTro/khuTro/them"
-                    className="flex-1 sm:flex-initial text-center px-4 py-2.5 rounded-full border-2 border-[#00FFCC] bg-white hover:bg-[#00FFCC]/20 text-slate-900 text-xs font-bold transition no-underline"
-                  >
-                    Thêm Khu Trọ
-                  </Link>
-                )}
-
                 <Link
                   href={
                     selectedMaKhu
@@ -176,84 +131,41 @@ export default function QuanLyKhuTroVaPhongPage() {
               </div>
             </div>
 
-            {/* 2. Thanh chọn Khu trọ */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                {khuTroList.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMaKhu(0)}
-                    className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                      selectedMaKhu === 0
-                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    Tất cả cơ sở ({khuTroList.reduce((acc, k) => acc + Number(k.TongSoPhong || 0), 0)})
-                  </button>
-                )}
-
-                {khuTroList.map((khu) => (
-                  <button
-                    key={khu.MaKhu}
-                    type="button"
-                    onClick={() => setSelectedMaKhu(khu.MaKhu)}
-                    className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                      selectedMaKhu === khu.MaKhu
-                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {khu.TenKhu} ({khu.TongSoPhong || 0})
-                  </button>
-                ))}
-              </div>
-
-              {/* Khung thông tin Khu trọ đang chọn */}
-              {activeKhu && (
-                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-base font-bold text-slate-900">
-                        {activeKhu.TenKhu}
-                      </h2>
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#00FFCC]/40 text-slate-900">
-                        Quản lý: {activeKhu.TenQuanLy || 'Chưa gán'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600">
-                      <strong>Địa chỉ:</strong> {activeKhu.DiaChi}
-                    </p>
-                    {activeKhu.MoTa && (
-                      <p className="text-xs text-slate-500">{activeKhu.MoTa}</p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Link
-                      href={`/chuTro/phongTro/khuTro/sua/${activeKhu.MaKhu}`}
-                      className="px-4 py-2 rounded-full bg-white hover:bg-[#00FFCC] text-slate-800 border border-slate-300 text-xs font-bold transition no-underline"
-                    >
-                      Sửa cơ sở
-                    </Link>
-
-                    {user.Quyen === 'ChuTro' && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteKhuTro(activeKhu)}
-                        className="px-4 py-2 rounded-full bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold transition cursor-pointer"
-                      >
-                        Xóa cơ sở
-                      </button>
-                    )}
-                  </div>
-                </div>
+            {/* 2. Thanh lọc theo Cơ sở */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              {khuTroList.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMaKhu(0)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    selectedMaKhu === 0
+                      ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Tất cả cơ sở ({khuTroList.reduce((acc, k) => acc + Number(k.TongSoPhong || 0), 0)})
+                </button>
               )}
+
+              {khuTroList.map((khu) => (
+                <button
+                  key={khu.MaKhu}
+                  type="button"
+                  onClick={() => setSelectedMaKhu(khu.MaKhu)}
+                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    selectedMaKhu === khu.MaKhu
+                      ? 'bg-[#00FFCC] text-slate-900 border border-teal-400 shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {khu.TenKhu} ({khu.TongSoPhong || 0})
+                </button>
+              ))}
             </div>
 
             {/* 3. Bộ lọc & Tìm kiếm phòng */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-              <div className="lg:col-span-5">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="sm:col-span-6">
                 <input
                   type="text"
                   value={keyword}
@@ -263,11 +175,10 @@ export default function QuanLyKhuTroVaPhongPage() {
                 />
               </div>
 
-              <div className="lg:col-span-7 flex flex-wrap items-center gap-2">
+              <div className="sm:col-span-6 flex flex-wrap items-center gap-2">
                 {[
                   { value: '', label: 'Tất cả trạng thái' },
                   { value: 'Trong', label: 'Đang trống' },
-                  { value: 'DaDatCoc', label: 'Đang được cọc' },
                   { value: 'DangThue', label: 'Đang thuê' },
                   { value: 'BaoTri', label: 'Bảo trì' },
                 ].map((st) => (
@@ -277,9 +188,7 @@ export default function QuanLyKhuTroVaPhongPage() {
                     onClick={() => setStatusFilter(st.value)}
                     className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                       statusFilter === st.value
-                        ? st.value === 'DaDatCoc'
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-[#00FFCC] text-slate-900'
+                        ? 'bg-[#00FFCC] text-slate-900'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -310,7 +219,6 @@ export default function QuanLyKhuTroVaPhongPage() {
                     key={room.MaPhong}
                     className="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition overflow-hidden flex flex-col"
                   >
-                    {/* Ảnh chính (AnhChinh = 1) */}
                     <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
                       <img
                         src={resolveRoomImageUrl(room.AnhDaiDien)}
@@ -327,7 +235,6 @@ export default function QuanLyKhuTroVaPhongPage() {
                       </div>
                     </div>
 
-                    {/* Thông tin phòng */}
                     <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                       <div>
                         <div className="flex items-baseline justify-between gap-2">
@@ -343,22 +250,6 @@ export default function QuanLyKhuTroVaPhongPage() {
                           {Number(room.Gia).toLocaleString('vi-VN')} đ / tháng
                         </p>
 
-                        {/* Ghi chú nhanh khi phòng đang được đặt cọc */}
-                        {room.TrangThai === 'DaDatCoc' && (
-                          <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-orange-50 border border-orange-200 px-3 py-1.5 text-[11px]">
-                            <span className="font-semibold text-orange-800">
-                              Phòng đang giữ chỗ cọc
-                            </span>
-                            <Link
-                              href="/chuTro/datPhong"
-                              className="font-bold text-orange-700 hover:underline no-underline shrink-0"
-                            >
-                              Xem đơn cọc →
-                            </Link>
-                          </div>
-                        )}
-
-                        {/* Danh sách Tiện ích */}
                         <div className="mt-3 flex flex-wrap gap-1.5">
                           {room.TienIch && room.TienIch.length > 0 ? (
                             room.TienIch.map((ti) => (
@@ -377,7 +268,6 @@ export default function QuanLyKhuTroVaPhongPage() {
                         </div>
                       </div>
 
-                      {/* Cụm nút điều hướng */}
                       <div className="pt-3 border-t border-slate-100 flex items-center gap-2">
                         <Link
                           href={`/chuTro/phongTro/chiTiet/${room.MaPhong}`}

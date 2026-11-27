@@ -17,11 +17,19 @@ router.post("/iot/quet-the", verifyDeviceKey, TheRaVaoController.iotQuetThe);
 router.get("/iot/lenh-ghi", verifyDeviceKey, TheRaVaoController.iotLayLenhGhi);
 router.post("/iot/xac-nhan-ghi", verifyDeviceKey, TheRaVaoController.iotXacNhanGhi);
 
-// 2. Nhóm API cho Người thuê
+// 2. Nhóm API mở cổng bằng NFC trên điện thoại
+router.post(
+  "/nfc/mo-cua",
+  verifyToken,
+  authorizeRoles("KhachThue", "QuanLy", "ChuTro"),
+  TheRaVaoController.moCuaBangNFC
+);
+
+// 3. Nhóm API cho Người thuê
 router.get("/cua-toi", verifyToken, authorizeRoles("KhachThue"), TheRaVaoController.getTheCuaToi);
 router.post("/yeu-cau-cap-lai", verifyToken, authorizeRoles("KhachThue"), TheRaVaoController.yeuCauCapLai);
 
-// 3. Nhóm API cho Chủ trọ & Quản lý
+// 4. Nhóm API cho Chủ trọ & Quản lý
 router.get("/lich-su", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getLichSuRaVao);
 router.get("/danh-sach", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getDanhSachThe);
 router.get("/chua-co-the", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.getNguoiChuaCoThe);
@@ -33,5 +41,7 @@ router.post("/phien-ghi/:sessionId/huy", verifyToken, authorizeRoles("ChuTro", "
 
 router.patch("/:maThe/khoa", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.khoaThe);
 router.delete("/:maThe", verifyToken, authorizeRoles("ChuTro", "QuanLy"), TheRaVaoController.xoaThe);
+
+router.post( "/iot/kiem-tra-mat-khau", verifyDeviceKey, TheRaVaoController.iotKiemTraMatKhau);
 
 module.exports = router;

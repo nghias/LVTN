@@ -3,11 +3,16 @@ const crypto = require("crypto");
 const db = require("../database/db");
 const TheRaVaoModel = require("../app/models/theRaVao.model");
 const LichSuTheModel = require("../app/models/lichSuThe.model");
+const KhuTroModel = require("../app/models/khuTro.model");
 
 // Quản lý phiên ghi thẻ tạm trong bộ nhớ (không sửa DB khi chưa quẹt thẻ)
 const WRITE_SESSION_TTL_MS = 60000;
 const activeSessionByKhu = new Map(); // maKhu -> sessionId
 const sessionById = new Map();        // sessionId -> sessionObject
+
+// Hàng đợi lệnh mở cửa từ điện thoại quét NFC theo từng MaKhu (tự hết hạn sau 20 giây)
+const REMOTE_OPEN_TTL_MS = 20000;
+const pendingDoorOpenByKhu = new Map(); // maKhu -> { hoTen, tenPhong, createdAt }
 
 function taoMaBiMat(maKhu) {
   const rand = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -33,6 +38,13 @@ function cleanupExpiredSessions() {
       sessionById.delete(sid);
     }
   }
+
+  // Dọn lệnh mở cửa NFC quá hạn
+  for (const [maKhu, cmd] of pendingDoorOpenByKhu.entries()) {
+    if (now - cmd.createdAt > REMOTE_OPEN_TTL_MS) {
+      pendingDoorOpenByKhu.delete(maKhu);
+    }
+  }
 }
 
 const getUserId = (user) => Number(user?.MaND ?? user?.maND);
@@ -43,7 +55,7 @@ const isQuanLy = (user) => getUserRole(user) === "QuanLy";
 async function loadReferenceData() {
   const [[khuTros], [phongs], [hopDongs], [cthdts], [thongTinCaNhans]] =
     await Promise.all([
-      db.query(`SELECT MaKhu, TenKhu, MaND FROM KhuTro ORDER BY MaKhu ASC`),
+      db.query(`SELECT MaKhu, TenKhu, MaND, MaMoCua FROM KhuTro ORDER BY MaKhu ASC`),
       db.query(`SELECT MaPhong, TenPhong, MaKhu FROM Phong`),
       db.query(`SELECT MaHDT, MaPhong, TrangThai FROM HopDongThue`),
       db.query(`SELECT MaHDT, MaND, NgayDi FROM ChiTietHopDongThue`),
@@ -155,16 +167,34 @@ const TheRaVaoService = {
   async layLenhGhiThe(maKhu) {
     cleanupExpiredSessions();
     const khuId = Number(maKhu);
+
+    // 1. Ưu tiên kiểm tra lệnh mở cổng qua NFC điện thoại
+    const remoteCmd = pendingDoorOpenByKhu.get(khuId);
+    if (remoteCmd) {
+      pendingDoorOpenByKhu.delete(khuId);
+      if (Date.now() - remoteCmd.createdAt <= REMOTE_OPEN_TTL_MS) {
+        return {
+          openDoor: true,
+          source: "NFC",
+          hoTen: remoteCmd.hoTen,
+          tenPhong: remoteCmd.tenPhong,
+          hasJob: false,
+        };
+      }
+    }
+
+    // 2. Kiểm tra lệnh ghi phôi thẻ RFID mới
     const sid = activeSessionByKhu.get(khuId);
-    if (!sid) return { hasJob: false };
+    if (!sid) return { openDoor: false, hasJob: false };
 
     const session = sessionById.get(sid);
     if (!session || session.status !== "WAITING") {
       activeSessionByKhu.delete(khuId);
-      return { hasJob: false };
+      return { openDoor: false, hasJob: false };
     }
 
     return {
+      openDoor: false,
       hasJob: true,
       sessionId: session.sessionId,
       mode: session.mode,
@@ -261,8 +291,83 @@ const TheRaVaoService = {
   },
 
   // =========================================================
-  // B. NGƯỜI THUÊ (KhachThue)
+  // B. NGƯỜI THUÊ & MỞ CỔNG BẰNG NFC ĐIỆN THOẠI
   // =========================================================
+  async moCuaBangNFC(user, { maMoCua }) {
+    const cleanCode = String(maMoCua || "").trim();
+    if (!cleanCode) {
+      const err = new Error("Không đọc được mã mở cửa từ thẻ NFC.");
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const khu = await KhuTroModel.findByMaMoCua(cleanCode);
+    if (!khu) {
+      const err = new Error(
+        "Thẻ NFC này chưa được đăng ký làm thẻ mở cổng trên hệ thống."
+      );
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const maND = getUserId(user);
+    const maKhu = Number(khu.MaKhu);
+    const ref = await loadReferenceData();
+    const ctx = resolveUserContext(maND, ref);
+    const hoTen = ctx.HoTen || user?.HoTen || "Cư dân";
+    const rental = ref.activeRentalByMaND.get(maND);
+
+    let tenPhong = "Ban quản lý";
+    if (isChuTro(user)) {
+      tenPhong = "Chủ trọ";
+    } else if (isQuanLy(user)) {
+      if (Number(khu.MaND) !== maND) {
+        const err = new Error(
+          "Bạn chỉ có quyền mở cổng tại cơ sở mình phụ trách."
+        );
+        err.statusCode = 403;
+        throw err;
+      }
+      tenPhong = "Quản lý";
+    } else {
+      if (!rental) {
+        const err = new Error(
+          "Bạn không có hợp đồng thuê phòng còn hiệu lực để mở cổng."
+        );
+        err.statusCode = 403;
+        throw err;
+      }
+      if (Number(rental.MaKhu) !== maKhu) {
+        const err = new Error("Thẻ cổng này không thuộc cơ sở bạn đang thuê.");
+        err.statusCode = 403;
+        throw err;
+      }
+      tenPhong = rental.TenPhong;
+    }
+
+    // Đẩy lệnh mở cổng vào hàng đợi cho ESP32 tại đúng cơ sở
+    pendingDoorOpenByKhu.set(maKhu, {
+      hoTen,
+      tenPhong,
+      createdAt: Date.now(),
+    });
+
+    // Ghi nhận lịch sử mở cổng vào LichSuThe (nếu người dùng đã có bản ghi thẻ)
+    const userCards = await TheRaVaoModel.findByMaND(maND);
+    const targetCard =
+      userCards.find((c) => c.TrangThai === "HoatDong") || userCards[0];
+    if (targetCard) {
+      await LichSuTheModel.create(targetCard.MaThe);
+    }
+
+    return {
+      maKhu,
+      tenKhu: khu.TenKhu,
+      tenPhong,
+      message: `Xác thực thành công! Cổng ${khu.TenKhu} đang mở...`,
+    };
+  },
+
   async getThongTinTheCuaToi(user, { tuNgay, denNgay } = {}) {
     const maND = getUserId(user);
     const ref = await loadReferenceData();
@@ -285,7 +390,14 @@ const TheRaVaoService = {
     });
 
     const theMap = new Map(dsThe.map((t) => [t.MaThe, t]));
-    const thongTinThue = ref.activeRentalByMaND.get(maND) || null;
+    const rental = ref.activeRentalByMaND.get(maND) || null;
+    const khuInfo = rental ? ref.khuMap.get(Number(rental.MaKhu)) : null;
+    const thongTinThue = rental
+      ? {
+          ...rental,
+          DaCaiDatTheCuaNFC: Boolean(khuInfo?.MaMoCua),
+        }
+      : null;
 
     const lichSu = lichSuRaw.map((ls) => ({
       MaLS: ls.MaLS,
@@ -676,6 +788,37 @@ const TheRaVaoService = {
     await TheRaVaoModel.deleteById(maThe);
 
     return { maThe, deleted: true };
+  },
+
+  async xacThucMatKhau({ maKhu, matKhau }) {
+    const khuId = Number(maKhu);
+    const cleanPass = String(matKhau || "").trim();
+
+    if (!khuId || !cleanPass) {
+      return { allow: false, message: "Thiếu mã cơ sở hoặc mật khẩu." };
+    }
+
+    const khu = await KhuTroModel.getById(khuId);
+    if (!khu) {
+      return { allow: false, message: "Không tìm thấy cơ sở." };
+    }
+
+    if (!khu.MatKhau) {
+      return { allow: false, message: "Cơ sở chưa thiết lập mật khẩu cửa." };
+    }
+
+    if (String(khu.MatKhau).trim() !== cleanPass) {
+      return { allow: false, message: "Mật khẩu mở cửa không chính xác." };
+    }
+
+    return {
+      allow: true,
+      message: "Mật khẩu hợp lệ! Đang mở cổng...",
+      data: {
+        maKhu: khuId,
+        tenKhu: khu.TenKhu,
+      },
+    };
   },
 
   async getLichSuRaVao(user, { maKhu, tuNgay, denNgay, keyword } = {}) {

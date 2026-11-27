@@ -11,6 +11,8 @@ export interface KhuTroItem {
   TongSoPhong?: number;
   SoPhongTrong?: number;
   SoPhongDaDatCoc?: number;
+  MatKhau?: string | null;
+  MaMoCua?: string | null;
 }
 
 export interface TienIchItem {
