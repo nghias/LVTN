@@ -36,7 +36,8 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
     {
       groupLabel: 'Không gian & Phòng',
       items: [
-        { label: 'Cơ sở & Phòng', href: '/chuTro/phongTro' },
+        { label: 'Quản lý cơ sở', href: '/chuTro/khuTro' },
+        { label: 'Phòng trọ', href: '/chuTro/phongTro' },
         { label: 'Tiện ích phòng', href: '/chuTro/tienIch' },
       ],
     },
@@ -63,7 +64,8 @@ export default function QuanLyHeader({ user }: QuanLyHeaderProps) {
   // Danh sách đầy đủ hiển thị trên giao diện Điện thoại
   const allMobileNavItems: NavItem[] = [
     { label: 'Thống kê', href: '/chuTro/thongKe' },
-    { label: 'Cơ sở & Phòng', href: '/chuTro/phongTro' },
+    { label: 'Quản lý cơ sở', href: '/chuTro/khuTro' },
+    { label: 'Phòng trọ', href: '/chuTro/phongTro' },
     { label: 'Tiện ích', href: '/chuTro/tienIch' },
     { label: 'Phí dịch vụ', href: '/chuTro/phiDichVu' },
     { label: 'Đăng tin', href: '/chuTro/tinDang' },

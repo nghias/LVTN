@@ -130,6 +130,12 @@ export const theRaVaoService = {
       headers: options?.silent ? { "x-silent-fetch": "1" } : undefined,
     });
   },
+  
+  moCuaBangNFC: (maMoCua: string) =>
+  request("/nfc/mo-cua", {
+    method: "POST",
+    body: JSON.stringify({ maMoCua }),
+  }),
 
   getDanhSachThe: (params?: {
     maKhu?: string;

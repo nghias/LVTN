@@ -23,22 +23,22 @@ export default function ThemKhuTroPage() {
   return (
     <FormPageLayout
       allowedRoles={['ChuTro']}
-      backHref="/chuTro/phongTro"
-      backLabel="Quay lại danh sách Khu trọ & Phòng"
-      title="Thêm Khu Trọ (Cơ Sở) Mới"
+      backHref="/chuTro/khuTro"
+      backLabel="Quay lại danh sách Cơ sở"
+      title="Thêm Cơ Sở Mới"
     >
       {() => (
         <KhuTroForm
           initialData={{ maND: quanLyList[0]?.MaND || 2 }}
           quanLyList={quanLyList}
           submitting={submitting}
-          submitLabel="Lưu Khu Trọ"
+          submitLabel="Lưu Cơ Sở"
           onSubmit={async (payload) => {
             try {
               setSubmitting(true);
               await PhongTroService.createKhuTro(payload);
-              showSuccess('Thêm khu trọ mới thành công!', 'Thành công', 1.5, () => {
-                router.push('/chuTro/phongTro');
+              showSuccess('Thêm cơ sở mới thành công!', 'Thành công', 1.5, () => {
+                router.push('/chuTro/khuTro');
               });
             } catch (err: unknown) {
               if (err instanceof Error) showError(err.message);

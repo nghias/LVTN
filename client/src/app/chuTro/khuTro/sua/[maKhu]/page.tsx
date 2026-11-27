@@ -53,11 +53,11 @@ export default function SuaKhuTroPage() {
   return (
     <FormPageLayout
       allowedRoles={['ChuTro', 'QuanLy']}
-      backHref="/chuTro/phongTro"
-      backLabel="Quay lại danh sách Khu trọ & Phòng"
-      title="Chỉnh Sửa Thông Tin Khu Trọ"
+      backHref="/chuTro/khuTro"
+      backLabel="Quay lại danh sách Cơ sở"
+      title="Chỉnh Sửa Thông Tin Cơ Sở"
       loading={loading}
-      loadingText="Đang tải thông tin khu trọ..."
+      loadingText="Đang tải thông tin cơ sở..."
     >
       {(user) => (
         <KhuTroForm
@@ -70,8 +70,8 @@ export default function SuaKhuTroPage() {
             try {
               setSubmitting(true);
               await PhongTroService.updateKhuTro(maKhu, payload);
-              showSuccess('Cập nhật thông tin khu trọ thành công!', 'Thành công', 1.5, () => {
-                router.push('/chuTro/phongTro');
+              showSuccess('Cập nhật thông tin cơ sở thành công!', 'Thành công', 1.5, () => {
+                router.push('/chuTro/khuTro');
               });
             } catch (err: unknown) {
               if (err instanceof Error) showError(err.message);

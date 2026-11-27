@@ -11,15 +11,17 @@ import {
   TheRaVaoItem,
   LichSuTheItem,
 } from "@/services/theRaVao.service";
+import { isWebNfcSupported, readNfcDoorTag } from "@/utils/webNfc.util";
 
 interface ThongTinThue {
   TenPhong: string;
   TenKhu: string;
+  DaCaiDatTheCuaNFC?: boolean;
 }
 
 const AUTO_REFRESH_MS = 4000;
 
-function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
+function NguoiThueQuanLyRaVaoContent({ user }: { user: UserProfile }) {
   const { showSuccess, showError } = useAlertModal();
   const showErrorRef = useRef(showError);
   showErrorRef.current = showError;
@@ -28,8 +30,12 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
   const [dsThe, setDsThe] = useState<TheRaVaoItem[]>([]);
   const [lichSu, setLichSu] = useState<LichSuTheItem[]>([]);
   const [thongTinThue, setThongTinThue] = useState<ThongTinThue | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
   const [newLogIds, setNewLogIds] = useState<number[]>([]);
+
+  // Trạng thái mở cửa bằng NFC điện thoại
+  const [nfcSupported, setNfcSupported] = useState<boolean>(true);
+  const [nfcState, setNfcState] = useState<"idle" | "scanning" | "verifying">("idle");
+  const nfcAbortRef = useRef<AbortController | null>(null);
 
   // Form yêu cầu cấp lại thẻ
   const [lyDo, setLyDo] = useState<string>("");
@@ -46,6 +52,13 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
   const isFetchingRef = useRef<boolean>(false);
   const initializedRef = useRef<boolean>(false);
   const knownLogIdsRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    setNfcSupported(isWebNfcSupported());
+    return () => {
+      nfcAbortRef.current?.abort();
+    };
+  }, []);
 
   const formatDateVN = (dateStr?: string) => {
     if (!dateStr) return "—";
@@ -90,20 +103,13 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
           setDsThe(res.data.dsThe || []);
           setLichSu(nextLogs);
           setThongTinThue(res.data.thongTinThue || null);
-          setLastUpdated(
-            new Date().toLocaleTimeString("vi-VN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-          );
         }
       } catch (err: unknown) {
         if (!silent) {
           showErrorRef.current(
             err instanceof Error
               ? err.message
-              : "Không thể tải thông tin thẻ ra vào."
+              : "Không thể tải thông tin quản lý ra vào."
           );
         }
       } finally {
@@ -114,7 +120,7 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
     []
   );
 
-  // Tải lần đầu + tự động cập nhật ngầm mỗi 4 giây (không load lại trang)
+  // Tải lần đầu + tự động cập nhật ngầm mỗi 4 giây
   useEffect(() => {
     loadData(undefined, false);
 
@@ -136,6 +142,42 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [loadData]);
+
+  // Thao tác quét thẻ NFC gắn cổng bằng điện thoại
+  const handleQuetNfcMoCong = async () => {
+    if (!thongTinThue) {
+      showError("Bạn cần có hợp đồng thuê còn hiệu lực để sử dụng mở cổng NFC.");
+      return;
+    }
+
+    const abortController = new AbortController();
+    nfcAbortRef.current = abortController;
+
+    try {
+      setNfcState("scanning");
+      const { code } = await readNfcDoorTag(25000, abortController.signal);
+
+      setNfcState("verifying");
+      const res = await theRaVaoService.moCuaBangNFC(code);
+      showSuccess(res.message || "Xác thực thành công! Cổng đang mở...");
+      await loadData(undefined, true);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === "ABORTED_BY_USER") {
+        return;
+      }
+      showError(
+        err instanceof Error ? err.message : "Không thể mở cổng bằng NFC."
+      );
+    } finally {
+      nfcAbortRef.current = null;
+      setNfcState("idle");
+    }
+  };
+
+  const handleHuyQuetNfc = () => {
+    nfcAbortRef.current?.abort();
+    setNfcState("idle");
+  };
 
   const handleYeuCauCapLai = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,17 +249,102 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-200">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Thẻ Ra Vào & Lịch Sử Mở Cổng
+              Quản Lý Ra Vào
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               {thongTinThue
                 ? `Phòng ${thongTinThue.TenPhong} • ${thongTinThue.TenKhu}`
-                : "Theo dõi thẻ từ RFID cá nhân, gửi yêu cầu cấp lại thẻ và xem lịch sử ra vào của bạn."}
+                : "Mở cổng bằng NFC trên điện thoại, quản lý thẻ từ RFID và theo dõi lịch sử ra vào của bạn."}
             </p>
           </div>
         </div>
 
-        {/* 1. Thông tin thẻ hiện tại & Yêu cầu cấp lại */}
+        {/* 1. MỞ CỔNG NHANH BẰNG NFC TRÊN ĐIỆN THOẠI (Ưu tiên trên cùng cho thao tác 1 chạm) */}
+        <section className="p-5 sm:p-6 rounded-2xl border-2 border-[#00FFCC] bg-gradient-to-br from-slate-900 via-slate-900 to-teal-950 text-white shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#00FFCC] text-slate-900 text-[11px] font-bold">
+                  Mở cổng không cần thẻ
+                </span>
+                {thongTinThue?.DaCaiDatTheCuaNFC === false && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 border border-amber-400/40 text-[11px] font-semibold">
+                    Cơ sở chưa gắn thẻ NFC
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight">
+                Chạm NFC để mở cổng ngay
+              </h2>
+
+              <p className="text-xs text-slate-300 leading-relaxed max-w-xl">
+                {nfcState === "scanning"
+                  ? "Đang bật cảm biến NFC... Hãy đưa mặt lưng điện thoại chạm sát vào thẻ NFC gắn trên cổng trong 1–2 giây."
+                  : nfcState === "verifying"
+                  ? "Đã đọc thẻ cổng! Đang xác thực quyền ra vào và gửi lệnh mở khóa..."
+                  : "Quên mang thẻ từ? Bấm nút bên cạnh rồi áp mặt lưng điện thoại vào thẻ NFC gắn ngay tại cổng khu trọ."}
+              </p>
+
+              {!nfcSupported && (
+                <p className="text-[11px] text-amber-300 pt-1">
+                  Lưu ý: Trình duyệt hiện tại chưa hỗ trợ Web NFC. Hãy mở trang này bằng <b>Google Chrome trên điện thoại Android</b> và bật NFC trong cài đặt máy.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+              {nfcState === "scanning" ? (
+                <>
+                  <div className="px-5 py-3.5 rounded-xl bg-amber-400 text-slate-900 text-sm font-bold text-center animate-pulse flex items-center justify-center gap-2">
+                    <span>Đưa điện thoại chạm thẻ...</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleHuyQuetNfc}
+                    className="px-4 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold cursor-pointer transition"
+                  >
+                    Hủy
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={
+                    nfcState === "verifying" ||
+                    !thongTinThue ||
+                    thongTinThue.DaCaiDatTheCuaNFC === false
+                  }
+                  onClick={handleQuetNfcMoCong}
+                  className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] active:scale-[0.99] text-slate-900 text-sm font-extrabold shadow-md transition flex items-center justify-center gap-2.5 cursor-pointer disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36" />
+                    <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58" />
+                    <path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8" />
+                    <path d="M16.37 2a20.16 20.16 0 0 1 0 20" />
+                  </svg>
+                  <span>
+                    {nfcState === "verifying"
+                      ? "Đang mở cổng..."
+                      : "Quét NFC mở cổng"}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* 2. Thông tin thẻ RFID hiện tại & Yêu cầu cấp lại */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Thẻ của tôi */}
           <div className="p-5 rounded-2xl border border-slate-200 bg-white space-y-3">
@@ -257,7 +384,7 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
                       Yêu cầu cấp lại thẻ đang chờ Quản lý cơ sở xử lý.
                     </p>
                     <p className="mt-1">
-                      Thẻ cũ đã tạm khóa để đảm bảo an ninh và sẽ hoạt động lại ngay sau khi Quản lý nạp mã thẻ mới.
+                      Thẻ cũ đã tạm khóa để đảm bảo an ninh. Trong thời gian chờ thẻ mới, bạn vẫn có thể dùng nút <b>Quét NFC mở cổng</b> ở trên.
                     </p>
                     {theHienTai.GhiChu && (
                       <p className="mt-1 text-amber-800">
@@ -321,7 +448,7 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
           </form>
         </div>
 
-        {/* 2. Lịch sử ra vào cá nhân (tự động cập nhật không load lại trang) */}
+        {/* 3. Lịch sử ra vào cá nhân (tự động cập nhật không load lại trang) */}
         <section className="p-5 rounded-2xl border border-slate-200 bg-white space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div>
@@ -329,7 +456,7 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
                 Lịch sử ra vào của bạn
               </h2>
               <p className="text-xs text-slate-500">
-                Ghi nhận tự động mỗi khi bạn quẹt thẻ mở cổng khu trọ.
+                Ghi nhận tự động mỗi khi bạn quẹt thẻ RFID hoặc mở cổng bằng NFC.
               </p>
             </div>
 
@@ -383,14 +510,14 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
             </p>
           ) : lichSu.length === 0 ? (
             <div className="p-8 text-center rounded-xl bg-slate-50 border border-dashed border-slate-300 text-xs text-slate-500">
-              Chưa có lượt quẹt thẻ mở cổng nào trong khoảng thời gian này.
+              Chưa có lượt mở cổng nào trong khoảng thời gian này.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase">
-                    <th className="py-3 px-4 font-bold">Ngày quẹt</th>
+                    <th className="py-3 px-4 font-bold">Ngày mở cổng</th>
                     <th className="py-3 px-4 font-bold">Giờ mở cổng</th>
                     <th className="py-3 px-4 font-bold">UID thẻ</th>
                     <th className="py-3 px-4 font-bold">Cơ sở</th>
@@ -434,7 +561,7 @@ function NguoiThueTheRaVaoContent({ user }: { user: UserProfile }) {
 export default function NguoiThueTheRaVaoPage() {
   return (
     <ProtectedRoute allowedRoles={["KhachThue"]}>
-      {(user) => <NguoiThueTheRaVaoContent user={user} />}
+      {(user) => <NguoiThueQuanLyRaVaoContent user={user} />}
     </ProtectedRoute>
   );
 }
