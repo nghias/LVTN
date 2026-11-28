@@ -284,9 +284,6 @@ export default function HomeHeader({ initialUser = null }: HomeHeaderProps) {
                   Hệ thống nhà trọ thông minh & thẻ từ RFID
                 </p>
               </div>
-              <span className="px-2.5 py-1 text-[10px] font-bold rounded-full bg-[#00FFCC] text-slate-900 shrink-0">
-                Khách xem phòng
-              </span>
             </div>
           )}
 

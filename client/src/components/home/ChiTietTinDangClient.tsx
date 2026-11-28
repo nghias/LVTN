@@ -9,6 +9,31 @@ import {
   SyntheticEvent,
 } from "react";
 import Link from "next/link";
+import {
+  Home,
+  ChevronRight,
+  ArrowLeft,
+  SearchX,
+  Building2,
+  Camera,
+  FileText,
+  MapPin,
+  Maximize2,
+  Zap,
+  Droplets,
+  Sparkles,
+  Check,
+  User,
+  Phone,
+  KeyRound,
+  Clock,
+  Lock,
+  Wrench,
+  MessageCircle,
+  PhoneCall,
+  LayoutGrid,
+  Eye,
+} from "lucide-react";
 
 import HomeHeader from "@/components/layout/homeHeader";
 import AppFooter from "@/components/layout/AppFooter";
@@ -39,6 +64,7 @@ import {
   extractRoomImageList,
   getRoomStatusDisplay,
   isVisiblePublicRoom,
+  renderTienIchIcon,
   RoomImageObject,
 } from "./TinDangSection";
 
@@ -256,13 +282,19 @@ export default function ChiTietTinDangClient({
           aria-label="Breadcrumb"
           className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 rounded-2xl border border-slate-200 shadow-2xs"
         >
-          <ol className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500 list-none m-0 p-0">
+          <ol className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-500 list-none m-0 p-0">
             <li>
-              <Link href="/" className="hover:text-teal-700 transition">
-                Trang chủ
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1 hover:text-teal-700 transition"
+              >
+                <Home className="w-3.5 h-3.5 shrink-0" />
+                <span>Trang chủ</span>
               </Link>
             </li>
-            <li>/</li>
+            <li aria-hidden="true">
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            </li>
             <li>
               <Link
                 href="/#tin-dang"
@@ -273,7 +305,9 @@ export default function ChiTietTinDangClient({
             </li>
             {currentTin && (
               <>
-                <li>/</li>
+                <li aria-hidden="true">
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </li>
                 <li className="text-slate-900 font-bold truncate max-w-xs sm:max-w-md">
                   Phòng {currentTin.TenPhong} ({currentTin.TenKhu})
                 </li>
@@ -283,9 +317,10 @@ export default function ChiTietTinDangClient({
 
           <Link
             href="/"
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-[#00FFCC] text-slate-900 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-[#00FFCC] text-slate-900 transition"
           >
-            ← Quay lại trang chủ
+            <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
+            <span>Quay lại trang chủ</span>
           </Link>
         </nav>
 
@@ -302,6 +337,9 @@ export default function ChiTietTinDangClient({
           </div>
         ) : !currentTin || !detailContact || !currentStatus ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center max-w-xl mx-auto shadow-xs space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+              <SearchX className="w-6 h-6" />
+            </div>
             <span className="inline-block px-3.5 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900">
               Không tìm thấy phòng
             </span>
@@ -310,17 +348,19 @@ export default function ChiTietTinDangClient({
             </h1>
             <Link
               href="/#tin-dang"
-              className="inline-block px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition"
             >
-              Xem toàn bộ phòng tại trang chủ
+              <ArrowLeft className="w-4 h-4 shrink-0" />
+              <span>Xem toàn bộ phòng tại trang chủ</span>
             </Link>
           </div>
         ) : (
           <article className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="px-5 sm:px-8 py-4 bg-[#00FFCC] text-slate-900 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5">
-                <span className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-900 text-[#00FFCC]">
-                  {currentTin.TenKhu}
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-900 text-[#00FFCC]">
+                  <Building2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>{currentTin.TenKhu}</span>
                 </span>
                 <h1 className="text-lg sm:text-xl font-bold">
                   Chi Tiết Phòng {currentTin.TenPhong}
@@ -347,8 +387,9 @@ export default function ChiTietTinDangClient({
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute bottom-3 right-3">
-                    <span className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-900/80 text-white backdrop-blur-xs">
-                      📷 {detailImageList.length || 1} hình ảnh thực tế
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-slate-900/80 text-white backdrop-blur-xs">
+                      <Camera className="w-3.5 h-3.5 shrink-0" />
+                      <span>{detailImageList.length || 1} hình ảnh thực tế</span>
                     </span>
                   </div>
                 </div>
@@ -387,8 +428,9 @@ export default function ChiTietTinDangClient({
                 )}
 
                 <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                    {currentTin.TieuDe}
+                  <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-slate-900">
+                    <FileText className="w-4 h-4 text-teal-600 shrink-0" />
+                    <span>{currentTin.TieuDe}</span>
                   </h2>
                   <div className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 whitespace-pre-line">
                     {currentTin.MoTa ||
@@ -401,17 +443,24 @@ export default function ChiTietTinDangClient({
                 <div className="space-y-5">
                   <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900">
-                        {currentTin.TenKhu}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#00FFCC] text-slate-900">
+                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                        <span>{currentTin.TenKhu}</span>
                       </span>
                       <span
-                        className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${currentStatus.badgeClass}`}
+                        className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full border ${currentStatus.badgeClass}`}
                       >
-                        ● {currentStatus.label}
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${currentStatus.dotClass}`}
+                        />
+                        <span>{currentStatus.label}</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 pt-1">
-                      📍 Địa chỉ: <strong>{detailDiaChi}</strong>
+                    <p className="flex items-start gap-1.5 text-xs text-slate-600 pt-1">
+                      <MapPin className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
+                      <span>
+                        Địa chỉ: <strong>{detailDiaChi}</strong>
+                      </span>
                     </p>
                     <p
                       suppressHydrationWarning
@@ -425,55 +474,69 @@ export default function ChiTietTinDangClient({
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                      <span className="text-slate-500 block">Diện tích</span>
-                      <strong className="text-sm text-slate-900">
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <Maximize2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                        <span>Diện tích</span>
+                      </span>
+                      <strong className="text-sm text-slate-900 block">
                         {Number(currentTin.DienTich)} m<sup>2</sup>
                       </strong>
                     </div>
-                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
-                      <span className="text-slate-500 block">Giá điện</span>
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>Giá điện</span>
+                      </span>
                       <strong
                         suppressHydrationWarning
-                        className="text-sm text-slate-900"
+                        className="text-sm text-slate-900 block"
                       >
                         {formatVND(giaDienNuoc.GiaDien)}/kWh
                       </strong>
                     </div>
-                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white col-span-2 sm:col-span-1">
-                      <span className="text-slate-500 block">Giá nước</span>
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white col-span-2 sm:col-span-1 space-y-1">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <Droplets className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                        <span>Giá nước</span>
+                      </span>
                       <strong
                         suppressHydrationWarning
-                        className="text-sm text-slate-900"
+                        className="text-sm text-slate-900 block"
                       >
                         {formatVND(giaDienNuoc.GiaNuoc)}/m³
                       </strong>
                     </div>
                   </div>
 
+                  {/* Tiện ích đi kèm — có khung icon riêng cho từng tiện ích */}
                   <div>
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
-                      Tiện ích đi kèm ({detailTienIchList.length})
+                    <h3 className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
+                      <Sparkles className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                      <span>Tiện ích đi kèm ({detailTienIchList.length})</span>
                     </h3>
                     <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                       {detailTienIchList.map((ti) => (
                         <div
                           key={ti.MaTI}
-                          className="p-3 rounded-xl bg-[#00FFCC]/15 border border-teal-200 flex items-start justify-between gap-2"
+                          className="p-3 rounded-xl bg-[#00FFCC]/15 border border-teal-200 flex items-center justify-between gap-3"
                         >
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">
-                              {ti.TenTI}
-                            </p>
-                            {ti.MoTa && (
-                              <p className="text-[11px] text-slate-600 mt-0.5">
-                                {ti.MoTa}
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-white border border-teal-200/80 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                              {renderTienIchIcon(ti.TenTI, "w-4 h-4")}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900">
+                                {ti.TenTI}
                               </p>
-                            )}
+                              {ti.MoTa && (
+                                <p className="text-[11px] text-slate-600 mt-0.5">
+                                  {ti.MoTa}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <span className="text-teal-700 font-bold text-xs">
-                            ✓
-                          </span>
+                          <Check className="w-4 h-4 text-teal-700 shrink-0" />
                         </div>
                       ))}
                     </div>
@@ -482,20 +545,26 @@ export default function ChiTietTinDangClient({
 
                 <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
                   <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Người phụ trách ({currentTin.TenKhu})
-                      </p>
-                      <p className="text-sm font-bold text-slate-900">
-                        {detailContact.tenQuanLy}
-                      </p>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-teal-700 shrink-0">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                          Người phụ trách ({currentTin.TenKhu})
+                        </p>
+                        <p className="text-sm font-bold text-slate-900 truncate">
+                          {detailContact.tenQuanLy}
+                        </p>
+                      </div>
                     </div>
                     {detailContact.hasPhoneFromDB && (
                       <a
                         href={`tel:${detailContact.sdtHienThi.replace(/\s+/g, "")}`}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 transition"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 transition shrink-0"
                       >
-                        📞 {detailContact.sdtHienThi}
+                        <Phone className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                        <span>{detailContact.sdtHienThi}</span>
                       </a>
                     )}
                   </div>
@@ -504,21 +573,27 @@ export default function ChiTietTinDangClient({
                   {currentStatus.canBook ? (
                     <Link
                       href={`/datPhong/${currentTin.MaPhong}`}
-                      className="block w-full px-4 py-3 bg-[#00FFCC] text-black text-xs sm:text-sm font-bold rounded-xl transition text-center no-underline shadow-xs"
+                      className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-[#00FFCC] hover:bg-[#00e6b8] text-black text-xs sm:text-sm font-bold rounded-xl transition text-center no-underline shadow-xs"
                     >
-                      Đặt cọc giữ phòng ngay
+                      <KeyRound className="w-4 h-4 shrink-0" />
+                      <span>Đặt cọc giữ phòng ngay</span>
                     </Link>
                   ) : currentStatus.key === "DaDatCoc" ? (
-                    <div className="w-full px-4 py-3 bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold rounded-xl text-center">
-                      Phòng đang được cọc giữ chỗ — không thể đặt cọc thêm
+                    <div className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold rounded-xl text-center">
+                      <Clock className="w-4 h-4 shrink-0" />
+                      <span>
+                        Phòng đang được cọc giữ chỗ — không thể đặt cọc thêm
+                      </span>
                     </div>
                   ) : currentStatus.key === "DangThue" ? (
-                    <div className="w-full px-4 py-3 bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl text-center">
-                      Phòng đã cho thuê — không cho phép đặt cọc
+                    <div className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl text-center">
+                      <Lock className="w-4 h-4 shrink-0" />
+                      <span>Phòng đã cho thuê — không cho phép đặt cọc</span>
                     </div>
                   ) : (
-                    <div className="w-full px-4 py-3 bg-slate-100 text-slate-500 border border-slate-200 text-xs font-bold rounded-xl text-center">
-                      Phòng đang bảo trì
+                    <div className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-slate-100 text-slate-500 border border-slate-200 text-xs font-bold rounded-xl text-center">
+                      <Wrench className="w-4 h-4 shrink-0" />
+                      <span>Phòng đang bảo trì</span>
                     </div>
                   )}
 
@@ -528,9 +603,10 @@ export default function ChiTietTinDangClient({
                         href={detailContact.zaloUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-4 py-2.5 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 text-[#0068FF] border border-[#0068FF] transition text-center"
+                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold bg-white hover:bg-blue-50 text-[#0068FF] border border-[#0068FF] transition text-center"
                       >
-                        Nhắn Zalo
+                        <MessageCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>Nhắn Zalo</span>
                       </a>
                     )}
                     <button
@@ -538,9 +614,10 @@ export default function ChiTietTinDangClient({
                       onClick={() =>
                         setContactRoom(currentTin as unknown as TinDangItem)
                       }
-                      className="flex-1 px-4 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition text-center cursor-pointer"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl transition text-center cursor-pointer"
                     >
-                      Liên hệ quản lý
+                      <PhoneCall className="w-3.5 h-3.5 shrink-0" />
+                      <span>Liên hệ quản lý</span>
                     </button>
                   </div>
                 </div>
@@ -558,8 +635,9 @@ export default function ChiTietTinDangClient({
         <section className="space-y-6 pt-4 border-t border-slate-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-1.5">
-                Tham khảo thêm
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Tham khảo thêm</span>
               </span>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
                 Các Phòng Trọ Khác Trong Hệ Thống ({otherTinDangList.length})
@@ -571,24 +649,28 @@ export default function ChiTietTinDangClient({
                 <button
                   type="button"
                   onClick={() => setRelatedFilter("ALL")}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                     relatedFilter === "ALL"
                       ? "bg-[#00FFCC] text-slate-900 border-teal-300"
                       : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                   }`}
                 >
-                  Tất cả phòng khác ({visibleOtherCount})
+                  <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+                  <span>Tất cả phòng khác ({visibleOtherCount})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setRelatedFilter("SAME_KHU")}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
                     relatedFilter === "SAME_KHU"
                       ? "bg-[#00FFCC] text-slate-900 border-teal-300"
                       : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                   }`}
                 >
-                  Cùng {currentTin.TenKhu} ({sameKhuCount})
+                  <Building2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Cùng {currentTin.TenKhu} ({sameKhuCount})
+                  </span>
                 </button>
               </div>
             )}
@@ -628,8 +710,9 @@ export default function ChiTietTinDangClient({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute top-3 left-3 max-w-[58%]">
-                      <span className="inline-block truncate max-w-full px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/80 text-[#00FFCC]">
-                        {tin.TenKhu}
+                      <span className="inline-flex items-center gap-1 max-w-full px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/80 text-[#00FFCC]">
+                        <Building2 className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{tin.TenKhu}</span>
                       </span>
                     </div>
                     <div className="absolute top-3 right-3">
@@ -640,6 +723,12 @@ export default function ChiTietTinDangClient({
                           className={`w-1.5 h-1.5 rounded-full ${statusCfg.dotClass}`}
                         />
                         {statusCfg.label}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-3 right-3">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/75 text-white">
+                        <Camera className="w-3 h-3 shrink-0" />
+                        <span>{roomImageObjs.length || 1} ảnh</span>
                       </span>
                     </div>
                   </div>
@@ -663,15 +752,17 @@ export default function ChiTietTinDangClient({
                         >
                           {formatVND(tin.Gia)} / tháng
                         </p>
-                        <span className="text-xs font-semibold text-slate-500">
-                          {Number(tin.DienTich)} m²
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                          <Maximize2 className="w-3 h-3 shrink-0" />
+                          <span>{Number(tin.DienTich)} m²</span>
                         </span>
                       </div>
                     </div>
 
                     <footer className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                      <span className="px-2.5 py-2 rounded-xl text-xs font-bold bg-slate-100 group-hover:bg-slate-200 text-slate-800 border border-slate-200 transition text-center whitespace-nowrap shrink-0">
-                        Chi tiết
+                      <span className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-slate-100 group-hover:bg-slate-200 text-slate-800 border border-slate-200 transition whitespace-nowrap shrink-0">
+                        <Eye className="w-3.5 h-3.5 shrink-0" />
+                        <span>Chi tiết</span>
                       </span>
 
                       <button
@@ -681,18 +772,20 @@ export default function ChiTietTinDangClient({
                           e.stopPropagation();
                           setContactRoom(tin as unknown as TinDangItem);
                         }}
-                        className="relative z-20 flex-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 transition text-center whitespace-nowrap cursor-pointer shadow-2xs"
+                        className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 transition whitespace-nowrap cursor-pointer shadow-2xs"
                       >
-                        Liên hệ
+                        <PhoneCall className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                        <span>Liên hệ</span>
                       </button>
 
                       {statusCfg.canBook ? (
                         <Link
                           href={`/datPhong/${tin.MaPhong}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="relative z-20 flex-1 px-2.5 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl text-center no-underline whitespace-nowrap transition shadow-2xs"
+                          className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold rounded-xl no-underline whitespace-nowrap transition shadow-2xs"
                         >
-                          Đặt cọc
+                          <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                          <span>Đặt cọc</span>
                         </Link>
                       ) : statusCfg.key === "DaDatCoc" ? (
                         <span
@@ -700,9 +793,10 @@ export default function ChiTietTinDangClient({
                             e.preventDefault();
                             e.stopPropagation();
                           }}
-                          className="relative z-20 flex-1 px-2.5 py-2 bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold rounded-xl text-center whitespace-nowrap cursor-not-allowed select-none"
+                          className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold rounded-xl whitespace-nowrap cursor-not-allowed select-none"
                         >
-                          Đang được cọc
+                          <Clock className="w-3.5 h-3.5 shrink-0" />
+                          <span>Đang được cọc</span>
                         </span>
                       ) : (
                         <span
@@ -710,9 +804,10 @@ export default function ChiTietTinDangClient({
                             e.preventDefault();
                             e.stopPropagation();
                           }}
-                          className="relative z-20 flex-1 px-2.5 py-2 bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl text-center whitespace-nowrap cursor-not-allowed select-none"
+                          className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl whitespace-nowrap cursor-not-allowed select-none"
                         >
-                          Đã cho thuê
+                          <Lock className="w-3.5 h-3.5 shrink-0" />
+                          <span>Đã cho thuê</span>
                         </span>
                       )}
                     </footer>

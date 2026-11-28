@@ -4,6 +4,43 @@
 import { useMemo, useState, SyntheticEvent } from "react";
 import Link from "next/link";
 import {
+  Home,
+  Building2,
+  LayoutGrid,
+  DoorOpen,
+  Clock,
+  Banknote,
+  Maximize2,
+  RotateCcw,
+  SearchX,
+  Camera,
+  MapPin,
+  Sparkles,
+  User,
+  Phone,
+  Eye,
+  PhoneCall,
+  KeyRound,
+  Lock,
+  Layers,
+  Snowflake,
+  Wifi,
+  Bike,
+  Wind,
+  Thermometer,
+  Shirt,
+  Bed,
+  Archive,
+  Utensils,
+  Bath,
+  ShieldCheck,
+  Sun,
+  Armchair,
+  Trash2,
+  Tv,
+  CheckCircle2,
+} from "lucide-react";
+import {
   resolveRoomImageUrl,
   DEFAULT_ROOM_FALLBACK_IMAGE,
 } from "@/services/phongTro.service";
@@ -50,6 +87,105 @@ export interface RoomStatusDisplay {
   dotClass: string;
   canBook: boolean;
   sortOrder: number;
+}
+
+// Trả về icon riêng phù hợp theo tên từng tiện ích (dùng chung cho TinDangSection & ChiTietTinDangClient)
+export function renderTienIchIcon(
+  tenTI?: string,
+  sizeClass: string = "w-3.5 h-3.5",
+) {
+  const name = (tenTI || "").toLowerCase();
+
+  if (name.includes("gác") || name.includes("lửng")) {
+    return <Layers className={`${sizeClass} text-teal-700 shrink-0`} />;
+  }
+  if (
+    name.includes("máy lạnh") ||
+    name.includes("điều hòa") ||
+    name.includes("điều hoà")
+  ) {
+    return <Snowflake className={`${sizeClass} text-sky-600 shrink-0`} />;
+  }
+  if (
+    name.includes("wifi") ||
+    name.includes("internet") ||
+    name.includes("mạng")
+  ) {
+    return <Wifi className={`${sizeClass} text-indigo-600 shrink-0`} />;
+  }
+  if (name.includes("xe") || name.includes("bãi")) {
+    return <Bike className={`${sizeClass} text-emerald-700 shrink-0`} />;
+  }
+  if (name.includes("quạt") || name.includes("gió")) {
+    return <Wind className={`${sizeClass} text-cyan-600 shrink-0`} />;
+  }
+  if (name.includes("tủ lạnh")) {
+    return <Thermometer className={`${sizeClass} text-blue-600 shrink-0`} />;
+  }
+  if (name.includes("giặt")) {
+    return <Shirt className={`${sizeClass} text-violet-600 shrink-0`} />;
+  }
+  if (name.includes("giường") || name.includes("nệm")) {
+    return <Bed className={`${sizeClass} text-amber-700 shrink-0`} />;
+  }
+  if (name.includes("tủ")) {
+    return <Archive className={`${sizeClass} text-amber-600 shrink-0`} />;
+  }
+  if (name.includes("bếp") || name.includes("nấu")) {
+    return <Utensils className={`${sizeClass} text-orange-600 shrink-0`} />;
+  }
+  if (
+    name.includes("wc") ||
+    name.includes("toilet") ||
+    name.includes("nhà vệ sinh") ||
+    name.includes("tắm") ||
+    name.includes("nước nóng")
+  ) {
+    return <Bath className={`${sizeClass} text-sky-700 shrink-0`} />;
+  }
+  if (name.includes("rác") || name.includes("vệ sinh")) {
+    return <Trash2 className={`${sizeClass} text-emerald-700 shrink-0`} />;
+  }
+  if (
+    name.includes("camera") ||
+    name.includes("an ninh") ||
+    name.includes("bảo vệ")
+  ) {
+    return <ShieldCheck className={`${sizeClass} text-emerald-600 shrink-0`} />;
+  }
+  if (
+    name.includes("vân tay") ||
+    name.includes("thẻ từ") ||
+    name.includes("khóa")
+  ) {
+    return <KeyRound className={`${sizeClass} text-teal-700 shrink-0`} />;
+  }
+  if (
+    name.includes("ban công") ||
+    name.includes("cửa sổ") ||
+    name.includes("thoáng")
+  ) {
+    return <Sun className={`${sizeClass} text-amber-500 shrink-0`} />;
+  }
+  if (
+    name.includes("bàn") ||
+    name.includes("ghế") ||
+    name.includes("nội thất")
+  ) {
+    return <Armchair className={`${sizeClass} text-stone-600 shrink-0`} />;
+  }
+  if (name.includes("tivi") || name.includes("tv")) {
+    return <Tv className={`${sizeClass} text-slate-700 shrink-0`} />;
+  }
+  if (
+    name.includes("giờ") ||
+    name.includes("tự do") ||
+    name.includes("24/7")
+  ) {
+    return <Clock className={`${sizeClass} text-teal-600 shrink-0`} />;
+  }
+
+  return <CheckCircle2 className={`${sizeClass} text-teal-700 shrink-0`} />;
 }
 
 export function formatDateSafe(dateVal?: string | Date | null): string {
@@ -274,8 +410,9 @@ export default function TinDangSection({
       {/* Tiêu đề & thống kê trạng thái phòng */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
-          <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-2">
-            Hệ thống phòng trọ trực tuyến
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#00FFCC]/30 text-slate-900 mb-2">
+            <Home className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+            <span>Hệ thống phòng trọ trực tuyến</span>
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-900">
             Danh Sách Phòng Đang Mở ({displayRooms.length}/{roomCounts.total})
@@ -289,42 +426,45 @@ export default function TinDangSection({
           </p>
         </div>
 
-        {/* Các nút lọc nhanh (chỉ giữ Tất cả / Còn trống / Đang được cọc) */}
+        {/* Các nút lọc nhanh (Tất cả / Còn trống / Đang được cọc) */}
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setSelectedTrangThai("ALL")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
               selectedTrangThai === "ALL"
                 ? "bg-slate-900 text-[#00FFCC] border-slate-900"
                 : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
             }`}
           >
-            Tất cả ({roomCounts.total})
+            <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+            <span>Tất cả ({roomCounts.total})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setSelectedTrangThai("Trong")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
               selectedTrangThai === "Trong"
                 ? "bg-emerald-600 text-white border-emerald-600"
                 : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
             }`}
           >
-            Còn trống ({roomCounts.Trong})
+            <DoorOpen className="w-3.5 h-3.5 shrink-0" />
+            <span>Còn trống ({roomCounts.Trong})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setSelectedTrangThai("DaDatCoc")}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
               selectedTrangThai === "DaDatCoc"
                 ? "bg-orange-500 text-white border-orange-500"
                 : "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
             }`}
           >
-            Đang được cọc ({roomCounts.DaDatCoc})
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <span>Đang được cọc ({roomCounts.DaDatCoc})</span>
           </button>
         </div>
       </div>
@@ -332,8 +472,9 @@ export default function TinDangSection({
       {/* Bộ lọc đa tiêu chí */}
       <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-            Cơ sở / Khu trọ
+          <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase mb-1">
+            <Building2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <span>Cơ sở / Khu trọ</span>
           </label>
           <select
             value={selectedKhu}
@@ -350,8 +491,9 @@ export default function TinDangSection({
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-            Mức giá thuê
+          <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase mb-1">
+            <Banknote className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <span>Mức giá thuê</span>
           </label>
           <select
             value={selectedMucGia}
@@ -366,8 +508,9 @@ export default function TinDangSection({
         </div>
 
         <div>
-          <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-            Diện tích phòng
+          <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase mb-1">
+            <Maximize2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <span>Diện tích phòng</span>
           </label>
           <select
             value={selectedDienTich}
@@ -386,13 +529,14 @@ export default function TinDangSection({
             type="button"
             onClick={handleResetAll}
             disabled={!hasActiveFilter}
-            className={`w-full px-4 py-2.5 rounded-xl text-xs font-bold border transition ${
+            className={`w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold border transition ${
               hasActiveFilter
                 ? "bg-slate-900 hover:bg-slate-800 text-[#00FFCC] border-slate-900 cursor-pointer"
                 : "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
             }`}
           >
-            Đặt lại bộ lọc
+            <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+            <span>Đặt lại bộ lọc</span>
           </button>
         </div>
       </div>
@@ -416,6 +560,9 @@ export default function TinDangSection({
         </div>
       ) : displayRooms.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center space-y-3">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+            <SearchX className="w-6 h-6" />
+          </div>
           <p className="text-base font-bold text-slate-800">
             Không tìm thấy phòng trọ nào khớp với bộ lọc hiện tại
           </p>
@@ -426,9 +573,10 @@ export default function TinDangSection({
             <button
               type="button"
               onClick={handleResetAll}
-              className="px-4 py-2 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold border border-teal-300 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 text-xs font-bold border border-teal-300 transition cursor-pointer"
             >
-              Xem tất cả phòng đang mở
+              <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+              <span>Xem tất cả phòng đang mở</span>
             </button>
           )}
         </div>
@@ -486,8 +634,9 @@ export default function TinDangSection({
 
                   {/* Khu trọ */}
                   <div className="absolute top-3 left-3 max-w-[58%]">
-                    <span className="inline-block truncate max-w-full px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/80 text-[#00FFCC] backdrop-blur-xs">
-                      {tin.TenKhu}
+                    <span className="inline-flex items-center gap-1 max-w-full px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/80 text-[#00FFCC] backdrop-blur-xs">
+                      <Building2 className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{tin.TenKhu}</span>
                     </span>
                   </div>
 
@@ -505,8 +654,9 @@ export default function TinDangSection({
 
                   {/* Số lượng ảnh */}
                   <div className="absolute bottom-3 right-3">
-                    <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/75 text-white">
-                      {roomImages.length || 1} ảnh
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900/75 text-white">
+                      <Camera className="w-3 h-3 shrink-0" />
+                      <span>{roomImages.length || 1} ảnh</span>
                     </span>
                   </div>
                 </div>
@@ -520,8 +670,11 @@ export default function TinDangSection({
                         <h3 className="text-lg font-bold text-slate-900 group-hover:text-teal-700 transition">
                           Phòng {tin.TenPhong}
                         </h3>
-                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
-                          {(tin as any).DiaChi || tin.TenKhu}
+                        <p className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="line-clamp-1">
+                            {(tin as any).DiaChi || tin.TenKhu}
+                          </span>
                         </p>
                       </div>
 
@@ -544,21 +697,23 @@ export default function TinDangSection({
                           / tháng
                         </span>
                       </p>
-                      <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
-                        {Number(tin.DienTich)} m²
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        <Maximize2 className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span>{Number(tin.DienTich)} m²</span>
                       </span>
                     </div>
 
-                    {/* Tiện ích nổi bật */}
+                    {/* Tiện ích nổi bật — mỗi tiện ích có icon riêng */}
                     <div className="flex flex-wrap gap-1.5">
                       {roomTienIch.length > 0 ? (
                         <>
                           {roomTienIch.slice(0, 4).map((ti) => (
                             <span
                               key={ti.MaTI}
-                              className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/20 text-slate-800 border border-teal-200"
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#00FFCC]/20 text-slate-800 border border-teal-200"
                             >
-                              {ti.TenTI}
+                              {renderTienIchIcon(ti.TenTI, "w-3 h-3")}
+                              <span>{ti.TenTI}</span>
                             </span>
                           ))}
                           {roomTienIch.length > 4 && (
@@ -568,32 +723,40 @@ export default function TinDangSection({
                           )}
                         </>
                       ) : (
-                        <span className="text-[11px] text-slate-400 italic">
-                          Đầy đủ tiện ích tiêu chuẩn ({tienIchList.length})
+                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 italic">
+                          <Sparkles className="w-3 h-3 shrink-0" />
+                          <span>
+                            Đầy đủ tiện ích tiêu chuẩn ({tienIchList.length})
+                          </span>
                         </span>
                       )}
                     </div>
 
                     {/* Thông tin quản lý cơ sở */}
                     <div className="text-[11px] text-slate-500 flex items-center justify-between pt-1 gap-2">
-                      <span className="truncate">
-                        Quản lý:{" "}
-                        <strong className="text-slate-700">
-                          {contact.tenQuanLy}
-                        </strong>
+                      <span className="inline-flex items-center gap-1 truncate">
+                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">
+                          Quản lý:{" "}
+                          <strong className="text-slate-700">
+                            {contact.tenQuanLy}
+                          </strong>
+                        </span>
                       </span>
                       {contact.hasPhoneFromDB && (
-                        <span className="font-semibold text-slate-700 shrink-0">
-                          {contact.sdtHienThi}
+                        <span className="inline-flex items-center gap-1 font-semibold text-slate-700 shrink-0">
+                          <Phone className="w-3 h-3 text-teal-600 shrink-0" />
+                          <span>{contact.sdtHienThi}</span>
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Thanh nút hành động: Chi tiết | Liên hệ | Đặt cọc (nhỏ gọn) */}
+                  {/* Thanh nút hành động: Chi tiết | Liên hệ | Đặt cọc */}
                   <footer className="pt-3 border-t border-slate-100 flex items-center gap-2">
-                    <span className="px-2.5 py-2 rounded-xl text-xs font-bold bg-slate-100 group-hover:bg-slate-200 text-slate-800 border border-slate-200 transition text-center whitespace-nowrap shrink-0">
-                      Chi tiết
+                    <span className="inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-slate-100 group-hover:bg-slate-200 text-slate-800 border border-slate-200 transition whitespace-nowrap shrink-0">
+                      <Eye className="w-3.5 h-3.5 shrink-0" />
+                      <span>Chi tiết</span>
                     </span>
 
                     <button
@@ -604,9 +767,10 @@ export default function TinDangSection({
                         onSelectContactRoom(tin);
                       }}
                       aria-label={`Liên hệ thuê Phòng ${tin.TenPhong} tại ${tin.TenKhu}`}
-                      className="relative z-20 flex-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 transition text-center whitespace-nowrap cursor-pointer shadow-2xs"
+                      className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-900 border border-slate-300 transition whitespace-nowrap cursor-pointer shadow-2xs"
                     >
-                      Liên hệ
+                      <PhoneCall className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                      <span>Liên hệ</span>
                     </button>
 
                     {/* Chỉ cho đặt cọc khi phòng Còn trống và chưa đặt cọc */}
@@ -614,19 +778,32 @@ export default function TinDangSection({
                       <Link
                         href={`/datPhong/${tin.MaPhong}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="relative z-20 flex-1 px-2.5 py-2 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold transition text-center no-underline whitespace-nowrap shadow-2xs"
+                        className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 text-xs font-bold transition no-underline whitespace-nowrap shadow-2xs"
                       >
-                        Đặt cọc
+                        <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                        <span>Đặt cọc</span>
                       </Link>
+                    ) : statusCfg.key === "DaDatCoc" ? (
+                      <span
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold whitespace-nowrap cursor-not-allowed select-none"
+                      >
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>Đang được cọc</span>
+                      </span>
                     ) : (
                       <span
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
                         }}
-                        className="relative z-20 flex-1 px-2.5 py-2 rounded-xl bg-orange-50 text-orange-600 border border-orange-200 text-xs font-bold text-center whitespace-nowrap cursor-not-allowed select-none"
+                        className="relative z-20 flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl bg-red-50 text-red-600 border border-red-200 text-xs font-bold whitespace-nowrap cursor-not-allowed select-none"
                       >
-                        Đang được cọc
+                        <Lock className="w-3.5 h-3.5 shrink-0" />
+                        <span>Đã cho thuê</span>
                       </span>
                     )}
                   </footer>

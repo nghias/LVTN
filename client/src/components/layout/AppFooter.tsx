@@ -2,6 +2,26 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  MessageCircle,
+  Phone,
+  Mail,
+  Layers,
+  Building2,
+  Zap,
+  QrCode,
+  KeyRound,
+  FileText,
+  BookOpen,
+  Cpu,
+  Users,
+  ShieldCheck,
+  ScrollText,
+  Share2,
+  Globe,
+  Play,
+  Sparkles,
+} from 'lucide-react';
 
 export default function AppFooter() {
   const pathname = usePathname();
@@ -16,11 +36,13 @@ export default function AppFooter() {
       <footer className="w-full bg-[#DDDDDD] text-slate-700 border-t border-slate-300 mt-auto">
         <div className="border-t border-teal-400/40 bg-[#00FFCC]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-1.5 sm:gap-3 text-center sm:text-left text-xs">
-            <p className="text-slate-900 text-[12px] font-bold tracking-tight">
-              © {new Date().getFullYear()} Xóm Trọ Gia Đình
+            <p className="inline-flex items-center gap-1.5 text-slate-900 text-[12px] font-bold tracking-tight">
+              <Building2 className="w-3.5 h-3.5 shrink-0" />
+              <span>© {new Date().getFullYear()} Xóm Trọ Gia Đình</span>
             </p>
-            <p className="hidden sm:block text-slate-900 text-[12px] font-semibold">
-              Giải pháp cho hộ gia đình thông minh
+            <p className="hidden sm:inline-flex items-center gap-1.5 text-slate-900 text-[12px] font-semibold">
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span>Giải pháp cho hộ gia đình thông minh</span>
             </p>
           </div>
         </div>
@@ -28,185 +50,186 @@ export default function AppFooter() {
     );
   }
 
-return (
-  <footer className="w-full bg-[#DDDDDD] text-slate-700 border-t border-slate-300/80 mt-auto">
-    {/* Phần nội dung chính */}
-    <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-7 sm:py-10 lg:py-12 grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 lg:gap-8 text-xs items-stretch">
-      
-      {/* Cột 1: Hỗ trợ & Liên hệ trực tiếp */}
-      <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 sm:space-y-3.5 min-w-0">
-        <div className="flex items-center gap-2 text-slate-900 font-bold pb-2.5 border-b border-slate-300/70">
-          <svg
-            width="18"
-            height="18"
-            className="w-6 h-6 p-1 rounded-lg bg-[#00FFCC]  shrink-0 shadow-2xs"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-            />
-          </svg>
-          <span className="text-xs font-bold leading-snug truncate">
-            Hỗ trợ khách hàng
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 pt-0.5">
-          <svg
-            width="16"
-            height="16"
-            className="w-6 h-6 p-1.5 rounded-lg bg-[#00FFCC] shrink-0 shadow-2xs"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-            />
-          </svg>
-          <span className="font-bold text-slate-900 text-xs sm:text-[13px] truncate">
-            0903.112.233
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-          <svg
-            width="16"
-            height="16"
-            className="w-6 h-6 p-1.5 rounded-lg bg-[#00FFCC]  shrink-0 shadow-2xs"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-            />
-          </svg>
-          <span className="truncate text-slate-800 font-medium text-[11px] sm:text-xs">
-            hotro@xomtroiot.vn
-          </span>
-        </div>
-      </div>
-
-      {/* Cột 2: Giải pháp */}
-      <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 min-w-0">
-        <h4 className="text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
-          Giải pháp
-        </h4>
-        <ul className="space-y-2 text-slate-700">
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Quản lý đa cơ sở trọ
-            </Link>
-          </li>
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Đồng hồ điện nước IoT
-            </Link>
-          </li>
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Cổng thanh toán VietQR
-            </Link>
-          </li>
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Kiểm soát thẻ từ RFID
-            </Link>
-          </li>
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Hợp đồng & Tạm trú số
-            </Link>
-          </li>
-        </ul>
-      </div>
-
-      {/* Cột 3: Tài nguyên */}
-      <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 min-w-0">
-        <h4 className="text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
-          Tài nguyên
-        </h4>
-        <ul className="space-y-2 text-slate-700">
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Hướng dẫn phần cứng IoT
-            </Link>
-          </li>
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Cẩm nang cư dân
-            </Link>
-          </li>
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Chính sách bảo mật
-            </Link>
-          </li>
-          <li>
-            <Link href="#" className="hover:text-teal-700 text-slate-800 font-medium transition no-underline block leading-snug">
-              Điều khoản dịch vụ
-            </Link>
-          </li>
-        </ul>
-      </div>
-
-      {/* Cột 4: Kết nối */}
-      <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 shadow-2xs lg:shadow-none flex flex-col justify-start space-y-3 min-w-0">
-        <h4 className="text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
-          Kết nối
-        </h4>
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1">
-          <Link
-            href="#"
-            className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] flex items-center justify-center transition shadow-xs border border-green-700 shrink-0"
-          >
-            <span className="font-bold text-xs ">
-              f
+  return (
+    <footer className="w-full bg-[#DDDDDD] text-slate-700 border-t border-slate-300/80 mt-auto">
+      {/* Phần nội dung chính */}
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-7 sm:py-10 lg:py-12 grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 lg:gap-8 text-xs items-stretch">
+        {/* Cột 1: Hỗ trợ & Liên hệ trực tiếp */}
+        <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 sm:space-y-3.5 min-w-0">
+          <div className="flex items-center gap-2 text-slate-900 font-bold pb-2.5 border-b border-slate-300/70">
+            <span className="w-6 h-6 rounded-lg bg-[#00FFCC] flex items-center justify-center text-slate-900 shrink-0 shadow-2xs">
+              <MessageCircle className="w-3.5 h-3.5" />
             </span>
-          </Link>
-          <Link
-            href="#"
-            className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] flex items-center justify-center transition shadow-xs border border-green-700 shrink-0"
-          >
-            <span className="font-bold text-xs ">
-              in
+            <span className="text-xs font-bold leading-snug truncate">
+              Hỗ trợ khách hàng
             </span>
-          </Link>
-          <Link
-            href="#"
-            className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] flex items-center justify-center transition shadow-xs border border-green-700 shrink-0"
-          >
-            <span className="font-bold text-xs ">
-              yt
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 pt-0.5">
+            <span className="w-6 h-6 rounded-lg bg-[#00FFCC] flex items-center justify-center text-slate-900 shrink-0 shadow-2xs">
+              <Phone className="w-3.5 h-3.5" />
             </span>
-          </Link>
+            <span className="font-bold text-slate-900 text-xs sm:text-[13px] truncate">
+              0903.112.233
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <span className="w-6 h-6 rounded-lg bg-[#00FFCC] flex items-center justify-center text-slate-900 shrink-0 shadow-2xs">
+              <Mail className="w-3.5 h-3.5" />
+            </span>
+            <span className="truncate text-slate-800 font-medium text-[11px] sm:text-xs">
+              hotro@xomtroiot.vn
+            </span>
+          </div>
+        </div>
+
+        {/* Cột 2: Giải pháp */}
+        <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 min-w-0">
+          <h4 className="flex items-center gap-1.5 text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+            <span>Giải pháp</span>
+          </h4>
+          <ul className="space-y-2 text-slate-700">
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <Building2 className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Quản lý đa cơ sở trọ</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <Zap className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Đồng hồ điện nước IoT</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <QrCode className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Cổng thanh toán VietQR</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Kiểm soát thẻ từ RFID</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <FileText className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Hợp đồng & Tạm trú số</span>
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        {/* Cột 3: Tài nguyên */}
+        <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 flex flex-col justify-start space-y-3 min-w-0">
+          <h4 className="flex items-center gap-1.5 text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
+            <BookOpen className="w-3.5 h-3.5 shrink-0" />
+            <span>Tài nguyên</span>
+          </h4>
+          <ul className="space-y-2 text-slate-700">
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <Cpu className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Hướng dẫn phần cứng IoT</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <Users className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Cẩm nang cư dân</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Chính sách bảo mật</span>
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#"
+                className="inline-flex items-center gap-1.5 hover:text-teal-700 text-slate-800 font-medium transition no-underline leading-snug"
+              >
+                <ScrollText className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                <span>Điều khoản dịch vụ</span>
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        {/* Cột 4: Kết nối */}
+        <div className="bg-[#DDDDDD] lg:bg-transparent p-3.5 sm:p-5 lg:p-0 shadow-2xs lg:shadow-none flex flex-col justify-start space-y-3 min-w-0">
+          <h4 className="flex items-center gap-1.5 text-xs font-bold text-teal-800 tracking-wide pb-2.5 border-b border-slate-300/70">
+            <Share2 className="w-3.5 h-3.5 shrink-0" />
+            <span>Kết nối</span>
+          </h4>
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1">
+            <Link
+              href="#"
+              aria-label="Website / Cộng đồng"
+              className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 flex items-center justify-center transition shadow-xs border border-teal-600 shrink-0"
+            >
+              <Globe className="w-4 h-4" />
+            </Link>
+            <Link
+              href="#"
+              aria-label="Hỗ trợ trực tuyến"
+              className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 flex items-center justify-center transition shadow-xs border border-teal-600 shrink-0"
+            >
+              <MessageCircle className="w-4 h-4" />
+            </Link>
+            <Link
+              href="#"
+              aria-label="Kênh video hướng dẫn"
+              className="group w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 flex items-center justify-center transition shadow-xs border border-teal-600 shrink-0"
+            >
+              <Play className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
 
-    {/* Phần chân dưới cùng */}
-    <div className="border-t border-teal-400/40 bg-[#00FFCC]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-3 text-center sm:text-left text-xs">
-        <p className="text-slate-900 text-[12px] font-bold tracking-tight">
-          © {new Date().getFullYear()} Xóm Trọ Gia Đình
-        </p>
-        <p className="text-slate-900 text-[12px] font-semibold">
-          Giải pháp cho hộ gia đình thông minh
-        </p>
+      {/* Phần chân dưới cùng */}
+      <div className="border-t border-teal-400/40 bg-[#00FFCC]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-3 text-center sm:text-left text-xs">
+          <p className="inline-flex items-center gap-1.5 text-slate-900 text-[12px] font-bold tracking-tight">
+            <Building2 className="w-3.5 h-3.5 shrink-0" />
+            <span>© {new Date().getFullYear()} Xóm Trọ Gia Đình</span>
+          </p>
+          <p className="inline-flex items-center gap-1.5 text-slate-900 text-[12px] font-semibold">
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span>Giải pháp cho hộ gia đình thông minh</span>
+          </p>
+        </div>
       </div>
-    </div>
-  </footer>
-);
+    </footer>
+  );
 }

@@ -2,6 +2,18 @@
 "use client";
 
 import {
+  Building2,
+  X,
+  Banknote,
+  User,
+  Phone,
+  PhoneCall,
+  Copy,
+  AlertCircle,
+  UserCheck,
+  MessageCircle,
+} from "lucide-react";
+import {
   TinDangItem,
   KhuTroWithContact,
   extractManagerContact,
@@ -33,8 +45,9 @@ export default function ContactRoomModal({
         {/* Header Modal */}
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3.5">
           <div>
-            <span className="inline-block px-3 py-0.5 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900 mb-1">
-              {contactRoom.TenKhu}
+            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold bg-[#00FFCC] text-slate-900 mb-1">
+              <Building2 className="w-3 h-3 shrink-0" />
+              <span>{contactRoom.TenKhu}</span>
             </span>
             <h3 className="text-lg font-bold text-slate-900">
               Liên Hệ Thuê Phòng {contactRoom.TenPhong}
@@ -43,29 +56,39 @@ export default function ContactRoomModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs flex items-center justify-center cursor-pointer shrink-0"
+            aria-label="Đóng cửa sổ liên hệ"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer shrink-0 transition"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Khối 1: Giá thuê & Quản lý cơ sở */}
         <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500 font-medium">Giá thuê:</span>
-            <span className="font-bold text-teal-700">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+              <Banknote className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              <span>Giá thuê:</span>
+            </span>
+            <span className="font-bold text-teal-700 text-right">
               {formatVND(contactRoom.Gia)} / tháng ({contactRoom.DienTich} m²)
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500 font-medium">Người quản lý:</span>
-            <span className="font-bold text-slate-900">
+
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+              <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>Người quản lý:</span>
+            </span>
+            <span className="font-bold text-slate-900 text-right">
               {selectedRoomContact.tenQuanLy}
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500 font-medium">
-              Số điện thoại / Zalo:
+
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 text-slate-500 font-medium">
+              <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span>Số điện thoại / Zalo:</span>
             </span>
             <span className="font-bold text-slate-900 bg-[#00FFCC]/40 px-2.5 py-0.5 rounded-lg">
               {selectedRoomContact.hasPhoneFromDB
@@ -84,6 +107,7 @@ export default function ContactRoomModal({
               rel="noopener noreferrer"
               className="w-full py-3 px-4 rounded-xl bg-[#0068FF] hover:bg-[#0052CC] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm shadow-[#0068FF]/25 transition no-underline"
             >
+              <MessageCircle className="w-4 h-4 shrink-0" />
               <span className="px-1.5 py-0.5 rounded bg-white text-[#0068FF] text-[10px] font-bold leading-none">
                 Zalo
               </span>
@@ -97,7 +121,8 @@ export default function ContactRoomModal({
                 href={selectedRoomContact.telUrl}
                 className="py-2.5 px-4 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 font-bold text-xs flex items-center justify-center gap-1.5 transition no-underline"
               >
-                <span>📞 Gọi điện ngay</span>
+                <PhoneCall className="w-3.5 h-3.5 shrink-0" />
+                <span>Gọi điện ngay</span>
               </a>
 
               <button
@@ -110,31 +135,37 @@ export default function ContactRoomModal({
                 }
                 className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
-                <span>📋 Sao chép SĐT</span>
+                <Copy className="w-3.5 h-3.5 shrink-0" />
+                <span>Sao chép SĐT</span>
               </button>
             </div>
           </div>
         ) : (
-          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
-            Số điện thoại của người quản lý khu trọ này chưa được cập nhật trên
-            cơ sở dữ liệu.
+          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <span>
+              Số điện thoại của người quản lý khu trọ này chưa được cập nhật
+              trên cơ sở dữ liệu.
+            </span>
           </div>
         )}
 
-        {/* Khối 2: Thông tin liên hệ Chủ trọ (Bắt buộc có mặt cho mọi cơ sở) */}
+        {/* Khối 2: Thông tin liên hệ Chủ trọ */}
         <div className="p-4 rounded-2xl bg-[#00FFCC]/15 border border-teal-300 space-y-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-600 font-medium">
-              Chủ trọ:
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
+              <UserCheck className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+              <span>Chủ trọ:</span>
             </span>
-            <span className="font-bold text-slate-900">
+            <span className="font-bold text-slate-900 text-right">
               {ownerContact.tenChuTro}
             </span>
           </div>
 
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-600 font-medium">
-              SĐT / Zalo Chủ trọ:
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium">
+              <Phone className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+              <span>SĐT / Zalo Chủ trọ:</span>
             </span>
             <span className="font-bold text-slate-900 bg-white border border-teal-200 px-2.5 py-0.5 rounded-lg">
               {ownerContact.hasPhoneFromDB
@@ -156,12 +187,15 @@ export default function ContactRoomModal({
                 </span>
                 <span>Chủ trọ</span>
               </a>
+
               <a
                 href={ownerContact.telUrl}
-                className="py-2 px-2 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 font-bold text-[11px] flex items-center justify-center transition no-underline"
+                className="py-2 px-2 rounded-xl bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-300 font-bold text-[11px] flex items-center justify-center gap-1 transition no-underline"
               >
-                📞 Gọi Chủ trọ
+                <PhoneCall className="w-3 h-3 shrink-0" />
+                <span>Gọi Chủ trọ</span>
               </a>
+
               <button
                 type="button"
                 onClick={() =>
@@ -170,9 +204,10 @@ export default function ContactRoomModal({
                     `Chủ trọ ${ownerContact.tenChuTro}`
                   )
                 }
-                className="py-2 px-2 rounded-xl bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 font-bold text-[11px] flex items-center justify-center transition cursor-pointer"
+                className="py-2 px-2 rounded-xl bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 font-bold text-[11px] flex items-center justify-center gap-1 transition cursor-pointer"
               >
-                📋 Chép SĐT
+                <Copy className="w-3 h-3 shrink-0" />
+                <span>Chép SĐT</span>
               </button>
             </div>
           )}
