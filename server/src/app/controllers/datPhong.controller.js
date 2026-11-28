@@ -15,7 +15,7 @@ try {
 const PAYOS_BASE_URL = "https://api-merchant.payos.vn/v2/payment-requests";
 const QR_EXPIRE_MINUTES = 15;
 const HOLD_HOURS = Number(process.env.BOOKING_HOLD_HOURS || 48);
-const MIN_DEPOSIT_AMOUNT = Number(process.env.BOOKING_MIN_DEPOSIT || 1000);
+const DEPOSIT_RATE = 0.15; // Đặt cọc cố định 15% giá trị phòng
 const CLIENT_URL = (
   process.env.CLIENT_URL ||
   process.env.FRONTEND_URL ||
@@ -28,6 +28,13 @@ const inFlightConfirmations = new Map();
 // =========================================================================
 // CÁC HÀM HELPER NỘI BỘ
 // =========================================================================
+
+// Tính tiền đặt cọc cố định 15% giá phòng (làm tròn bội số 1.000đ)
+function calculateFixedDeposit(giaPhong) {
+  const price = Number(giaPhong) || 0;
+  if (price <= 0) return 0;
+  return Math.round((price * DEPOSIT_RATE) / 1000) * 1000;
+}
 
 function resolvePayOSCredentials(thongTinNH) {
   const clientId = String(
@@ -67,6 +74,69 @@ function removeVietnameseTones(str = "") {
 
 function formatVND(amount) {
   return `${Math.round(Number(amount || 0)).toLocaleString("vi-VN")}đ`;
+}
+
+// Đối chiếu số tiền thực nhận trên PayOS so với số tiền cọc 15% yêu cầu
+function evaluatePayOSAmount(payosData, expectedAmount) {
+  const expected = Math.round(Number(expectedAmount) || 0);
+  const payosStatus = String(payosData?.status || "").toUpperCase();
+
+  let paidAmount = 0;
+  if (payosData?.amountPaid !== undefined && payosData?.amountPaid !== null) {
+    paidAmount = Number(payosData.amountPaid) || 0;
+  } else if (
+    Array.isArray(payosData?.transactions) &&
+    payosData.transactions.length > 0
+  ) {
+    paidAmount = payosData.transactions.reduce(
+      (sum, tx) => sum + (Number(tx?.amount) || 0),
+      0,
+    );
+  } else if (payosStatus === "PAID") {
+    paidAmount = Number(payosData?.amount) || expected;
+  }
+  paidAmount = Math.round(paidAmount);
+
+  const remainingAmount = Math.max(0, expected - paidAmount);
+  const overpaidAmount = Math.max(0, paidAmount - expected);
+
+  let amountStatus = "UNPAID"; // UNPAID | UNDERPAID | EXACT | OVERPAID
+  let isWrongAmount = false;
+  let warningMessage = null;
+
+  if (paidAmount > 0 && paidAmount < expected) {
+    amountStatus = "UNDERPAID";
+    isWrongAmount = true;
+    warningMessage = `Cảnh báo chuyển thiếu tiền: Hệ thống mới nhận được ${formatVND(
+      paidAmount,
+    )} / ${formatVND(expected)} (còn thiếu ${formatVND(
+      remainingAmount,
+    )}). Phòng CHƯA được giữ chỗ. Vui lòng chuyển bổ sung đúng ${formatVND(
+      remainingAmount,
+    )} với cùng nội dung chuyển khoản trước khi hết giờ, hoặc liên hệ quản lý cơ sở để được hỗ trợ.`;
+  } else if (paidAmount > expected && expected > 0) {
+    amountStatus = "OVERPAID";
+    isWrongAmount = true;
+    warningMessage = `Cảnh báo chuyển thừa tiền: Bạn đã chuyển ${formatVND(
+      paidAmount,
+    )}, thừa ${formatVND(overpaidAmount)} so với mức cọc 15% quy định (${formatVND(
+      expected,
+    )}). Phòng vẫn được giữ chỗ và quản lý sẽ đối soát hoàn lại phần tiền thừa cho bạn.`;
+  } else if (paidAmount === expected && expected > 0) {
+    amountStatus = "EXACT";
+  }
+
+  return {
+    payosStatus,
+    expectedAmount: expected,
+    paidAmount,
+    remainingAmount,
+    overpaidAmount,
+    amountStatus,
+    isWrongAmount,
+    isSufficient: paidAmount >= expected && expected > 0,
+    warningMessage,
+  };
 }
 
 // Sinh OrderCode 12 chữ số bắt đầu bằng 9 để tách biệt với bảng ThanhToan hóa đơn
@@ -216,6 +286,112 @@ async function cancelBookingAndReleaseRoom(maDP, maPhong, reason) {
   }
 }
 
+// Helper tạo thông báo nội bộ (chống trùng theo từ khóa + mã đơn)
+async function createAndEmitBookingNotification({
+  booking,
+  tieuDe,
+  noiDung,
+  dedupKeyword,
+  io = null,
+}) {
+  try {
+    const [existingNotiRows] = await db.execute(
+      `SELECT MaTB FROM thongbao
+       WHERE MaLTB = 6
+         AND (NoiDung LIKE ? OR TieuDe LIKE ?)
+         AND TieuDe LIKE ?
+       LIMIT 1`,
+      [`%${booking.MaTraCuu}%`, `%${booking.MaTraCuu}%`, `%${dedupKeyword}%`],
+    );
+
+    if (existingNotiRows.length > 0) return null;
+
+    let maQuanLyKhu = booking.MaQuanLyKhu ? Number(booking.MaQuanLyKhu) : null;
+    if (!maQuanLyKhu && booking.MaPhong) {
+      const [khuRows] = await db.execute(
+        `SELECT k.MaND AS MaQuanLyKhu
+         FROM phong p
+         INNER JOIN khutro k ON p.MaKhu = k.MaKhu
+         WHERE p.MaPhong = ?
+         LIMIT 1`,
+        [Number(booking.MaPhong)],
+      );
+      maQuanLyKhu = khuRows[0]?.MaQuanLyKhu
+        ? Number(khuRows[0].MaQuanLyKhu)
+        : null;
+    }
+
+    const dsNguoiNhan = Array.from(
+      new Set([1, ...(maQuanLyKhu ? [maQuanLyKhu] : [])]),
+    );
+
+    let maTB = null;
+    if (typeof DatPhongModel.createInternalNotification === "function") {
+      maTB = await DatPhongModel.createInternalNotification({
+        maLTB: 6,
+        maQuanLyKhu,
+        tieuDe,
+        noiDung,
+      });
+    } else if (typeof DatPhongModel.createBookingNotification === "function") {
+      const notiRes = await DatPhongModel.createBookingNotification({
+        maQuanLyKhu,
+        tieuDe,
+        noiDung,
+      });
+      maTB = notiRes?.maTB ?? notiRes;
+    } else {
+      const [insTb] = await db.execute(
+        `INSERT INTO thongbao (MaTBGoc, NDGui, MaLTB, TieuDe, NoiDung, NgayGui)
+         VALUES (NULL, 1, 6, ?, ?, NOW())`,
+        [tieuDe, noiDung],
+      );
+      maTB = insTb.insertId;
+    }
+
+    if (maTB && dsNguoiNhan.length > 0) {
+      for (const ndId of dsNguoiNhan) {
+        await db.execute(
+          `INSERT IGNORE INTO nhanthongbao (MaTB, NDNhan, TrangThai)
+           VALUES (?, ?, 'ChuaDoc')`,
+          [Number(maTB), Number(ndId)],
+        );
+      }
+    }
+
+    const socketPayload = {
+      MaTB: maTB,
+      MaTBGoc: null,
+      NDGui: 1,
+      TenNguoiGui: "Hệ thống Đặt cọc tự động",
+      QuyenNguoiGui: "ChuTro",
+      MaLTB: 6,
+      TenLTB: "Đặt cọc giữ phòng",
+      TieuDe: tieuDe,
+      NoiDung: noiDung,
+      NgayGui: new Date().toISOString(),
+      TrangThai: "ChuaDoc",
+    };
+
+    if (typeof emitThongBaoMoi === "function") {
+      emitThongBaoMoi(dsNguoiNhan, socketPayload);
+    } else if (io) {
+      dsNguoiNhan.forEach((ndId) => {
+        io.to(`user_${ndId}`).emit("NEW_NOTIFICATION", socketPayload);
+        io.to(`user_${ndId}`).emit("thong_bao_moi", socketPayload);
+      });
+    }
+
+    return maTB;
+  } catch (notiErr) {
+    console.error(
+      `[DatPhong][Noti] Lỗi tạo thông báo nội bộ cho ${booking?.MaTraCuu}:`,
+      notiErr,
+    );
+    return null;
+  }
+}
+
 // Gửi Email hóa đơn đặt cọc / trùng cọc / hoàn cọc qua mail.util.js (Brevo)
 async function dispatchBookingEmail(type, booking) {
   if (!booking) {
@@ -359,14 +535,83 @@ const DatPhongController = {
   // -----------------------------------------------------------------------
   // HÀM DÙNG CHUNG: Xác nhận thanh toán cọc tự động
   // Gọi từ cả API Polling 3 giây lẫn Webhook trong ThanhToanController.js
+  // Tự đối chiếu số tiền thực nhận trên PayOS trước khi chốt đơn
   // -----------------------------------------------------------------------
-  xacNhanThanhToanCocTuDong: async (orderCode, io = null) => {
+  xacNhanThanhToanCocTuDong: async (
+    orderCode,
+    io = null,
+    payosDataInput = null,
+  ) => {
     const lockKey = String(orderCode);
     if (inFlightConfirmations.has(lockKey)) {
       return inFlightConfirmations.get(lockKey);
     }
 
     const workPromise = (async () => {
+      const bookingBefore = await DatPhongModel.getByOrderCode(orderCode);
+      if (!bookingBefore) {
+        return { found: false };
+      }
+
+      // Đối chiếu số tiền thực chuyển trên PayOS nếu đơn vẫn đang chờ thanh toán
+      let amountCheck = null;
+      if (bookingBefore.TrangThai === "ChoThanhToan") {
+        let payosData = payosDataInput;
+        if (!payosData) {
+          try {
+            const payosConfig = await DatPhongModel.getPayOSConfig();
+            const credentials = resolvePayOSCredentials(payosConfig);
+            if (credentials.clientId && credentials.apiKey) {
+              payosData = await fetchPayOSPaymentStatus(orderCode, credentials);
+            }
+          } catch (payosErr) {
+            console.error(
+              `[DatPhong] Không thể đối chiếu PayOS cho orderCode=${orderCode}:`,
+              payosErr.message,
+            );
+          }
+        }
+
+        if (payosData) {
+          amountCheck = evaluatePayOSAmount(payosData, bookingBefore.SoTienCoc);
+
+          // CHẶN KHÔNG CHỐT ĐƠN nếu chuyển thiếu tiền hoặc PayOS chưa PAID
+          if (
+            !amountCheck.isSufficient ||
+            amountCheck.payosStatus !== "PAID"
+          ) {
+            console.warn(
+              `[DatPhong] Từ chối chốt đơn ${bookingBefore.MaTraCuu}: status=${amountCheck.payosStatus}, nhận=${amountCheck.paidAmount}, yêu cầu=${amountCheck.expectedAmount}`,
+            );
+
+            // Nếu khách đã lỡ chuyển thiếu tiền -> báo ngay cho Quản lý & Chủ trọ biết
+            if (amountCheck.amountStatus === "UNDERPAID") {
+              await createAndEmitBookingNotification({
+                booking: bookingBefore,
+                tieuDe: `[Chuyển thiếu tiền cọc] ${bookingBefore.TenPhong} - ${bookingBefore.MaTraCuu}`,
+                noiDung: `Khách ${bookingBefore.HoTenKhach} (SĐT: ${bookingBefore.SDT}) vừa chuyển thiếu tiền cọc phòng ${bookingBefore.TenPhong}: mới nhận ${formatVND(
+                  amountCheck.paidAmount,
+                )} / yêu cầu ${formatVND(
+                  amountCheck.expectedAmount,
+                )} (thiếu ${formatVND(
+                  amountCheck.remainingAmount,
+                )}). Phòng hiện CHƯA được khóa giữ chỗ.`,
+                dedupKeyword: "Chuyển thiếu tiền cọc",
+                io,
+              });
+            }
+
+            return {
+              found: true,
+              rejected: true,
+              reason: "WRONG_AMOUNT",
+              amountCheck,
+              booking: bookingBefore,
+            };
+          }
+        }
+      }
+
       const txResult = await DatPhongModel.confirmPaymentTransaction(
         orderCode,
         {
@@ -378,6 +623,32 @@ const DatPhongController = {
         return { found: false };
       }
 
+      // Nếu khách chuyển THỪA tiền -> ghi chú chênh lệch vào đơn để quản lý đối soát
+      const isOverpaid = amountCheck?.amountStatus === "OVERPAID";
+      if (isOverpaid && !txResult.alreadyProcessed) {
+        const overpaidNote = `[CẢNH BÁO CHUYỂN THỪA: Đã nhận ${formatVND(
+          amountCheck.paidAmount,
+        )} / Yêu cầu ${formatVND(amountCheck.expectedAmount)}, thừa ${formatVND(
+          amountCheck.overpaidAmount,
+        )}]`;
+        try {
+          await db.execute(
+            `UPDATE datphong
+             SET GhiChu = CASE
+               WHEN GhiChu IS NULL OR TRIM(GhiChu) = '' THEN ?
+               ELSE CONCAT(GhiChu, ' | ', ?)
+             END
+             WHERE MaDP = ?`,
+            [overpaidNote, overpaidNote, Number(txResult.maDP)],
+          );
+        } catch (noteErr) {
+          console.error(
+            "[DatPhong] Lỗi ghi chú chuyển thừa tiền:",
+            noteErr.message,
+          );
+        }
+      }
+
       const booking = await DatPhongModel.getById(txResult.maDP);
       let emailResult = null;
 
@@ -385,137 +656,40 @@ const DatPhongController = {
       if (!txResult.alreadyProcessed && booking) {
         const isDuplicate = txResult.outcome === "TrungLapCanHoan";
 
+        const overpaidSuffix = isOverpaid
+          ? ` LƯU Ý: Khách chuyển THỪA ${formatVND(
+              amountCheck.overpaidAmount,
+            )} (thực nhận ${formatVND(
+              amountCheck.paidAmount,
+            )}), vui lòng đối soát hoàn lại phần thừa.`
+          : "";
+
         const tieuDe = isDuplicate
           ? `[Trùng cọc cần hoàn] ${booking.TenPhong} - ${booking.MaTraCuu}`
-          : `[Đặt cọc giữ phòng] ${booking.TenPhong} - ${booking.HoTenKhach}`;
+          : isOverpaid
+            ? `[Đặt cọc — Chuyển thừa tiền] ${booking.TenPhong} - ${booking.HoTenKhach}`
+            : `[Đặt cọc giữ phòng] ${booking.TenPhong} - ${booking.HoTenKhach}`;
 
         const noiDung = isDuplicate
           ? `Khách ${booking.HoTenKhach} (SĐT: ${booking.SDT}, Email: ${booking.Email}) thanh toán ${formatVND(
-              booking.SoTienCoc,
+              isOverpaid ? amountCheck.paidAmount : booking.SoTienCoc,
             )} nhưng phòng ${booking.TenPhong} (${booking.TenKhu}) đã được giữ trước đó. Mã đơn: ${
               booking.MaTraCuu
-            }. Vui lòng liên hệ hoàn 100% tiền cọc.`
+            }. Vui lòng liên hệ hoàn 100% tiền cọc.${overpaidSuffix}`
           : `Khách ${booking.HoTenKhach} (SĐT: ${booking.SDT}, Email: ${booking.Email}) đã thanh toán cọc ${formatVND(
               booking.SoTienCoc,
             )} giữ phòng ${booking.TenPhong} (${booking.TenKhu}). Hẹn xem: ${
               booking.NgayHenXem
-            }. Mã tra cứu: ${booking.MaTraCuu}.`;
+            }. Mã tra cứu: ${booking.MaTraCuu}.${overpaidSuffix}`;
 
-        // 1. Lưu thông báo vào bảng thongbao & nhanthongbao (chống trùng theo MaTraCuu / OrderCode)
-        try {
-          const [existingNotiRows] = await db.execute(
-            `SELECT MaTB FROM thongbao
-             WHERE MaLTB = 6
-               AND (
-                 NoiDung LIKE ?
-                 OR TieuDe LIKE ?
-                 OR NoiDung LIKE ?
-               )
-               AND TieuDe NOT LIKE '%Hết hạn%'
-             LIMIT 1`,
-            [
-              `%${booking.MaTraCuu}%`,
-              `%${booking.MaTraCuu}%`,
-              `%${booking.OrderCode}%`,
-            ],
-          );
-
-          if (existingNotiRows.length === 0) {
-            // Đảm bảo luôn lấy được MaQuanLyKhu kể cả khi getById bị thiếu cột
-            let maQuanLyKhu = booking.MaQuanLyKhu
-              ? Number(booking.MaQuanLyKhu)
-              : null;
-
-            if (!maQuanLyKhu && booking.MaPhong) {
-              const [khuRows] = await db.execute(
-                `SELECT k.MaND AS MaQuanLyKhu
-                 FROM phong p
-                 INNER JOIN khutro k ON p.MaKhu = k.MaKhu
-                 WHERE p.MaPhong = ?
-                 LIMIT 1`,
-                [Number(booking.MaPhong)],
-              );
-              maQuanLyKhu = khuRows[0]?.MaQuanLyKhu
-                ? Number(khuRows[0].MaQuanLyKhu)
-                : null;
-            }
-
-            const dsNguoiNhan = Array.from(
-              new Set([1, ...(maQuanLyKhu ? [maQuanLyKhu] : [])]),
-            );
-
-            let maTB = null;
-
-            // Tương thích mọi phiên bản DatPhongModel + có fallback SQL trực tiếp
-            if (typeof DatPhongModel.createInternalNotification === "function") {
-              maTB = await DatPhongModel.createInternalNotification({
-                maLTB: 6,
-                maQuanLyKhu,
-                tieuDe,
-                noiDung,
-              });
-            } else if (
-              typeof DatPhongModel.createBookingNotification === "function"
-            ) {
-              const notiRes = await DatPhongModel.createBookingNotification({
-                maQuanLyKhu,
-                tieuDe,
-                noiDung,
-              });
-              maTB = notiRes?.maTB ?? notiRes;
-            } else {
-              const [insTb] = await db.execute(
-                `INSERT INTO thongbao (MaTBGoc, NDGui, MaLTB, TieuDe, NoiDung, NgayGui)
-                 VALUES (NULL, 1, 6, ?, ?, NOW())`,
-                [tieuDe, noiDung],
-              );
-              maTB = insTb.insertId;
-            }
-
-            // Đảm bảo tất cả người nhận (Chủ trọ = 1 & Quản lý khu) đều có trong nhanthongbao
-            if (maTB && dsNguoiNhan.length > 0) {
-              for (const ndId of dsNguoiNhan) {
-                await db.execute(
-                  `INSERT IGNORE INTO nhanthongbao (MaTB, NDNhan, TrangThai)
-                   VALUES (?, ?, 'ChuaDoc')`,
-                  [Number(maTB), Number(ndId)],
-                );
-              }
-            }
-
-            console.log(
-              `[DatPhong][Noti] Đã tạo MaTB=${maTB} cho đơn ${booking.MaTraCuu} -> NDNhan=${dsNguoiNhan.join(",")}`,
-            );
-
-            const socketPayload = {
-              MaTB: maTB,
-              MaTBGoc: null,
-              NDGui: 1,
-              TenNguoiGui: "Hệ thống Đặt cọc tự động",
-              QuyenNguoiGui: "ChuTro",
-              MaLTB: 6,
-              TenLTB: "Đặt cọc giữ phòng",
-              TieuDe: tieuDe,
-              NoiDung: noiDung,
-              NgayGui: new Date().toISOString(),
-              TrangThai: "ChuaDoc",
-            };
-
-            if (typeof emitThongBaoMoi === "function") {
-              emitThongBaoMoi(dsNguoiNhan, socketPayload);
-            } else if (io) {
-              dsNguoiNhan.forEach((ndId) => {
-                io.to(`user_${ndId}`).emit("NEW_NOTIFICATION", socketPayload);
-                io.to(`user_${ndId}`).emit("thong_bao_moi", socketPayload);
-              });
-            }
-          }
-        } catch (notiErr) {
-          console.error(
-            `[DatPhong][Noti] Lỗi tạo thông báo nội bộ cho ${booking.MaTraCuu}:`,
-            notiErr,
-          );
-        }
+        // 1. Lưu thông báo vào bảng thongbao & nhanthongbao
+        await createAndEmitBookingNotification({
+          booking,
+          tieuDe,
+          noiDung,
+          dedupKeyword: isDuplicate ? "Trùng cọc" : "Đặt cọc",
+          io,
+        });
 
         // 2. Gửi Email hóa đơn kèm thông tin liên hệ quản lý qua Brevo
         emailResult = await dispatchBookingEmail(
@@ -526,8 +700,10 @@ const DatPhongController = {
 
       return {
         found: true,
+        rejected: false,
         alreadyProcessed: txResult.alreadyProcessed,
         outcome: txResult.outcome,
+        amountCheck,
         booking,
         emailResult,
       };
@@ -543,20 +719,14 @@ const DatPhongController = {
 
   // -----------------------------------------------------------------------
   // 1. [POST] /api/dat-phong/tao-yeu-cau (Public - Khách vãng lai)
+  // Tiền đặt cọc cố định = 15% giá trị phòng
   // -----------------------------------------------------------------------
   taoYeuCauDatCoc: async (req, res) => {
     try {
       const { MaPhong, HoTenKhach, SDT, Email, NgayHenXem, SoTienCoc, GhiChu } =
         req.body;
 
-      if (
-        !MaPhong ||
-        !HoTenKhach ||
-        !SDT ||
-        !Email ||
-        !NgayHenXem ||
-        !SoTienCoc
-      ) {
+      if (!MaPhong || !HoTenKhach || !SDT || !Email || !NgayHenXem) {
         return res.status(400).json({
           success: false,
           message: "Vui lòng nhập đầy đủ thông tin đặt cọc giữ phòng.",
@@ -608,28 +778,31 @@ const DatPhongController = {
         });
       }
 
-      const depositAmount = Math.round(Number(SoTienCoc));
+      // Tính tiền đặt cọc cố định 15% trực tiếp từ giá phòng trong CSDL
       const giaPhong = Number(phong.Gia) || 0;
-      const effectiveMinDeposit =
-        giaPhong > 0
-          ? Math.min(MIN_DEPOSIT_AMOUNT, giaPhong)
-          : MIN_DEPOSIT_AMOUNT;
+      const depositAmount = calculateFixedDeposit(giaPhong);
 
-      if (
-        !Number.isFinite(depositAmount) ||
-        depositAmount < effectiveMinDeposit
-      ) {
+      if (giaPhong <= 0 || depositAmount <= 0) {
         return res.status(400).json({
           success: false,
-          message: `Số tiền đặt cọc tối thiểu là ${formatVND(effectiveMinDeposit)}.`,
+          message:
+            "Phòng trọ chưa có giá thuê hợp lệ để tính tiền đặt cọc 15%.",
         });
       }
 
-      if (giaPhong > 0 && depositAmount > giaPhong) {
-        return res.status(400).json({
-          success: false,
-          message: `Số tiền đặt cọc không được vượt quá giá phòng (${formatVND(giaPhong)}).`,
-        });
+      // Chặn trường hợp phía client gửi sai số tiền so với quy định 15%
+      if (
+        SoTienCoc !== undefined &&
+        SoTienCoc !== null &&
+        String(SoTienCoc).trim() !== ""
+      ) {
+        const clientAmount = Math.round(Number(SoTienCoc));
+        if (!Number.isFinite(clientAmount) || clientAmount !== depositAmount) {
+          return res.status(400).json({
+            success: false,
+            message: `Số tiền đặt cọc bắt buộc bằng đúng 15% giá thuê phòng (${formatVND(depositAmount)}).`,
+          });
+        }
       }
 
       const payosConfig = await DatPhongModel.getPayOSConfig();
@@ -695,7 +868,7 @@ const DatPhongController = {
         buyerPhone: sdtClean,
         items: [
           {
-            name: `Dat coc giu phong ${removeVietnameseTones(phong.TenPhong)}`,
+            name: `Dat coc 15% giu phong ${removeVietnameseTones(phong.TenPhong)}`,
             quantity: 1,
             price: depositAmount,
           },
@@ -735,20 +908,22 @@ const DatPhongController = {
 
       return res.status(201).json({
         success: true,
-        message:
-          "Tạo yêu cầu đặt cọc thành công. Vui lòng quét mã QR trong 15 phút.",
+        message: `Tạo yêu cầu đặt cọc 15% (${formatVND(depositAmount)}) thành công. Vui lòng chuyển đúng số tiền trong 15 phút.`,
         data: {
           maDP,
           maTraCuu,
           tokenTraCuu,
           orderCode,
           soTienCoc: depositAmount,
+          tyLeCoc: 15,
+          giaPhong,
           thoiGianHetHanQR: bookingCreated?.ThoiGianHetHanQR,
           phong: {
             MaPhong: phong.MaPhong,
             TenPhong: phong.TenPhong,
             TenKhu: phong.TenKhu,
             DiaChi: phong.DiaChi,
+            Gia: giaPhong,
           },
           payos: {
             checkoutUrl: payosJson.data.checkoutUrl,
@@ -773,6 +948,7 @@ const DatPhongController = {
 
   // -----------------------------------------------------------------------
   // 2. [GET] /api/dat-phong/kiem-tra-payos/:orderCode (Public - Polling 3s)
+  // Kiểm tra trạng thái & đối chiếu chính xác số tiền thực chuyển
   // -----------------------------------------------------------------------
   kiemTraThanhToanPayOS: async (req, res) => {
     try {
@@ -810,6 +986,13 @@ const DatPhongController = {
             tokenTraCuu: isPaid ? booking.TokenTraCuu : undefined,
             thoiGianThanhToan: booking.ThoiGianThanhToan,
             thoiGianHetHanGiu: booking.ThoiGianHetHanGiu,
+            expectedAmount: Number(booking.SoTienCoc) || 0,
+            paidAmount: isPaid ? Number(booking.SoTienCoc) || 0 : 0,
+            remainingAmount: 0,
+            overpaidAmount: 0,
+            amountStatus: isPaid ? "EXACT" : "UNPAID",
+            isWrongAmount: false,
+            warningMessage: null,
           },
         });
       }
@@ -817,20 +1000,31 @@ const DatPhongController = {
       const payosConfig = await DatPhongModel.getPayOSConfig();
       const credentials = resolvePayOSCredentials(payosConfig);
       const payosData = await fetchPayOSPaymentStatus(orderCode, credentials);
-      const payosStatus = String(payosData?.status || "").toUpperCase();
+      const amountCheck = evaluatePayOSAmount(payosData, booking.SoTienCoc);
 
-      if (payosStatus === "PAID") {
+      const secondsRemaining =
+        booking.SecondsRemainingQR !== null &&
+        booking.SecondsRemainingQR !== undefined
+          ? Number(booking.SecondsRemainingQR)
+          : 900;
+
+      // Trường hợp 1: PayOS xác nhận PAID và đủ tiền (>= 15% quy định)
+      if (amountCheck.payosStatus === "PAID" && amountCheck.isSufficient) {
         const io = req.app?.get?.("io") || global.io;
         const result = await DatPhongController.xacNhanThanhToanCocTuDong(
           orderCode,
           io,
+          payosData,
         );
+
         return res.status(200).json({
           success: true,
           message:
             result.outcome === "TrungLapCanHoan"
               ? "Giao dịch đã được ghi nhận nhưng phòng vừa có người đặt trước. Quản lý sẽ hoàn 100% tiền cọc."
-              : "Thanh toán đặt cọc giữ phòng thành công!",
+              : amountCheck.amountStatus === "OVERPAID"
+                ? amountCheck.warningMessage
+                : "Thanh toán đặt cọc giữ phòng thành công!",
           data: {
             paid: true,
             trangThai: result.booking.TrangThai,
@@ -839,52 +1033,125 @@ const DatPhongController = {
             thoiGianThanhToan: result.booking.ThoiGianThanhToan,
             thoiGianHetHanGiu: result.booking.ThoiGianHetHanGiu,
             emailSent: Boolean(result.emailResult?.sent),
+            payosStatus: amountCheck.payosStatus,
+            expectedAmount: amountCheck.expectedAmount,
+            paidAmount: amountCheck.paidAmount,
+            remainingAmount: amountCheck.remainingAmount,
+            overpaidAmount: amountCheck.overpaidAmount,
+            amountStatus: amountCheck.amountStatus,
+            isWrongAmount: amountCheck.isWrongAmount,
+            warningMessage: amountCheck.warningMessage,
           },
         });
       }
 
-      const secondsRemaining =
-        booking.SecondsRemainingQR !== null &&
-        booking.SecondsRemainingQR !== undefined
-          ? Number(booking.SecondsRemainingQR)
-          : 900;
-
       const isQrExpired = secondsRemaining <= 0;
 
+      // Trường hợp 2: Quá hạn 15 phút hoặc PayOS đã hủy/hết hạn
       if (
-        payosStatus === "CANCELLED" ||
-        payosStatus === "EXPIRED" ||
+        amountCheck.payosStatus === "CANCELLED" ||
+        amountCheck.payosStatus === "EXPIRED" ||
         isQrExpired
       ) {
-        await cancelPayOSPaymentLink(orderCode);
+        const hasPartialPayment = amountCheck.amountStatus === "UNDERPAID";
+        const cancelReason = hasPartialPayment
+          ? `Quá hạn 15 phút và khách chuyển thiếu tiền (đã nhận ${formatVND(
+              amountCheck.paidAmount,
+            )} / yêu cầu ${formatVND(amountCheck.expectedAmount)}, thiếu ${formatVND(
+              amountCheck.remainingAmount,
+            )})`
+          : amountCheck.payosStatus === "CANCELLED"
+            ? "Đơn thanh toán đã bị hủy trên PayOS"
+            : "Tự động hủy do quá 15 phút chưa thanh toán";
+
+        await cancelPayOSPaymentLink(orderCode, cancelReason);
         await cancelBookingAndReleaseRoom(
           booking.MaDP,
           booking.MaPhong,
-          payosStatus === "CANCELLED"
-            ? "Đơn thanh toán đã bị hủy trên PayOS"
-            : "Tự động hủy do quá 15 phút chưa thanh toán",
+          cancelReason,
         );
+
+        // Nếu khách đã chuyển thiếu tiền trước khi hết giờ -> báo Quản lý hỗ trợ hoàn lại
+        if (hasPartialPayment) {
+          const io = req.app?.get?.("io") || global.io;
+          await createAndEmitBookingNotification({
+            booking,
+            tieuDe: `[Hết hạn — Chuyển thiếu tiền cọc] ${booking.TenPhong} - ${booking.MaTraCuu}`,
+            noiDung: `Đơn ${booking.MaTraCuu} (khách ${booking.HoTenKhach}, SĐT: ${booking.SDT}) đã hết hạn 15 phút nhưng khách đã chuyển thiếu ${formatVND(
+              amountCheck.paidAmount,
+            )} / ${formatVND(
+              amountCheck.expectedAmount,
+            )}. Vui lòng liên hệ khách kiểm tra và hoàn lại số tiền đã chuyển.`,
+            dedupKeyword: "Hết hạn — Chuyển thiếu tiền cọc",
+            io,
+          });
+        }
+
         return res.status(200).json({
           success: true,
+          message: hasPartialPayment
+            ? `Đơn đã hết hạn 15 phút. Hệ thống ghi nhận bạn đã chuyển thiếu ${formatVND(
+                amountCheck.paidAmount,
+              )} / ${formatVND(
+                amountCheck.expectedAmount,
+              )}. Vui lòng liên hệ quản lý cơ sở (${booking.SDTQuanLy || "Ban quản lý"}) để được đối soát hoàn lại.`
+            : "Đơn đặt cọc đã hết hạn thanh toán.",
           data: {
             paid: false,
             trangThai: "DaHuy",
-            payosStatus,
+            payosStatus: amountCheck.payosStatus,
             secondsRemaining: 0,
             maTraCuu: booking.MaTraCuu,
+            expectedAmount: amountCheck.expectedAmount,
+            paidAmount: amountCheck.paidAmount,
+            remainingAmount: amountCheck.remainingAmount,
+            overpaidAmount: amountCheck.overpaidAmount,
+            amountStatus: amountCheck.amountStatus,
+            isWrongAmount: amountCheck.isWrongAmount,
+            warningMessage: hasPartialPayment
+              ? `Đơn đã hết hạn thanh toán nhưng hệ thống ghi nhận bạn đã chuyển ${formatVND(
+                  amountCheck.paidAmount,
+                )} (thiếu ${formatVND(
+                  amountCheck.remainingAmount,
+                )}). Vui lòng liên hệ quản lý cơ sở để được hỗ trợ hoàn tiền.`
+              : null,
           },
+        });
+      }
+
+      // Trường hợp 3: Đang chờ thanh toán — nếu khách vừa chuyển thiếu tiền -> bắn cảnh báo ngay
+      if (amountCheck.amountStatus === "UNDERPAID") {
+        const io = req.app?.get?.("io") || global.io;
+        await createAndEmitBookingNotification({
+          booking,
+          tieuDe: `[Chuyển thiếu tiền cọc] ${booking.TenPhong} - ${booking.MaTraCuu}`,
+          noiDung: `Khách ${booking.HoTenKhach} (SĐT: ${booking.SDT}) chuyển thiếu tiền cọc phòng ${booking.TenPhong}: mới nhận ${formatVND(
+            amountCheck.paidAmount,
+          )} / yêu cầu ${formatVND(
+            amountCheck.expectedAmount,
+          )} (thiếu ${formatVND(amountCheck.remainingAmount)}).`,
+          dedupKeyword: "Chuyển thiếu tiền cọc",
+          io,
         });
       }
 
       return res.status(200).json({
         success: true,
+        message: amountCheck.warningMessage || undefined,
         data: {
           paid: false,
           trangThai: "ChoThanhToan",
-          payosStatus,
+          payosStatus: amountCheck.payosStatus,
           secondsRemaining,
           maTraCuu: booking.MaTraCuu,
           thoiGianHetHanQR: booking.ThoiGianHetHanQR,
+          expectedAmount: amountCheck.expectedAmount,
+          paidAmount: amountCheck.paidAmount,
+          remainingAmount: amountCheck.remainingAmount,
+          overpaidAmount: amountCheck.overpaidAmount,
+          amountStatus: amountCheck.amountStatus,
+          isWrongAmount: amountCheck.isWrongAmount,
+          warningMessage: amountCheck.warningMessage,
         },
       });
     } catch (error) {
@@ -935,16 +1202,21 @@ const DatPhongController = {
         });
       }
 
+      let amountCheck = null;
+
       // Kiểm tra lần cuối với PayOS tránh trường hợp khách chuyển ở giây 14:59
       try {
         const payosConfig = await DatPhongModel.getPayOSConfig();
         const credentials = resolvePayOSCredentials(payosConfig);
         const payosData = await fetchPayOSPaymentStatus(orderCode, credentials);
-        if (String(payosData?.status || "").toUpperCase() === "PAID") {
+        amountCheck = evaluatePayOSAmount(payosData, booking.SoTienCoc);
+
+        if (amountCheck.payosStatus === "PAID" && amountCheck.isSufficient) {
           const io = req.app?.get?.("io") || global.io;
           const result = await DatPhongController.xacNhanThanhToanCocTuDong(
             orderCode,
             io,
+            payosData,
           );
           return res.status(200).json({
             success: true,
@@ -953,6 +1225,12 @@ const DatPhongController = {
               trangThai: result.booking.TrangThai,
               maTraCuu: result.booking.MaTraCuu,
               tokenTraCuu: result.booking.TokenTraCuu,
+              expectedAmount: amountCheck.expectedAmount,
+              paidAmount: amountCheck.paidAmount,
+              overpaidAmount: amountCheck.overpaidAmount,
+              amountStatus: amountCheck.amountStatus,
+              isWrongAmount: amountCheck.isWrongAmount,
+              warningMessage: amountCheck.warningMessage,
             },
           });
         }
@@ -960,21 +1238,58 @@ const DatPhongController = {
         // Bỏ qua lỗi mạng khi kiểm tra PayOS và tiến hành hủy đơn
       }
 
-      await cancelPayOSPaymentLink(orderCode);
+      const hasPartialPayment = amountCheck?.amountStatus === "UNDERPAID";
+      const cancelReason = hasPartialPayment
+        ? `Quá hạn 15 phút và khách chuyển thiếu tiền (đã nhận ${formatVND(
+            amountCheck.paidAmount,
+          )} / yêu cầu ${formatVND(amountCheck.expectedAmount)})`
+        : "Tự động hủy do quá 15 phút chưa hoàn tất thanh toán";
+
+      await cancelPayOSPaymentLink(orderCode, cancelReason);
       await cancelBookingAndReleaseRoom(
         booking.MaDP,
         booking.MaPhong,
-        "Tự động hủy do quá 15 phút chưa hoàn tất thanh toán",
+        cancelReason,
       );
+
+      if (hasPartialPayment) {
+        const io = req.app?.get?.("io") || global.io;
+        await createAndEmitBookingNotification({
+          booking,
+          tieuDe: `[Hết hạn — Chuyển thiếu tiền cọc] ${booking.TenPhong} - ${booking.MaTraCuu}`,
+          noiDung: `Đơn ${booking.MaTraCuu} (khách ${booking.HoTenKhach}, SĐT: ${booking.SDT}) đã hết hạn 15 phút nhưng khách đã chuyển thiếu ${formatVND(
+            amountCheck.paidAmount,
+          )} / ${formatVND(
+            amountCheck.expectedAmount,
+          )}. Vui lòng liên hệ khách kiểm tra và hoàn lại số tiền đã chuyển.`,
+          dedupKeyword: "Hết hạn — Chuyển thiếu tiền cọc",
+          io,
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        message:
-          "Đơn đặt cọc đã hủy do quá 15 phút. Phòng đã trở về trạng thái không có cọc.",
+        message: hasPartialPayment
+          ? `Đơn đặt cọc đã hủy do quá 15 phút và chuyển thiếu tiền (đã nhận ${formatVND(
+              amountCheck.paidAmount,
+            )}). Vui lòng liên hệ quản lý cơ sở để được hỗ trợ hoàn tiền.`
+          : "Đơn đặt cọc đã hủy do quá 15 phút. Phòng đã trở về trạng thái không có cọc.",
         data: {
           paid: false,
           trangThai: "DaHuy",
           maTraCuu: booking.MaTraCuu,
+          expectedAmount: amountCheck?.expectedAmount ?? Number(booking.SoTienCoc),
+          paidAmount: amountCheck?.paidAmount ?? 0,
+          remainingAmount: amountCheck?.remainingAmount ?? 0,
+          amountStatus: amountCheck?.amountStatus ?? "UNPAID",
+          isWrongAmount: Boolean(hasPartialPayment),
+          warningMessage: hasPartialPayment
+            ? `Hệ thống ghi nhận bạn đã chuyển ${formatVND(
+                amountCheck.paidAmount,
+              )} nhưng còn thiếu ${formatVND(
+                amountCheck.remainingAmount,
+              )} khi mã QR hết hạn. Vui lòng liên hệ quản lý cơ sở để được đối soát hoàn lại.`
+            : null,
         },
       });
     } catch (error) {
@@ -1263,12 +1578,15 @@ const DatPhongController = {
           .status(404)
           .json({ success: false, message: "Không tìm thấy phòng trọ." });
       }
+      const gia = Number(phong.Gia) || 0;
       return res.status(200).json({
         success: true,
         data: {
           ...phong,
-          Gia: Number(phong.Gia) || 0,
+          Gia: gia,
           DienTich: Number(phong.DienTich) || 0,
+          TyLeCoc: 15,
+          SoTienCocQuyDinh: calculateFixedDeposit(gia),
         },
       });
     } catch (error) {

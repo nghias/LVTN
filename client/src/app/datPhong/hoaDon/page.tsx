@@ -31,6 +31,35 @@ interface CachedPaymentSession {
   };
 }
 
+interface WrongAmountAlert {
+  amountStatus: 'UNDERPAID' | 'OVERPAID';
+  expectedAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  overpaidAmount: number;
+  warningMessage: string;
+}
+
+function extractWrongAmountAlert(data: any): WrongAmountAlert | null {
+  if (
+    !data?.isWrongAmount ||
+    (data?.amountStatus !== 'UNDERPAID' && data?.amountStatus !== 'OVERPAID')
+  ) {
+    return null;
+  }
+
+  return {
+    amountStatus: data.amountStatus,
+    expectedAmount: Number(data.expectedAmount || 0),
+    paidAmount: Number(data.paidAmount || 0),
+    remainingAmount: Number(data.remainingAmount || 0),
+    overpaidAmount: Number(data.overpaidAmount || 0),
+    warningMessage:
+      data.warningMessage ||
+      'Số tiền chuyển khoản không khớp với mức đặt cọc 15% quy định.',
+  };
+}
+
 function ThanhToanPayOSContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,6 +77,7 @@ function ThanhToanPayOSContent() {
   const [isExpired, setIsExpired] = useState(false);
   const [paidSuccess, setPaidSuccess] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [wrongAmountAlert, setWrongAmountAlert] = useState<WrongAmountAlert | null>(null);
 
   const expireHandledRef = useRef(false);
 
@@ -137,7 +167,7 @@ function ThanhToanPayOSContent() {
     ? Math.floor(new Date(booking.ThoiGianHetHanQR.replace(' ', 'T')).getTime() / 1000)
     : 0;
 
-  // Hàm xử lý khi hết 15 phút: báo Backend hủy đơn & mở lại phòng không có cọc
+  // Hàm xử lý khi hết 15 phút: báo Backend hủy đơn & kiểm tra xem khách có lỡ chuyển thiếu/đủ ở giây cuối không
   const handleExpireOrder = useCallback(async () => {
     if (expireHandledRef.current || paidSuccess) return;
     expireHandledRef.current = true;
@@ -146,16 +176,24 @@ function ThanhToanPayOSContent() {
     if (activeOrderCode) {
       try {
         const res = await datPhongService.huyDonQuaHan(activeOrderCode);
-        // Trường hợp khách chuyển ở giây cuối 14:59 -> PayOS đã ghi nhận PAID
-        if (res.data?.paid) {
+        const data = res.data as any;
+        const alertInfo = extractWrongAmountAlert(data);
+
+        if (alertInfo) {
+          setWrongAmountAlert(alertInfo);
+        }
+
+        // Trường hợp khách chuyển đủ ở giây cuối 14:59 -> PayOS đã ghi nhận PAID
+        if (data?.paid) {
           setPaidSuccess(true);
-          const code = res.data.maTraCuu || maTraCuuParam;
-          const token = res.data.tokenTraCuu || tokenParam;
-          setTimeout(() => redirectToInvoice(code, token), 800);
+          const code = data.maTraCuu || maTraCuuParam;
+          const token = data.tokenTraCuu || tokenParam;
+          const delayMs = alertInfo?.amountStatus === 'OVERPAID' ? 3500 : 800;
+          setTimeout(() => redirectToInvoice(code, token), delayMs);
           return;
         }
       } catch {
-        // Fallback: Cron Job 1 phút trên server vẫn tự hủy đơn
+        // Fallback: Cron Job trên server vẫn tự hủy đơn
       }
     }
 
@@ -185,7 +223,7 @@ function ThanhToanPayOSContent() {
     return () => clearInterval(timer);
   }, [loading, expiredAtUnix, paidSuccess, isExpired, handleExpireOrder]);
 
-  // Auto-polling mỗi 3 giây kiểm tra thanh toán PayOS
+  // Auto-polling mỗi 3 giây kiểm tra thanh toán & đối chiếu số tiền thực nhận trên PayOS
   useEffect(() => {
     if (loading || !activeOrderCode || isExpired || paidSuccess) return;
 
@@ -195,14 +233,20 @@ function ThanhToanPayOSContent() {
         const res = await datPhongService.kiemTraPayOS(activeOrderCode);
         if (cancelled) return;
 
-        if (res.data?.paid) {
+        const data = res.data as any;
+        const alertInfo = extractWrongAmountAlert(data);
+        setWrongAmountAlert(alertInfo);
+
+        if (data?.paid) {
           setPaidSuccess(true);
-          const code = res.data.maTraCuu || maTraCuuParam;
-          const token = res.data.tokenTraCuu || tokenParam;
+          const code = data.maTraCuu || maTraCuuParam;
+          const token = data.tokenTraCuu || tokenParam;
+          // Nếu khách chuyển thừa tiền -> giữ 3.5 giây để đọc cảnh báo hoàn tiền thừa
+          const delayMs = alertInfo?.amountStatus === 'OVERPAID' ? 3500 : 1000;
           setTimeout(() => {
             redirectToInvoice(code, token);
-          }, 1000);
-        } else if (res.data?.trangThai === 'DaHuy') {
+          }, delayMs);
+        } else if (data?.trangThai === 'DaHuy') {
           setIsExpired(true);
         }
       } catch {
@@ -216,7 +260,15 @@ function ThanhToanPayOSContent() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [loading, activeOrderCode, isExpired, paidSuccess, maTraCuuParam, tokenParam, redirectToInvoice]);
+  }, [
+    loading,
+    activeOrderCode,
+    isExpired,
+    paidSuccess,
+    maTraCuuParam,
+    tokenParam,
+    redirectToInvoice,
+  ]);
 
   const handleCopy = async (label: string, value: string) => {
     try {
@@ -238,6 +290,9 @@ function ThanhToanPayOSContent() {
   const khuName = roomBrief?.TenKhu || booking?.TenKhu || '';
   const diaChi = roomBrief?.DiaChi || booking?.DiaChiKhu || '';
   const maPhongGoc = roomBrief?.MaPhong || booking?.MaPhong;
+  const requiredAmount = qrResult?.payos?.amount || booking?.SoTienCoc || 0;
+  const isUnderpaid = wrongAmountAlert?.amountStatus === 'UNDERPAID';
+  const isOverpaid = wrongAmountAlert?.amountStatus === 'OVERPAID';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F1F5F9] text-slate-900">
@@ -300,26 +355,108 @@ function ThanhToanPayOSContent() {
 
             <div className="p-6 sm:p-8">
               {paidSuccess ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center space-y-2.5">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xl font-bold">
-                    ✓
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center space-y-2.5">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xl font-bold">
+                      ✓
+                    </div>
+                    <h2 className="text-base font-bold text-emerald-900">
+                      Chuyển khoản đặt cọc thành công!
+                    </h2>
+                    <p className="text-xs text-emerald-700">
+                      Hệ thống đã gửi Email hóa đơn kèm thông tin liên hệ quản lý và đang mở trang hóa đơn ({maTraCuuParam})...
+                    </p>
                   </div>
-                  <h2 className="text-base font-bold text-emerald-900">
-                    Chuyển khoản đặt cọc thành công!
-                  </h2>
-                  <p className="text-xs text-emerald-700">
-                    Hệ thống đã gửi Email hóa đơn kèm thông tin liên hệ quản lý và đang mở trang hóa đơn ({maTraCuuParam})...
-                  </p>
+
+                  {/* Cảnh báo nếu khách chuyển thừa tiền */}
+                  {isOverpaid && wrongAmountAlert && (
+                    <div
+                      role="alert"
+                      className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-950 space-y-2.5"
+                    >
+                      <p className="font-bold text-sm text-amber-900">
+                        Cảnh báo: Bạn đã chuyển THỪA {formatVND(wrongAmountAlert.overpaidAmount)}!
+                      </p>
+                      <p className="leading-relaxed">{wrongAmountAlert.warningMessage}</p>
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                        <div className="rounded-xl bg-white border border-amber-200 p-2">
+                          <span className="block text-[10px] text-slate-500">Yêu cầu (15%)</span>
+                          <b className="text-slate-900">
+                            {formatVND(wrongAmountAlert.expectedAmount)}
+                          </b>
+                        </div>
+                        <div className="rounded-xl bg-white border border-amber-200 p-2">
+                          <span className="block text-[10px] text-slate-500">Đã nhận</span>
+                          <b className="text-teal-700">
+                            {formatVND(wrongAmountAlert.paidAmount)}
+                          </b>
+                        </div>
+                        <div className="rounded-xl bg-white border border-amber-200 p-2">
+                          <span className="block text-[10px] text-slate-500">Chuyển thừa</span>
+                          <b className="text-amber-700">
+                            {formatVND(wrongAmountAlert.overpaidAmount)}
+                          </b>
+                        </div>
+                      </div>
+                      <div className="pt-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => redirectToInvoice(maTraCuuParam, tokenParam)}
+                          className="rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-xs font-bold text-white cursor-pointer"
+                        >
+                          Xem hóa đơn ngay →
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : isExpired ? (
                 <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center space-y-3">
                   <h2 className="text-base font-bold text-rose-800">
-                    Mã QR đã hết hiệu lực sau 15 phút
+                    {isUnderpaid
+                      ? 'Đơn đã hết hạn 15 phút (Chuyển thiếu tiền cọc)'
+                      : 'Mã QR đã hết hiệu lực sau 15 phút'}
                   </h2>
-                  <p className="text-xs text-rose-700 leading-relaxed">
-                    Đơn đặt cọc <b>{maTraCuuParam}</b> đã tự động hủy và phòng đã được mở lại trạng thái{' '}
-                    <b>Còn trống (không có cọc)</b> để khách hàng khác có thể thuê.
-                  </p>
+
+                  {isUnderpaid && wrongAmountAlert ? (
+                    <div className="text-left rounded-2xl border border-rose-300 bg-white p-4 text-xs text-rose-900 space-y-2 max-w-xl mx-auto">
+                      <p className="leading-relaxed">{wrongAmountAlert.warningMessage}</p>
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-2">
+                          <span className="block text-[10px] text-slate-500">Yêu cầu (15%)</span>
+                          <b className="text-slate-900">
+                            {formatVND(wrongAmountAlert.expectedAmount)}
+                          </b>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-2">
+                          <span className="block text-[10px] text-slate-500">Đã nhận</span>
+                          <b className="text-teal-700">
+                            {formatVND(wrongAmountAlert.paidAmount)}
+                          </b>
+                        </div>
+                        <div className="rounded-xl bg-rose-50 border border-rose-200 p-2">
+                          <span className="block text-[10px] text-rose-600">Còn thiếu</span>
+                          <b className="text-rose-700">
+                            {formatVND(wrongAmountAlert.remainingAmount)}
+                          </b>
+                        </div>
+                      </div>
+                      {booking?.SDTQuanLy && (
+                        <p className="pt-1 text-slate-700">
+                          Liên hệ quản lý hỗ trợ hoàn tiền:{' '}
+                          <b>
+                            {booking.TenQuanLy || 'Ban quản lý'} — {booking.SDTQuanLy}
+                          </b>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-rose-700 leading-relaxed">
+                      Đơn đặt cọc <b>{maTraCuuParam}</b> đã tự động hủy và phòng đã được mở lại trạng thái{' '}
+                      <b>Còn trống (không có cọc)</b> để khách hàng khác có thể thuê.
+                    </p>
+                  )}
+
                   <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
                     {maPhongGoc && (
                       <Link
@@ -340,20 +477,124 @@ function ThanhToanPayOSContent() {
               ) : (
                 <div className="space-y-5">
                   {/* Thanh trạng thái & đồng hồ 15 phút */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-200 bg-teal-50/70 px-4 py-3">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-teal-900">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-teal-500 animate-ping" />
-                      <span>Đang chờ chuyển khoản (tự kiểm tra mỗi 3 giây)...</span>
+                  <div
+                    className={`flex flex-wrap items-center justify-between gap-2 rounded-2xl border px-4 py-3 ${
+                      isUnderpaid
+                        ? 'border-rose-300 bg-rose-50'
+                        : 'border-teal-200 bg-teal-50/70'
+                    }`}
+                  >
+                    <div
+                      className={`flex items-center gap-2 text-xs font-semibold ${
+                        isUnderpaid ? 'text-rose-800' : 'text-teal-900'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-2.5 w-2.5 rounded-full animate-ping ${
+                          isUnderpaid ? 'bg-rose-500' : 'bg-teal-500'
+                        }`}
+                      />
+                      <span>
+                        {isUnderpaid
+                          ? 'Phát hiện chuyển thiếu tiền — Phòng CHƯA được giữ chỗ (đang tiếp tục kiểm tra)...'
+                          : 'Đang chờ chuyển khoản (tự kiểm tra mỗi 3 giây)...'}
+                      </span>
                     </div>
                     <span className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-bold text-[#00FFCC] tabular-nums">
                       Hết hạn sau {formatCountdown(secondsLeft)}
                     </span>
                   </div>
 
+                  {/* Cảnh báo realtime ngay khi phát hiện chuyển THIẾU tiền */}
+                  {isUnderpaid && wrongAmountAlert && (
+                    <div
+                      role="alert"
+                      className="rounded-2xl border-2 border-rose-400 bg-rose-50 p-4 text-xs text-rose-900 space-y-3"
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-600 text-[11px] font-bold text-white">
+                          !
+                        </span>
+                        <div className="space-y-1">
+                          <p className="font-bold text-sm text-rose-900">
+                            Cảnh báo: Bạn đã chuyển THIẾU số tiền đặt cọc!
+                          </p>
+                          <p className="leading-relaxed">{wrongAmountAlert.warningMessage}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
+                        <div className="rounded-xl bg-white border border-rose-200 p-2.5">
+                          <span className="block text-[10px] text-slate-500">
+                            Cọc quy định (15%)
+                          </span>
+                          <b className="text-sm text-slate-900">
+                            {formatVND(wrongAmountAlert.expectedAmount)}
+                          </b>
+                        </div>
+                        <div className="rounded-xl bg-white border border-rose-200 p-2.5">
+                          <span className="block text-[10px] text-slate-500">
+                            Hệ thống đã nhận
+                          </span>
+                          <b className="text-sm text-teal-700">
+                            {formatVND(wrongAmountAlert.paidAmount)}
+                          </b>
+                        </div>
+                        <div className="rounded-xl bg-rose-100/80 border border-rose-300 p-2.5">
+                          <span className="block text-[10px] font-semibold text-rose-700">
+                            Số tiền còn thiếu
+                          </span>
+                          <b className="text-sm text-rose-700">
+                            {formatVND(wrongAmountAlert.remainingAmount)}
+                          </b>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <span className="text-[11px] text-rose-800">
+                          Chuyển bổ sung đúng số tiền còn thiếu với <b>cùng STK và nội dung CK</b> bên dưới để hoàn tất.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleCopy(
+                              'REMAINING',
+                              String(wrongAmountAlert.remainingAmount)
+                            )
+                          }
+                          className="rounded-lg bg-rose-600 hover:bg-rose-700 px-3 py-1.5 text-[11px] font-bold text-white cursor-pointer"
+                        >
+                          {copiedField === 'REMAINING'
+                            ? 'Đã chép số tiền thiếu'
+                            : `Sao chép số tiền thiếu (${formatVND(
+                                wrongAmountAlert.remainingAmount
+                              )})`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cảnh báo cố định nhắc chuyển đúng số tiền (khi chưa phát sinh lỗi chuyển thiếu) */}
+                  {!isUnderpaid && (
+                    <div
+                      role="note"
+                      className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950 leading-relaxed"
+                    >
+                      <b>Cảnh báo quan trọng:</b> Vui lòng chuyển khoản{' '}
+                      <b>đúng số tiền {formatVND(requiredAmount)}</b> (15% giá phòng) và{' '}
+                      <b>giữ nguyên nội dung chuyển khoản</b> trên mã QR. Nếu tự ý sửa số tiền
+                      thấp hơn, hệ thống sẽ <b>không khóa giữ phòng</b>.
+                    </div>
+                  )}
+
                   {qrResult ? (
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
                       <div className="md:col-span-5 flex flex-col items-center">
-                        <div className="rounded-2xl border-2 border-[#00FFCC] bg-white p-3 shadow-sm">
+                        <div
+                          className={`rounded-2xl border-2 bg-white p-3 shadow-sm ${
+                            isUnderpaid ? 'border-rose-400' : 'border-[#00FFCC]'
+                          }`}
+                        >
                           <img
                             src={qrImageSrc}
                             alt="Mã VietQR PayOS"
@@ -367,11 +608,20 @@ function ThanhToanPayOSContent() {
 
                       <div className="md:col-span-7 space-y-3 text-xs">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-2.5">
-                          <div className="flex justify-between items-center">
-                            <span className="text-slate-500">Số tiền cọc:</span>
-                            <span className="text-base font-bold text-teal-700">
-                              {formatVND(qrResult.payos.amount)}
-                            </span>
+                          <div className="flex justify-between items-center gap-2">
+                            <span className="text-slate-500">Số tiền cọc (15%):</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopy('AMOUNT', String(qrResult.payos.amount))
+                              }
+                              className="text-base font-bold text-teal-700 cursor-pointer"
+                            >
+                              {formatVND(qrResult.payos.amount)}{' '}
+                              <span className="text-[11px] font-semibold text-teal-600 underline">
+                                {copiedField === 'AMOUNT' ? 'Đã chép' : 'Sao chép'}
+                              </span>
+                            </button>
                           </div>
                           <div className="flex justify-between gap-2">
                             <span className="text-slate-500">Chủ tài khoản:</span>
@@ -408,11 +658,11 @@ function ThanhToanPayOSContent() {
                         </div>
 
                         <p className="text-[11px] text-slate-500 leading-relaxed">
-                          Lưu ý: Quét mã QR bằng ứng dụng ngân hàng để điền chính xác số tiền và nội dung.
-                          Nếu không hoàn tất trong <b>15 phút</b>, giao dịch sẽ tự động hủy để khách khác có thể đặt phòng.
+                          Lưu ý: Quét mã QR bằng ứng dụng ngân hàng để điền chính xác số tiền và
+                          nội dung. Không tự ý chỉnh sửa số tiền chuyển khoản. Nếu không hoàn tất
+                          đủ số tiền trong <b>15 phút</b>, giao dịch sẽ tự động hủy để khách khác có
+                          thể đặt phòng.
                         </p>
-
-
                       </div>
                     </div>
                   ) : (

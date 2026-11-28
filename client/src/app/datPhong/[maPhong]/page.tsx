@@ -11,9 +11,13 @@ import { datPhongService } from '@/services/datPhong.service';
 const formatVND = (amount: number) =>
   `${Math.round(amount || 0).toLocaleString('vi-VN')}đ`;
 
-const MIN_DEPOSIT_CONFIG = Number(
-  process.env.NEXT_PUBLIC_BOOKING_MIN_DEPOSIT || 1000
-);
+const DEPOSIT_RATE = 0.15; // Đặt cọc cố định 15% giá trị phòng
+
+const calculateFixedDeposit = (giaPhong: number) => {
+  const price = Number(giaPhong) || 0;
+  if (price <= 0) return 0;
+  return Math.round((price * DEPOSIT_RATE) / 1000) * 1000;
+};
 
 // Khung giờ hành chính, phút chỉ chọn :00 hoặc :30
 const MORNING_SLOTS = [
@@ -111,14 +115,7 @@ const normalizePhone = (raw: string) => {
   return cleaned;
 };
 
-type FieldName =
-  | 'hoTenKhach'
-  | 'sdt'
-  | 'email'
-  | 'ngayHenXem'
-  | 'soTienCoc'
-  | 'ghiChu';
-
+type FieldName = 'hoTenKhach' | 'sdt' | 'email' | 'ngayHenXem' | 'ghiChu';
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 export default function DatPhongPage() {
@@ -152,7 +149,6 @@ export default function DatPhongPage() {
   const [email, setEmail] = useState('');
   const [ngayHen, setNgayHen] = useState('');
   const [gioHen, setGioHen] = useState('09:00');
-  const [soTienCoc, setSoTienCoc] = useState('');
   const [ghiChu, setGhiChu] = useState('');
 
   // Trạng thái lỗi và đã tương tác từng trường
@@ -164,7 +160,6 @@ export default function DatPhongPage() {
     sdt: useRef<HTMLInputElement>(null),
     email: useRef<HTMLInputElement>(null),
     ngayHenXem: useRef<HTMLInputElement>(null),
-    soTienCoc: useRef<HTMLInputElement>(null),
     ghiChu: useRef<HTMLTextAreaElement>(null),
   };
 
@@ -197,11 +192,6 @@ export default function DatPhongPage() {
       .layThongTinPhong(maPhong)
       .then((res) => {
         setRoom(res.data);
-        const gia = Number(res.data.Gia) || 0;
-        const minDep =
-          gia > 0 ? Math.min(MIN_DEPOSIT_CONFIG, gia) : MIN_DEPOSIT_CONFIG;
-        // Điền sẵn mức tối thiểu (1.000đ) để test nhanh
-        setSoTienCoc(String(minDep));
       })
       .catch((err: any) => {
         setRoomError(err?.message || 'Không tìm thấy phòng trọ.');
@@ -209,24 +199,11 @@ export default function DatPhongPage() {
       .finally(() => setLoadingRoom(false));
   }, [maPhong]);
 
-  const minDeposit = useMemo(() => {
-    if (!room) return MIN_DEPOSIT_CONFIG;
-    const gia = Number(room.Gia) || 0;
-    return gia > 0 ? Math.min(MIN_DEPOSIT_CONFIG, gia) : MIN_DEPOSIT_CONFIG;
+  // Số tiền cọc cố định = 15% giá trị phòng
+  const fixedDeposit = useMemo(() => {
+    if (!room) return 0;
+    return calculateFixedDeposit(room.Gia);
   }, [room]);
-
-  const suggestedDeposits = useMemo(() => {
-    if (!room) return [1000, 2000, 10000, 100000];
-    const gia = Number(room.Gia) || 0;
-    const tenPercent = Math.max(
-      minDeposit,
-      Math.round((gia * 0.1) / 10000) * 10000
-    );
-    const list = [minDeposit, 2000, 10000, tenPercent, 300000].filter(
-      (v) => v >= minDeposit && (gia === 0 || v <= gia)
-    );
-    return Array.from(new Set(list)).sort((a, b) => a - b);
-  }, [room, minDeposit]);
 
   // Tính ngày nhỏ nhất & lớn nhất có ít nhất 1 khung giờ hành chính hợp lệ trong tối đa 7 ngày
   const { minVisitDate, maxVisitDate } = useMemo(() => {
@@ -269,7 +246,6 @@ export default function DatPhongPage() {
       email?: string;
       ngayHen?: string;
       gioHen?: string;
-      soTienCoc?: string;
       ghiChu?: string;
     }
   ): string | undefined => {
@@ -278,7 +254,6 @@ export default function DatPhongPage() {
     const valEmail = overrides?.email ?? email;
     const valNgay = overrides?.ngayHen ?? ngayHen;
     const valGio = overrides?.gioHen ?? gioHen;
-    const valCoc = overrides?.soTienCoc ?? soTienCoc;
     const valGhiChu = overrides?.ghiChu ?? ghiChu;
 
     switch (field) {
@@ -360,27 +335,6 @@ export default function DatPhongPage() {
         return undefined;
       }
 
-      case 'soTienCoc': {
-        const digits = valCoc.replace(/[^\d]/g, '');
-        if (!digits) return 'Vui lòng nhập số tiền đặt cọc giữ chỗ.';
-        const amount = Number(digits);
-        if (!Number.isFinite(amount) || amount <= 0) {
-          return 'Số tiền đặt cọc không hợp lệ.';
-        }
-        if (amount < minDeposit) {
-          return `Số tiền đặt cọc tối thiểu là ${formatVND(minDeposit)}.`;
-        }
-        if (room && room.Gia > 0 && amount > room.Gia) {
-          return `Số tiền đặt cọc không được vượt quá giá thuê phòng (${formatVND(
-            room.Gia
-          )}).`;
-        }
-        if (amount % 1000 !== 0) {
-          return 'Số tiền đặt cọc phải là bội số của 1.000đ (VD: 100.000đ, 250.000đ).';
-        }
-        return undefined;
-      }
-
       case 'ghiChu': {
         if (valGhiChu.trim().length > MAX_NOTE_LENGTH) {
           return `Ghi chú không được vượt quá ${MAX_NOTE_LENGTH} ký tự.`;
@@ -404,7 +358,6 @@ export default function DatPhongPage() {
       ? getAvailableSlotsForDate(newDate, currentTime)
       : [];
 
-    // Nếu khung giờ hiện tại không còn hợp lệ ở ngày mới chọn -> tự chọn khung giờ khả dụng đầu tiên
     let nextTime = gioHen;
     if (validSlots.length > 0 && !validSlots.includes(gioHen as any)) {
       nextTime = validSlots[0];
@@ -439,12 +392,16 @@ export default function DatPhongPage() {
     if (!room) return;
     setSubmitError(null);
 
+    if (fixedDeposit <= 0) {
+      setSubmitError('Phòng hiện chưa có giá thuê hợp lệ để tính tiền cọc 15%.');
+      return;
+    }
+
     const fieldsOrder: FieldName[] = [
       'hoTenKhach',
       'sdt',
       'email',
       'ngayHenXem',
-      'soTienCoc',
       'ghiChu',
     ];
 
@@ -468,7 +425,6 @@ export default function DatPhongPage() {
       return;
     }
 
-    const depositNumber = Number(soTienCoc.replace(/[^\d]/g, ''));
     const normalizedName = hoTenKhach.trim().replace(/\s+/g, ' ');
     const normalizedSdt = normalizePhone(sdt.trim());
     const normalizedEmail = email.trim().toLowerCase();
@@ -482,7 +438,7 @@ export default function DatPhongPage() {
         SDT: normalizedSdt,
         Email: normalizedEmail,
         NgayHenXem: ngayHenXem,
-        SoTienCoc: depositNumber,
+        SoTienCoc: fixedDeposit,
         GhiChu: ghiChu.trim() || undefined,
       });
 
@@ -600,7 +556,8 @@ export default function DatPhongPage() {
             <div className="p-6 sm:p-8">
               <form onSubmit={handleSubmit} noValidate className="space-y-4">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600 leading-relaxed">
-                  Phòng chỉ được khóa giữ chỗ sau khi PayOS xác nhận nhận đủ tiền cọc
+                  Mức đặt cọc giữ chỗ được quy định cố định bằng <b>15% giá thuê phòng</b>.
+                  Phòng chỉ được khóa giữ chỗ sau khi PayOS xác nhận nhận đủ đúng số tiền cọc
                   (mã QR có hiệu lực trong <b>15 phút</b>). Bạn có thể chọn ngày hẹn xem phòng
                   trong vòng <b>tối đa {MAX_VISIT_DAYS} ngày</b> kể từ ngày đặt cọc; khi đến xem
                   đúng hẹn trong khung giờ hành chính, quản lý sẽ <b>hoàn lại 100% tiền cọc</b> dù
@@ -700,7 +657,7 @@ export default function DatPhongPage() {
                   </div>
                 </div>
 
-                {/* Email + Ngày giờ hẹn xem phòng (Giờ hành chính, phút 00/30, tối đa 7 ngày) */}
+                {/* Email + Ngày giờ hẹn xem phòng */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label
@@ -832,87 +789,52 @@ export default function DatPhongPage() {
                   </div>
                 </div>
 
-                {/* Số tiền đặt cọc */}
-                <div>
-                  <label
-                    htmlFor="soTienCoc"
-                    className="block text-xs font-bold text-slate-700 mb-1"
-                  >
-                    Số tiền đặt cọc giữ chỗ (VNĐ){' '}
-                    <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    ref={fieldRefs.soTienCoc}
-                    id="soTienCoc"
-                    type="text"
-                    inputMode="numeric"
-                    value={
-                      soTienCoc
-                        ? Number(soTienCoc.replace(/[^\d]/g, '')).toLocaleString(
-                            'vi-VN'
-                          )
-                        : ''
-                    }
-                    aria-invalid={Boolean(touched.soTienCoc && errors.soTienCoc)}
-                    onChange={(e) => {
-                      const rawDigits = e.target.value
-                        .replace(/[^\d]/g, '')
-                        .slice(0, 9);
-                      setSoTienCoc(rawDigits);
-                      setSubmitError(null);
-                      if (touched.soTienCoc) {
-                        setErrors((prev) => ({
-                          ...prev,
-                          soTienCoc: validateField('soTienCoc', {
-                            soTienCoc: rawDigits,
-                          }),
-                        }));
-                      }
-                    }}
-                    onBlur={() => handleBlur('soTienCoc')}
-                    placeholder={`Tối thiểu ${formatVND(minDeposit)}`}
-                    className={getInputClass(
-                      Boolean(touched.soTienCoc && errors.soTienCoc),
-                      'font-bold text-teal-800'
-                    )}
-                  />
-                  {touched.soTienCoc && errors.soTienCoc ? (
-                    <p className="mt-1 text-xs font-medium text-rose-600">
-                      {errors.soTienCoc}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Tối thiểu {formatVND(minDeposit)}
-                      {room.Gia > 0 ? `, tối đa ${formatVND(room.Gia)}` : ''} (bội số của 1.000đ).
-                    </p>
-                  )}
-
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {suggestedDeposits.map((val) => (
-                      <button
-                        key={val}
-                        type="button"
-                        onClick={() => {
-                          const strVal = String(val);
-                          setSoTienCoc(strVal);
-                          setSubmitError(null);
-                          setErrors((prev) => ({
-                            ...prev,
-                            soTienCoc: validateField('soTienCoc', {
-                              soTienCoc: strVal,
-                            }),
-                          }));
-                        }}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-bold border cursor-pointer transition ${
-                          Number(soTienCoc) === val
-                            ? 'bg-[#00FFCC] border-teal-500 text-slate-900'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        {formatVND(val)}
-                      </button>
-                    ))}
+                {/* Số tiền đặt cọc cố định 15% giá trị phòng */}
+                <div className="rounded-2xl border border-teal-200 bg-teal-50/70 p-4 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-bold text-slate-700">
+                        Số tiền đặt cọc giữ chỗ (cố định 15% giá thuê phòng)
+                      </p>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        15% × {formatVND(room.Gia)} ={' '}
+                        <span className="font-bold text-teal-800">
+                          {formatVND(fixedDeposit)}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white border border-teal-300 px-4 py-2 text-right">
+                      <span className="block text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                        Cần thanh toán
+                      </span>
+                      <span className="text-lg font-extrabold text-teal-800">
+                        {formatVND(fixedDeposit)}
+                      </span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Cảnh báo chuyển khoản đúng số tiền */}
+                <div
+                  role="note"
+                  className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900 leading-relaxed space-y-1"
+                >
+                  <p className="font-bold text-amber-950">
+                    Lưu ý quan trọng khi chuyển khoản VietQR:
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    <li>
+                      Vui lòng giữ nguyên <b>đúng số tiền {formatVND(fixedDeposit)}</b> và{' '}
+                      <b>đúng nội dung chuyển khoản</b> trên mã QR, không tự ý sửa đổi trên ứng dụng ngân hàng.
+                    </li>
+                    <li>
+                      Nếu chuyển <b>thiếu tiền</b>, hệ thống sẽ tự động cảnh báo và{' '}
+                      <b>chưa khóa giữ phòng</b> cho đến khi nhận đủ số tiền quy định.
+                    </li>
+                    <li>
+                      Nếu chuyển <b>thừa tiền</b>, hệ thống sẽ ghi nhận cảnh báo để quản lý đối soát và hoàn lại phần chênh lệch cho bạn.
+                    </li>
+                  </ul>
                 </div>
 
                 {/* Ghi chú */}
@@ -975,10 +897,12 @@ export default function DatPhongPage() {
                   </Link>
                   <button
                     type="submit"
-                    disabled={submitting}
+                    disabled={submitting || fixedDeposit <= 0}
                     className="rounded-xl bg-[#00F5C4] hover:bg-[#00E0B0] px-6 py-2.5 text-xs font-bold text-slate-900 shadow-xs disabled:opacity-60 cursor-pointer"
                   >
-                    {submitting ? 'Đang tạo mã VietQR...' : 'Tạo mã QR Đặt Cọc'}
+                    {submitting
+                      ? 'Đang tạo mã VietQR...'
+                      : `Tạo mã QR Đặt Cọc (${formatVND(fixedDeposit)})`}
                   </button>
                 </div>
               </form>
