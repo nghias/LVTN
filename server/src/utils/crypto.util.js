@@ -35,21 +35,73 @@ const decryptAES = (cipherText) => {
   }
 };
 
-// 2. Băm mật khẩu 1 chiều bằng BCRYPT (Dùng khi đăng ký hoặc đổi mật khẩu)
+// 2. Băm mật khẩu 1 chiều bằng BCRYPT (Dùng khi đăng ký, đổi mật khẩu, mật khẩu cửa)
 const hashPassword = async (plainPassword) => {
   const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(plainPassword, salt);
+  return bcrypt.hash(String(plainPassword), salt);
 };
 
-// 3. So khớp mật khẩu bằng BCRYPT (Dùng khi đăng nhập)
+// 3. So khớp mật khẩu bằng BCRYPT (Dùng khi đăng nhập, mở cửa bằng bàn phím)
 const comparePassword = async (plainPassword, hashedPassword) => {
   if (!plainPassword || !hashedPassword) return false;
-  return bcrypt.compare(plainPassword, hashedPassword);
+  return bcrypt.compare(String(plainPassword), hashedPassword);
 };
+
+// 4. Băm 1 chiều HMAC-SHA256 cho MaMoCua (NFC) và TheRaVao.GiaTri (UID thẻ RFID)
+const getAccessHmacSecret = () => {
+  const secret = process.env.ACCESS_HMAC_SECRET || env.aesSecretKey;
+  if (!secret) {
+    throw new Error('Thiếu biến môi trường ACCESS_HMAC_SECRET trong .env');
+  }
+  return String(secret);
+};
+
+const normalizeAccessCode = (rawValue) => {
+  if (!rawValue) return '';
+  return String(rawValue).trim().toUpperCase();
+};
+
+const hashAccessCode = (rawValue) => {
+  const normalized = normalizeAccessCode(rawValue);
+  if (!normalized) return null;
+  return crypto
+    .createHmac('sha256', getAccessHmacSecret())
+    .update(normalized)
+    .digest('hex');
+};
+
+// Tạo chuỗi lưu vào TheRaVao.GiaTri theo dạng HMAC(UID)|HMAC(UID|SECRET)
+const buildCardGiaTriHash = (uid, secret) => {
+  const cleanUid = normalizeAccessCode(uid);
+  const cleanSecret = String(secret || '').trim();
+  if (!cleanUid || !cleanSecret) return null;
+  const uidHash = hashAccessCode(cleanUid);
+  const pairHash = crypto
+    .createHmac('sha256', getAccessHmacSecret())
+    .update(`${cleanUid}|${cleanSecret}`)
+    .digest('hex');
+  return `${uidHash}|${pairHash}`;
+};
+
+// 5. Các hàm kiểm tra định dạng đã mã hóa (tránh mã hóa lặp)
+const isSha256Hex = (value) =>
+  typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+
+const isHashedCardGiaTri = (value) =>
+  typeof value === 'string' && /^[a-f0-9]{64}(\|[a-f0-9]{64})?$/i.test(value);
+
+const isBcryptHash = (value) =>
+  typeof value === 'string' && /^\$2[aby]\$\d{2}\$.{53}$/.test(value);
 
 module.exports = {
   encryptAES,
   decryptAES,
   hashPassword,
   comparePassword,
+  normalizeAccessCode,
+  hashAccessCode,
+  buildCardGiaTriHash,
+  isSha256Hex,
+  isHashedCardGiaTri,
+  isBcryptHash,
 };

@@ -34,7 +34,6 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
   const [selectedMaND, setSelectedMaND] = useState<string>("");
   const [ghiChu, setGhiChu] = useState<string>("Cấp thẻ ra vào mới");
 
-  // Trạng thái phiên ghi trên RC522
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string>("");
   const [sessionState, setSessionState] = useState<PhienGhiStatus | null>(null);
@@ -71,7 +70,6 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMaKhu]);
 
-  // Tự động hủy phiên đang chờ khi người dùng rời trang hoặc đóng tab
   useEffect(() => {
     const cancelIfWaiting = () => {
       if (activeSessionRef.current) {
@@ -147,7 +145,7 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
               stopPolling();
               activeSessionRef.current = "";
               showSuccessRef.current(
-                `Đã cấp thẻ mới thành công! Mã UID: ${st.result?.uid || "—"}`
+                "Đã cấp và mã hóa thẻ mới thành công!"
               );
             } else if (["EXPIRED", "CANCELLED", "ERROR"].includes(st.status)) {
               stopPolling();
@@ -195,7 +193,6 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
           </p>
         </div>
 
-        {/* Bộ lọc chọn cơ sở & người dùng */}
         <form onSubmit={handleBatDauCapMoi} className="space-y-5">
           <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50 space-y-4">
             {isChuTro && khuTroList.length > 0 && (
@@ -247,7 +244,6 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
             </div>
           </div>
 
-          {/* 2 Khối: Thông tin người được cấp & Thông số thẻ sẽ nạp */}
           {selectedPerson && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-5 rounded-2xl border border-slate-200 bg-white space-y-2">
@@ -279,12 +275,12 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
                   Chuẩn thẻ: <b className="text-slate-900">RFID 13.56MHz (Mifare S50 1K)</b>
                 </p>
                 <p className="text-xs text-slate-600">
-                  Cơ chế bảo mật: <b className="text-slate-900">UID + Mã bí mật Block 4</b>
+                  Cơ chế bảo mật: <b className="text-slate-900">Mã hóa HMAC-SHA256 + Block 4</b>
                 </p>
                 <p className="text-xs text-slate-600">
-                  UID ghi nhận:{" "}
-                  <b className="font-mono text-teal-700">
-                    {sessionState?.result?.uid || "Chờ đặt phôi thẻ lên RC522"}
+                  Trạng thái nạp thẻ:{" "}
+                  <b className="text-teal-700">
+                    {isSuccess ? "Đã ghi & mã hóa bảo mật" : "Chờ đặt phôi thẻ lên RC522"}
                   </b>
                 </p>
                 <p className="text-xs text-slate-600">
@@ -309,7 +305,6 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
             </div>
           )}
 
-          {/* Khung trạng thái chờ / thành công / hết hạn */}
           {sessionState && (
             <div
               className={`p-5 rounded-2xl border space-y-2 ${
@@ -342,11 +337,7 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
                     Cấp thẻ mới thành công!
                   </p>
                   <p className="text-xs">
-                    Thẻ của <b>{selectedPerson?.HoTen}</b> đã được kích hoạt với UID{" "}
-                    <span className="font-mono font-bold">
-                      {sessionState.result?.uid}
-                    </span>
-                    .
+                    Thẻ của <b>{selectedPerson?.HoTen}</b> đã được mã hóa bảo mật và kích hoạt hoạt động.
                   </p>
                 </>
               )}
@@ -365,7 +356,6 @@ function CapTheMoiContent({ user }: { user: UserProfile }) {
             </div>
           )}
 
-          {/* Cụm nút hành động */}
           <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
             {isWaiting ? (
               <button

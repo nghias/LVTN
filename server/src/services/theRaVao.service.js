@@ -4,6 +4,13 @@ const db = require("../database/db");
 const TheRaVaoModel = require("../app/models/theRaVao.model");
 const LichSuTheModel = require("../app/models/lichSuThe.model");
 const KhuTroModel = require("../app/models/khuTro.model");
+const {
+  decryptAES,
+  comparePassword,
+  hashAccessCode,
+  buildCardGiaTriHash,
+  isBcryptHash,
+} = require("../utils/crypto.util");
 
 // Quản lý phiên ghi thẻ tạm trong bộ nhớ (không sửa DB khi chưa quẹt thẻ)
 const WRITE_SESSION_TTL_MS = 60000;
@@ -19,9 +26,13 @@ function taoMaBiMat(maKhu) {
   return `K${maKhu}_${rand}`.slice(0, 16);
 }
 
-function tachMaUID(giaTri) {
-  if (!giaTri) return null;
-  return giaTri.includes("|") ? giaTri.split("|")[0] : giaTri;
+function safeDecrypt(value) {
+  if (!value) return null;
+  try {
+    return decryptAES(value) || value;
+  } catch {
+    return value;
+  }
 }
 
 function cleanupExpiredSessions() {
@@ -33,13 +44,11 @@ function cleanupExpiredSessions() {
         activeSessionByKhu.delete(session.maKhu);
       }
     }
-    // Dọn rác các phiên kết thúc quá 10 phút
     if (session.status !== "WAITING" && now - session.updatedAt > 10 * 60 * 1000) {
       sessionById.delete(sid);
     }
   }
 
-  // Dọn lệnh mở cửa NFC quá hạn
   for (const [maKhu, cmd] of pendingDoorOpenByKhu.entries()) {
     if (now - cmd.createdAt > REMOTE_OPEN_TTL_MS) {
       pendingDoorOpenByKhu.delete(maKhu);
@@ -59,7 +68,7 @@ async function loadReferenceData() {
       db.query(`SELECT MaPhong, TenPhong, MaKhu FROM Phong`),
       db.query(`SELECT MaHDT, MaPhong, TrangThai FROM HopDongThue`),
       db.query(`SELECT MaHDT, MaND, NgayDi FROM ChiTietHopDongThue`),
-      db.query(`SELECT MaND, HoTen, SDT, CCCD FROM ThongTinCaNhan`),
+      db.query(`SELECT MaND, HoTen, SDT FROM ThongTinCaNhan`),
     ]);
 
   const khuMap = new Map(khuTros.map((k) => [Number(k.MaKhu), k]));
@@ -103,8 +112,7 @@ function resolveUserContext(maND, { khuTros, profileMap, activeRentalByMaND }) {
   return {
     MaND: id,
     HoTen: profile?.HoTen || "Chưa cập nhật",
-    SDT: profile?.SDT || null,
-    CCCD: profile?.CCCD || null,
+    SDT: safeDecrypt(profile?.SDT),
     MaPhong: rental?.MaPhong || null,
     TenPhong: rental?.TenPhong || (qlKhu ? "Quản lý cơ sở" : null),
     MaKhu: rental?.MaKhu ?? (qlKhu ? Number(qlKhu.MaKhu) : null),
@@ -115,20 +123,20 @@ function resolveUserContext(maND, { khuTros, profileMap, activeRentalByMaND }) {
 
 const TheRaVaoService = {
   // =========================================================
-  // A. THIẾT BỊ IOT (ESP32 + RC522)
+  // A. THIẾT BỊ IOT (ESP32 + RC522 + KEYPAD HX-543)
   // =========================================================
   async xacThucQuetThe({ maKhu, uid, secret }) {
     if (!maKhu || !uid || !secret) {
       return { allow: false, message: "Thiếu thông tin thẻ hoặc mã khu trọ." };
     }
 
-    const giaTri = `${String(uid).trim().toUpperCase()}|${String(secret).trim()}`;
-    const the = await TheRaVaoModel.findByGiaTri(giaTri);
+    // Băm HMAC(UID)|HMAC(UID|SECRET) để đối chiếu với cột GiaTri trong DB
+    const giaTriHash = buildCardGiaTriHash(uid, secret);
+    const the = await TheRaVaoModel.findByGiaTri(giaTriHash);
 
     if (!the) {
       return { allow: false, message: "Thẻ không tồn tại hoặc sai mã bảo mật." };
     }
-    // Chặn tuyệt đối khi thẻ bị khóa hoặc thu hồi
     if (the.TrangThai !== "HoatDong") {
       return { allow: false, message: "Thẻ đang bị khóa hoặc không hoạt động." };
     }
@@ -231,23 +239,23 @@ const TheRaVaoService = {
       throw err;
     }
 
-    // Kiểm tra phôi thẻ vật lý có đang thuộc về 1 bản ghi khác không
+    // Băm UID để kiểm tra phôi thẻ vật lý có đang thuộc về bản ghi khác không
+    const hashedUid = hashAccessCode(cleanUid);
     const excludeMaThe = session.mode === "REISSUE" ? session.maThe : 0;
-    const dup = await TheRaVaoModel.findByUidPrefix(cleanUid, excludeMaThe);
+    const dup = await TheRaVaoModel.findByUidPrefix(hashedUid, excludeMaThe);
     if (dup) {
-      // Giữ nguyên phiên WAITING để người quản lý đặt phôi thẻ trắng khác mà không cần tạo lại phiên
-      session.lastError = "Phôi thẻ vừa đặt đã được gán cho tài khoản khác! Vui lòng dùng phôi thẻ trắng khác.";
+      session.lastError =
+        "Phôi thẻ vừa đặt đã được gán cho tài khoản khác! Vui lòng dùng phôi thẻ trắng khác.";
       session.updatedAt = Date.now();
       const err = new Error(session.lastError);
       err.statusCode = 409;
       throw err;
     }
 
-    const giaTriMoi = `${cleanUid}|${session.secret}`;
+    const giaTriMoiHash = buildCardGiaTriHash(cleanUid, session.secret);
     let finalMaThe = session.maThe;
 
     if (session.mode === "NEW") {
-      // Ràng buộc mỗi người chỉ 1 thẻ duy nhất
       const existing = await TheRaVaoModel.findByMaND(session.maND);
       if (existing.length > 0) {
         session.status = "ERROR";
@@ -261,14 +269,13 @@ const TheRaVaoService = {
 
       finalMaThe = await TheRaVaoModel.create({
         maND: session.maND,
-        giaTri: giaTriMoi,
+        giaTri: giaTriMoiHash,
         trangThai: "HoatDong",
         ghiChu: session.ghiChu || "Cấp thẻ mới",
       });
     } else {
-      // REISSUE: cập nhật trực tiếp bản ghi đã tồn tại, KHÔNG tạo dòng mới
       await TheRaVaoModel.reissueById(session.maThe, {
-        giaTri: giaTriMoi,
+        giaTri: giaTriMoiHash,
         ghiChu: session.ghiChu || "Cấp lại mã thẻ mới",
       });
     }
@@ -276,11 +283,12 @@ const TheRaVaoService = {
     session.status = "SUCCESS";
     session.lastError = null;
     session.updatedAt = Date.now();
+    // Không trả UID gốc ra Frontend
     session.result = {
       maThe: finalMaThe,
       maND: session.maND,
-      uid: cleanUid,
       trangThai: "HoatDong",
+      daMaHoa: true,
     };
 
     if (activeSessionByKhu.get(session.maKhu) === session.sessionId) {
@@ -288,6 +296,42 @@ const TheRaVaoService = {
     }
 
     return session.result;
+  },
+
+  // Xác thực mật khẩu bàn phím bằng Bcrypt
+  async xacThucMatKhau({ maKhu, matKhau }) {
+    const khuId = Number(maKhu);
+    const cleanPass = String(matKhau || "").trim();
+
+    if (!khuId || !cleanPass) {
+      return { allow: false, message: "Thiếu mã cơ sở hoặc mật khẩu." };
+    }
+
+    const khu = await KhuTroModel.getById(khuId);
+    if (!khu) {
+      return { allow: false, message: "Không tìm thấy cơ sở." };
+    }
+
+    if (!khu.MatKhau) {
+      return { allow: false, message: "Cơ sở chưa thiết lập mật khẩu cửa." };
+    }
+
+    const isValid = isBcryptHash(khu.MatKhau)
+      ? await comparePassword(cleanPass, khu.MatKhau)
+      : false;
+
+    if (!isValid) {
+      return { allow: false, message: "Mật khẩu mở cửa không chính xác." };
+    }
+
+    return {
+      allow: true,
+      message: "Mật khẩu hợp lệ! Đang mở cổng...",
+      data: {
+        maKhu: khuId,
+        tenKhu: khu.TenKhu,
+      },
+    };
   },
 
   // =========================================================
@@ -301,7 +345,9 @@ const TheRaVaoService = {
       throw err;
     }
 
-    const khu = await KhuTroModel.findByMaMoCua(cleanCode);
+    // Băm HMAC-SHA256 trước khi tìm trong KhuTro.MaMoCua
+    const hashedDoorCode = hashAccessCode(cleanCode);
+    const khu = await KhuTroModel.findByMaMoCua(hashedDoorCode);
     if (!khu) {
       const err = new Error(
         "Thẻ NFC này chưa được đăng ký làm thẻ mở cổng trên hệ thống."
@@ -345,14 +391,12 @@ const TheRaVaoService = {
       tenPhong = rental.TenPhong;
     }
 
-    // Đẩy lệnh mở cổng vào hàng đợi cho ESP32 tại đúng cơ sở
     pendingDoorOpenByKhu.set(maKhu, {
       hoTen,
       tenPhong,
       createdAt: Date.now(),
     });
 
-    // Ghi nhận lịch sử mở cổng vào LichSuThe (nếu người dùng đã có bản ghi thẻ)
     const userCards = await TheRaVaoModel.findByMaND(maND);
     const targetCard =
       userCards.find((c) => c.TrangThai === "HoatDong") || userCards[0];
@@ -373,13 +417,14 @@ const TheRaVaoService = {
     const ref = await loadReferenceData();
     const dsTheRaw = await TheRaVaoModel.findByMaND(maND);
 
+    // Không trả MaUID / GiaTri
     const dsThe = dsTheRaw.map((t) => ({
       MaThe: t.MaThe,
       MaND: t.MaND,
-      MaUID: tachMaUID(t.GiaTri),
       NgayTao: t.NgayTao,
       TrangThai: t.TrangThai,
       GhiChu: t.GhiChu,
+      DaMaHoa: Boolean(t.GiaTri),
     }));
 
     const maTheList = dsTheRaw.map((t) => t.MaThe);
@@ -389,7 +434,6 @@ const TheRaVaoService = {
       limit: 100,
     });
 
-    const theMap = new Map(dsThe.map((t) => [t.MaThe, t]));
     const rental = ref.activeRentalByMaND.get(maND) || null;
     const khuInfo = rental ? ref.khuMap.get(Number(rental.MaKhu)) : null;
     const thongTinThue = rental
@@ -402,7 +446,6 @@ const TheRaVaoService = {
     const lichSu = lichSuRaw.map((ls) => ({
       MaLS: ls.MaLS,
       MaThe: ls.MaThe,
-      MaUID: theMap.get(ls.MaThe)?.MaUID || null,
       NgayQuetThe: ls.NgayQuetThe,
       GioQuetThe: ls.GioQuetThe,
       TenPhong: thongTinThue?.TenPhong || null,
@@ -412,7 +455,6 @@ const TheRaVaoService = {
     return { dsThe, lichSu, thongTinThue };
   },
 
-  // Khách yêu cầu cấp lại -> cập nhật trạng thái trên chính thẻ hiện có (không tạo bản ghi thứ 2)
   async yeuCauCapLaiThe(user, { lyDo }) {
     const maND = getUserId(user);
     const ref = await loadReferenceData();
@@ -426,7 +468,9 @@ const TheRaVaoService = {
 
     const dsThe = await TheRaVaoModel.findByMaND(maND);
     if (dsThe.length === 0) {
-      const err = new Error("Bạn chưa được cấp thẻ lần đầu. Vui lòng liên hệ Quản lý cơ sở để cấp thẻ mới.");
+      const err = new Error(
+        "Bạn chưa được cấp thẻ lần đầu. Vui lòng liên hệ Quản lý cơ sở để cấp thẻ mới."
+      );
       err.statusCode = 400;
       throw err;
     }
@@ -439,7 +483,6 @@ const TheRaVaoService = {
     }
 
     const ghiChu = (lyDo || "Khách thuê yêu cầu cấp lại thẻ").trim();
-    // Chuyển sang ChoCapLai -> đồng thời vô hiệu hóa mở cổng ngay để đảm bảo an ninh
     await TheRaVaoModel.updateStatus(theHienTai.MaThe, "ChoCapLai", ghiChu);
 
     return {
@@ -469,10 +512,10 @@ const TheRaVaoService = {
         return {
           MaThe: t.MaThe,
           MaND: ctx.MaND,
-          MaUID: tachMaUID(t.GiaTri),
           NgayTao: t.NgayTao,
           TrangThai: t.TrangThai,
           GhiChu: t.GhiChu,
+          DaMaHoa: Boolean(t.GiaTri),
           HoTen: ctx.HoTen,
           SDT: ctx.SDT,
           MaPhong: ctx.MaPhong,
@@ -491,7 +534,7 @@ const TheRaVaoService = {
         }
         if (trangThai && item.TrangThai !== trangThai) return false;
         if (kw) {
-          const hay = `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""} ${item.MaUID || ""} ${item.GhiChu || ""}`.toLowerCase();
+          const hay = `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""} ${item.GhiChu || ""}`.toLowerCase();
           if (!hay.includes(kw)) return false;
         }
         return true;
@@ -503,7 +546,6 @@ const TheRaVaoService = {
     };
   },
 
-  // Chỉ lấy danh sách người dùng thuộc cơ sở quản lý mà CHƯA có bất kỳ thẻ nào
   async getNguoiChuaCoThe(user, { maKhu } = {}) {
     const ref = await loadReferenceData();
     const khuTroList = isQuanLy(user)
@@ -569,13 +611,12 @@ const TheRaVaoService = {
     return {
       MaThe: the.MaThe,
       MaND: ctx.MaND,
-      MaUID: tachMaUID(the.GiaTri),
       NgayTao: the.NgayTao,
       TrangThai: the.TrangThai,
       GhiChu: the.GhiChu,
+      DaMaHoa: Boolean(the.GiaTri),
       HoTen: ctx.HoTen,
       SDT: ctx.SDT,
-      CCCD: ctx.CCCD,
       MaPhong: ctx.MaPhong,
       TenPhong: ctx.TenPhong,
       MaKhu: ctx.MaKhu,
@@ -584,7 +625,6 @@ const TheRaVaoService = {
     };
   },
 
-  // Tạo phiên ghi mới (cho cả NEW và REISSUE) — tự động thay thế phiên treo cũ mà không lỗi
   async batDauPhienGhi(user, { mode, maND, maThe, ghiChu }) {
     cleanupExpiredSessions();
 
@@ -645,7 +685,6 @@ const TheRaVaoService = {
       }
     }
 
-    // Nếu cơ sở này đang có 1 phiên ghi cũ bị treo do đóng trang -> hủy sạch phiên cũ, không báo lỗi
     const oldSid = activeSessionByKhu.get(ctx.MaKhu);
     if (oldSid && sessionById.has(oldSid)) {
       const oldSession = sessionById.get(oldSid);
@@ -670,7 +709,7 @@ const TheRaVaoService = {
       tenKhu: ctx.TenKhu,
       secret,
       ghiChu: (ghiChu || (mode === "NEW" ? "Cấp thẻ mới" : "Cấp lại thẻ")).trim(),
-      status: "WAITING", // WAITING | SUCCESS | CANCELLED | EXPIRED | ERROR
+      status: "WAITING",
       lastError: null,
       result: null,
       createdAt: now,
@@ -783,42 +822,10 @@ const TheRaVaoService = {
       }
     }
 
-    // Xóa lịch sử quẹt thẻ gắn với MaThe trước để không vi phạm khóa ngoại
     await LichSuTheModel.deleteByMaThe(maThe);
     await TheRaVaoModel.deleteById(maThe);
 
     return { maThe, deleted: true };
-  },
-
-  async xacThucMatKhau({ maKhu, matKhau }) {
-    const khuId = Number(maKhu);
-    const cleanPass = String(matKhau || "").trim();
-
-    if (!khuId || !cleanPass) {
-      return { allow: false, message: "Thiếu mã cơ sở hoặc mật khẩu." };
-    }
-
-    const khu = await KhuTroModel.getById(khuId);
-    if (!khu) {
-      return { allow: false, message: "Không tìm thấy cơ sở." };
-    }
-
-    if (!khu.MatKhau) {
-      return { allow: false, message: "Cơ sở chưa thiết lập mật khẩu cửa." };
-    }
-
-    if (String(khu.MatKhau).trim() !== cleanPass) {
-      return { allow: false, message: "Mật khẩu mở cửa không chính xác." };
-    }
-
-    return {
-      allow: true,
-      message: "Mật khẩu hợp lệ! Đang mở cổng...",
-      data: {
-        maKhu: khuId,
-        tenKhu: khu.TenKhu,
-      },
-    };
   },
 
   async getLichSuRaVao(user, { maKhu, tuNgay, denNgay, keyword } = {}) {
@@ -840,7 +847,6 @@ const TheRaVaoService = {
         return {
           MaLS: ls.MaLS,
           MaThe: ls.MaThe,
-          MaUID: card?.MaUID || null,
           NgayQuetThe: ls.NgayQuetThe,
           GioQuetThe: ls.GioQuetThe,
           MaND: card?.MaND,
@@ -852,7 +858,7 @@ const TheRaVaoService = {
       })
       .filter((item) => {
         if (!kw) return true;
-        return `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""} ${item.MaUID || ""}`
+        return `${item.HoTen} ${item.TenPhong || ""} ${item.TenKhu || ""}`
           .toLowerCase()
           .includes(kw);
       });

@@ -13,6 +13,8 @@ export interface KhuTroItem {
   SoPhongDaDatCoc?: number;
   MatKhau?: string | null;
   MaMoCua?: string | null;
+  DaCoMatKhau?: boolean;
+  DaGanTheNFC?: boolean;
 }
 
 export interface TienIchItem {

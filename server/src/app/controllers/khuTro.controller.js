@@ -4,7 +4,11 @@ const PhongTroModel = require('../models/phongTro.model');
 const NguoiDungModel = require('../models/nguoiDung.model');
 
 const { successResponse, errorResponse } = require('../../utils/response.util');
-const { decryptAES } = require('../../utils/crypto.util');
+const {
+  decryptAES,
+  hashPassword,
+  hashAccessCode,
+} = require('../../utils/crypto.util');
 
 class KhuTroController {
   safeDecryptPhone(encryptedPhone) {
@@ -14,6 +18,17 @@ class KhuTroController {
     } catch {
       return encryptedPhone;
     }
+  }
+
+  // Ẩn tuyệt đối MatKhau và MaMoCua khỏi JSON trả về Frontend
+  sanitizeKhuTro(khu) {
+    if (!khu) return null;
+    const { MatKhau, MaMoCua, ...safeFields } = khu;
+    return {
+      ...safeFields,
+      DaCoMatKhau: Boolean(MatKhau),
+      DaGanTheNFC: Boolean(MaMoCua),
+    };
   }
 
   // Kiểm tra quyền sở hữu Khu trọ của Quản lý
@@ -60,7 +75,7 @@ class KhuTroController {
         const soPhongTrong = roomsInKhu.filter((r) => r.TrangThai === 'Trong').length;
 
         return {
-          ...khu,
+          ...this.sanitizeKhuTro(khu),
           TenQuanLy: ql ? ql.HoTen : 'Chưa gán',
           SDTQuanLy: ql && ql.SDT ? this.safeDecryptPhone(ql.SDT) : null,
           TongSoPhong: roomsInKhu.length,
@@ -106,7 +121,7 @@ class KhuTroController {
 
       const ql = await NguoiDungModel.findById(khuTro.MaND);
       return successResponse(res, 'Lấy thông tin khu trọ thành công!', {
-        ...khuTro,
+        ...this.sanitizeKhuTro(khuTro),
         TenQuanLy: ql ? ql.HoTen : null,
       });
     } catch (error) {
@@ -130,17 +145,53 @@ class KhuTroController {
         return errorResponse(res, 'Vui lòng nhập tên khu trọ và địa chỉ!', 400);
       }
 
+      const rawPass = MatKhau ? String(MatKhau).trim() : '123456';
+      if (!/^\d{6}$/.test(rawPass)) {
+        return errorResponse(
+          res,
+          'Mật khẩu mở cửa phải gồm đúng 6 chữ số (VD: 123456)!',
+          400
+        );
+      }
+      const hashedPass = await hashPassword(rawPass);
+
+      let hashedDoorCode = null;
+      if (MaMoCua && String(MaMoCua).trim()) {
+        const cleanCode = String(MaMoCua).trim();
+        if (cleanCode.length > 100) {
+          return errorResponse(
+            res,
+            'Mã mở cửa NFC không được vượt quá 100 ký tự!',
+            400
+          );
+        }
+        hashedDoorCode = hashAccessCode(cleanCode);
+        const existed = await KhuTroModel.findByMaMoCua(hashedDoorCode);
+        if (existed) {
+          return errorResponse(
+            res,
+            `Thẻ NFC này đã được gán cho cơ sở "${existed.TenKhu}"!`,
+            409
+          );
+        }
+      }
+
       const newMaKhu = await KhuTroModel.create({
         MaND: Number(MaND) || req.user.maND,
         TenKhu: TenKhu.trim(),
         MoTa: MoTa?.trim() || '',
         DiaChi: DiaChi.trim(),
-        MatKhau: MatKhau ? String(MatKhau).trim() : '123456',
-        MaMoCua: MaMoCua ? String(MaMoCua).trim() : null,
+        MatKhau: hashedPass,
+        MaMoCua: hashedDoorCode,
       });
 
       const created = await KhuTroModel.getById(newMaKhu);
-      return successResponse(res, 'Thêm khu trọ mới thành công!', created, 201);
+      return successResponse(
+        res,
+        'Thêm khu trọ mới thành công!',
+        this.sanitizeKhuTro(created),
+        201
+      );
     } catch (error) {
       next(error);
     }
@@ -172,13 +223,17 @@ class KhuTroController {
       });
 
       const updated = await KhuTroModel.getById(maKhu);
-      return successResponse(res, 'Cập nhật khu trọ thành công!', updated);
+      return successResponse(
+        res,
+        'Cập nhật khu trọ thành công!',
+        this.sanitizeKhuTro(updated)
+      );
     } catch (error) {
       next(error);
     }
   }
 
-  // 6. [PUT] /api/khu-tro/:maKhu/mat-khau (Đổi mật khẩu mở cửa 6 chữ số)
+  // 6. [PUT] /api/khu-tro/:maKhu/mat-khau (Đổi mật khẩu mở cửa 6 chữ số -> băm Bcrypt)
   async updateMatKhauCua(req, res, next) {
     try {
       const maKhu = Number(req.params.maKhu);
@@ -194,19 +249,20 @@ class KhuTroController {
         );
       }
 
-      await KhuTroModel.updateMatKhau(maKhu, rawPass);
+      const hashedPass = await hashPassword(rawPass);
+      await KhuTroModel.updateMatKhau(maKhu, hashedPass);
       const updated = await KhuTroModel.getById(maKhu);
       return successResponse(
         res,
         'Đổi mật khẩu mở cửa thành công!',
-        updated
+        this.sanitizeKhuTro(updated)
       );
     } catch (error) {
       next(error);
     }
   }
 
-  // 7. [PUT] /api/khu-tro/:maKhu/ma-mo-cua (Ghi / cập nhật giá trị thẻ NFC gắn cổng)
+  // 7. [PUT] /api/khu-tro/:maKhu/ma-mo-cua (Ghi / cập nhật thẻ NFC -> băm HMAC-SHA256)
   async updateMaMoCua(req, res, next) {
     try {
       const maKhu = Number(req.params.maKhu);
@@ -228,8 +284,10 @@ class KhuTroController {
         );
       }
 
-      // Kiểm tra trùng mã thẻ NFC với cơ sở khác
-      const existed = await KhuTroModel.findByMaMoCua(cleanCode);
+      const hashedCode = hashAccessCode(cleanCode);
+
+      // Kiểm tra trùng mã thẻ NFC (đã băm) với cơ sở khác
+      const existed = await KhuTroModel.findByMaMoCua(hashedCode);
       if (existed && Number(existed.MaKhu) !== maKhu) {
         return errorResponse(
           res,
@@ -238,12 +296,12 @@ class KhuTroController {
         );
       }
 
-      await KhuTroModel.updateMaMoCua(maKhu, cleanCode);
+      await KhuTroModel.updateMaMoCua(maKhu, hashedCode);
       const updated = await KhuTroModel.getById(maKhu);
       return successResponse(
         res,
-        `Đã lưu mã thẻ NFC mở cửa cho ${khuTro.TenKhu} thành công!`,
-        updated
+        `Đã mã hóa và lưu thẻ NFC mở cửa cho ${khuTro.TenKhu} thành công!`,
+        this.sanitizeKhuTro(updated)
       );
     } catch (error) {
       next(error);

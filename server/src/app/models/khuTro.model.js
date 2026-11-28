@@ -37,19 +37,19 @@ const KhuTroModel = {
     return rows[0] || null;
   },
 
-  // Tìm khu trọ theo mã thẻ NFC gắn cổng (dùng khi kiểm tra trùng hoặc quét mở cửa)
-  findByMaMoCua: async (maMoCua) => {
+  // Tìm khu trọ theo mã thẻ NFC đã băm HMAC-SHA256
+  findByMaMoCua: async (hashedMaMoCua) => {
     const sql = `
       SELECT MaKhu, MaND, TenKhu, MoTa, DiaChi, MatKhau, MaMoCua
       FROM KhuTro
       WHERE MaMoCua = ?
       LIMIT 1
     `;
-    const [rows] = await db.execute(sql, [maMoCua]);
+    const [rows] = await db.execute(sql, [hashedMaMoCua]);
     return rows[0] || null;
   },
 
-  // Thêm khu trọ mới
+  // Thêm khu trọ mới (MatKhau đã băm Bcrypt, MaMoCua đã băm HMAC-SHA256 từ Controller)
   create: async ({ MaND, TenKhu, MoTa, DiaChi, MatKhau, MaMoCua }) => {
     const sql = `
       INSERT INTO KhuTro (MaND, TenKhu, MoTa, DiaChi, MatKhau, MaMoCua)
@@ -60,7 +60,7 @@ const KhuTroModel = {
       TenKhu,
       MoTa || '',
       DiaChi,
-      MatKhau || '123456',
+      MatKhau,
       MaMoCua || null,
     ]);
     return result.insertId;
@@ -77,17 +77,17 @@ const KhuTroModel = {
     return result.affectedRows > 0;
   },
 
-  // Đổi mật khẩu mở cửa (Bàn phím)
-  updateMatKhau: async (maKhu, matKhau) => {
+  // Đổi mật khẩu mở cửa đã băm Bcrypt
+  updateMatKhau: async (maKhu, hashedMatKhau) => {
     const sql = `UPDATE KhuTro SET MatKhau = ? WHERE MaKhu = ?`;
-    const [result] = await db.execute(sql, [matKhau, maKhu]);
+    const [result] = await db.execute(sql, [hashedMatKhau, maKhu]);
     return result.affectedRows > 0;
   },
 
-  // Ghi / cập nhật mã thẻ NFC gắn cổng
-  updateMaMoCua: async (maKhu, maMoCua) => {
+  // Ghi / cập nhật mã thẻ NFC đã băm HMAC-SHA256
+  updateMaMoCua: async (maKhu, hashedMaMoCua) => {
     const sql = `UPDATE KhuTro SET MaMoCua = ? WHERE MaKhu = ?`;
-    const [result] = await db.execute(sql, [maMoCua, maKhu]);
+    const [result] = await db.execute(sql, [hashedMaMoCua, maKhu]);
     return result.affectedRows > 0;
   },
 

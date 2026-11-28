@@ -20,12 +20,10 @@ export default function QuanLyKhuTroPage() {
   const [keyword, setKeyword] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
-  // State đổi mật khẩu cửa theo từng MaKhu
   const [editingPassMaKhu, setEditingPassMaKhu] = useState<number | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
   const [savingPass, setSavingPass] = useState<boolean>(false);
 
-  // State thao tác NFC theo từng MaKhu: "WRITE-1" | "READ-1" | ""
   const [nfcWorkingKey, setNfcWorkingKey] = useState<string>('');
 
   const fetchKhuTroList = useCallback(async () => {
@@ -70,7 +68,6 @@ export default function QuanLyKhuTroPage() {
     );
   };
 
-  // Đổi mật khẩu mở cửa (6 chữ số)
   const handleSaveDoorPassword = async (maKhu: number) => {
     const cleaned = newPassword.trim();
     if (!/^\d{6}$/.test(cleaned)) {
@@ -80,7 +77,7 @@ export default function QuanLyKhuTroPage() {
     try {
       setSavingPass(true);
       await PhongTroService.updateMatKhauCua(maKhu, cleaned);
-      showSuccess('Đã cập nhật mật khẩu mở cửa thành công!');
+      showSuccess('Đã cập nhật và mã hóa mật khẩu mở cửa thành công!');
       setEditingPassMaKhu(null);
       setNewPassword('');
       fetchKhuTroList();
@@ -91,7 +88,6 @@ export default function QuanLyKhuTroPage() {
     }
   };
 
-  // Ghi mã mới lên thẻ NFC gắn cửa & lưu vào DB
   const handleWriteNfcTag = async (khu: KhuTroItem) => {
     const key = `WRITE-${khu.MaKhu}`;
     try {
@@ -99,7 +95,7 @@ export default function QuanLyKhuTroPage() {
       const newCode = generateDoorNfcCode(khu.MaKhu);
       await writeNfcDoorTag(newCode);
       await PhongTroService.updateMaMoCua(khu.MaKhu, newCode);
-      showSuccess(`Đã ghi thẻ NFC mới (${newCode}) cho ${khu.TenKhu}!`);
+      showSuccess(`Đã ghi và mã hóa thẻ NFC mới cho ${khu.TenKhu}!`);
       fetchKhuTroList();
     } catch (err: unknown) {
       showError(err instanceof Error ? err.message : 'Ghi thẻ NFC thất bại.');
@@ -108,14 +104,13 @@ export default function QuanLyKhuTroPage() {
     }
   };
 
-  // Đọc mã có sẵn (NDEF hoặc UID) từ thẻ gắn cửa & lưu vào DB
   const handleReadNfcTag = async (khu: KhuTroItem) => {
     const key = `READ-${khu.MaKhu}`;
     try {
       setNfcWorkingKey(key);
       const { code } = await readNfcDoorTag();
       await PhongTroService.updateMaMoCua(khu.MaKhu, code);
-      showSuccess(`Đã lưu mã thẻ NFC (${code}) cho ${khu.TenKhu}!`);
+      showSuccess(`Đã mã hóa và lưu thẻ NFC cho ${khu.TenKhu}!`);
       fetchKhuTroList();
     } catch (err: unknown) {
       showError(err instanceof Error ? err.message : 'Đọc thẻ NFC thất bại.');
@@ -131,7 +126,6 @@ export default function QuanLyKhuTroPage() {
           <QuanLyHeader user={user} />
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-            {/* Tiêu đề & nút Thêm cơ sở */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
@@ -152,7 +146,6 @@ export default function QuanLyKhuTroPage() {
               )}
             </div>
 
-            {/* Ô tìm kiếm */}
             {khuTroList.length > 1 && (
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
                 <input
@@ -165,7 +158,6 @@ export default function QuanLyKhuTroPage() {
               </div>
             )}
 
-            {/* Danh sách Cơ sở */}
             {loading ? (
               <div className="py-16 text-center text-sm text-slate-500">
                 Đang tải danh sách cơ sở...
@@ -182,13 +174,14 @@ export default function QuanLyKhuTroPage() {
                   const isEditingPass = editingPassMaKhu === khu.MaKhu;
                   const isWriting = nfcWorkingKey === `WRITE-${khu.MaKhu}`;
                   const isReading = nfcWorkingKey === `READ-${khu.MaKhu}`;
+                  const hasPass = khu.DaCoMatKhau ?? Boolean(khu.MatKhau);
+                  const hasNfc = khu.DaGanTheNFC ?? Boolean(khu.MaMoCua);
 
                   return (
                     <div
                       key={khu.MaKhu}
                       className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4 flex flex-col justify-between"
                     >
-                      {/* Thông tin cơ bản */}
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
@@ -240,9 +233,9 @@ export default function QuanLyKhuTroPage() {
                               Mật khẩu mở cửa (Bàn phím)
                             </p>
                             <p className="text-[11px] text-slate-500">
-                              Hiện tại:{' '}
+                              Trạng thái:{' '}
                               <span className="font-mono font-bold text-slate-900">
-                                {khu.MatKhau ? '••••••' : 'Chưa thiết lập'}
+                                {hasPass ? '•••••• (Đã mã hóa)' : 'Chưa thiết lập'}
                               </span>
                             </p>
                           </div>
@@ -264,7 +257,7 @@ export default function QuanLyKhuTroPage() {
                         {isEditingPass && (
                           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200">
                             <input
-                              type="text"
+                              type="password"
                               inputMode="numeric"
                               maxLength={6}
                               value={newPassword}
@@ -302,9 +295,9 @@ export default function QuanLyKhuTroPage() {
                           <p className="text-xs font-bold text-slate-900">
                             Thẻ NFC gắn cổng (Quét mở cửa)
                           </p>
-                          {khu.MaMoCua ? (
+                          {hasNfc ? (
                             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                              Đã gắn: {khu.MaMoCua}
+                              Đã kích hoạt (Đã mã hóa)
                             </span>
                           ) : (
                             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800">

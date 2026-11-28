@@ -146,7 +146,6 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
       <QuanLyHeader user={user} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-5">
-        {/* Header + Quay lại Lịch sử & Nút Cấp thẻ mới */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
           <div>
             <button
@@ -160,7 +159,7 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
               Danh Sách Thẻ Ra Vào
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Mỗi người dùng sở hữu tối đa 1 thẻ duy nhất. Thẻ bị khóa sẽ không mở được cổng và có thể xóa.
+              Mỗi người dùng sở hữu tối đa 1 thẻ duy nhất. Mã thẻ được mã hóa bảo mật một chiều.
             </p>
           </div>
 
@@ -176,7 +175,6 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
           </Link>
         </div>
 
-        {/* 3 Thẻ thống kê nhanh */}
         <div className="grid grid-cols-3 gap-3">
           <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50">
             <p className="text-[11px] font-bold text-slate-500 uppercase">Đang hoạt động</p>
@@ -192,7 +190,6 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
           </div>
         </div>
 
-        {/* Chọn cơ sở */}
         {(isChuTro || khuTroList.length > 1) && khuTroList.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {isChuTro && (
@@ -225,7 +222,6 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
           </div>
         )}
 
-        {/* Bộ lọc */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -241,7 +237,7 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Tên người dùng, phòng, UID thẻ, ghi chú..."
+              placeholder="Tên người dùng, phòng, ghi chú..."
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
             />
           </div>
@@ -274,7 +270,6 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
           </button>
         </form>
 
-        {/* Danh sách thẻ */}
         {loading ? (
           <div className="py-16 text-center text-slate-500 text-sm">
             Đang tải danh sách thẻ...
@@ -304,11 +299,7 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
                       {renderBadge(item.TrangThai)}
                     </div>
                     <p className="text-xs text-slate-600">
-                      UID:{" "}
-                      <span className="font-mono font-bold text-slate-900">
-                        {item.MaUID || "—"}
-                      </span>{" "}
-                      • Ngày cấp: {formatDateVN(item.NgayTao)}
+                      Ngày cấp: <span className="font-semibold text-slate-800">{formatDateVN(item.NgayTao)}</span>
                     </p>
                     {item.GhiChu && (
                       <p className="text-xs text-slate-500">{item.GhiChu}</p>
@@ -350,7 +341,6 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase">
                     <th className="py-3.5 px-4 font-bold">Chủ Thẻ</th>
                     <th className="py-3.5 px-4 font-bold">Phòng / Cơ Sở</th>
-                    <th className="py-3.5 px-4 font-bold">UID Thẻ</th>
                     <th className="py-3.5 px-4 font-bold">Ngày Cấp</th>
                     <th className="py-3.5 px-4 font-bold">Trạng Thái</th>
                     <th className="py-3.5 px-4 font-bold">Ghi Chú</th>
@@ -375,9 +365,6 @@ function DanhSachTheContent({ user }: { user: UserProfile }) {
                           <p className="text-[11px] text-slate-500">
                             {item.TenKhu || "—"}
                           </p>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
-                          {item.MaUID || "—"}
                         </td>
                         <td className="py-3.5 px-4 text-slate-600">
                           {formatDateVN(item.NgayTao)}

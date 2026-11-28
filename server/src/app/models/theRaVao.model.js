@@ -22,13 +22,13 @@ const TheRaVaoModel = {
     return rows[0] || null;
   },
 
-  async findByGiaTri(giaTri) {
+  async findByGiaTri(giaTriHash) {
     const [rows] = await db.query(
       `SELECT MaThe, MaND, GiaTri, NgayTao, TrangThai, GhiChu
        FROM TheRaVao
        WHERE GiaTri = ?
        LIMIT 1`,
-      [giaTri]
+      [giaTriHash]
     );
     return rows[0] || null;
   },
@@ -44,13 +44,14 @@ const TheRaVaoModel = {
     return rows;
   },
 
-  async findByUidPrefix(uid, excludeMaThe = 0) {
+  // Đối chiếu theo tiền tố HMAC(UID) để chặn dùng trùng phôi thẻ vật lý
+  async findByUidPrefix(uidHash, excludeMaThe = 0) {
     const [rows] = await db.query(
       `SELECT MaThe, MaND
        FROM TheRaVao
        WHERE (GiaTri LIKE ? OR GiaTri = ?) AND MaThe <> ?
        LIMIT 1`,
-      [`${uid}|%`, uid, Number(excludeMaThe) || 0]
+      [`${uidHash}|%`, uidHash, Number(excludeMaThe) || 0]
     );
     return rows[0] || null;
   },

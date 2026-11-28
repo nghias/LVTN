@@ -63,7 +63,6 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
     loadDetail();
   }, [maThe]);
 
-  // Tự động hủy phiên chờ nếu rời trang hoặc đóng trình duyệt
   useEffect(() => {
     const cancelIfWaiting = () => {
       if (activeSessionRef.current) {
@@ -137,7 +136,6 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
                 prev
                   ? {
                       ...prev,
-                      MaUID: st.result?.uid || prev.MaUID,
                       TrangThai: "HoatDong",
                       NgayTao: new Date().toISOString(),
                       GhiChu: ghiChu,
@@ -145,7 +143,7 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
                   : prev
               );
               showSuccessRef.current(
-                `Đã cấp lại mã thẻ thành công! UID mới: ${st.result?.uid || "—"}`
+                "Đã cấp lại và mã hóa thẻ thành công!"
               );
             } else if (["EXPIRED", "CANCELLED", "ERROR"].includes(st.status)) {
               stopPolling();
@@ -200,7 +198,6 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
           </div>
         ) : (
           <form onSubmit={handleBatDauCapLai} className="space-y-5">
-            {/* Thông tin người được cấp & Thông số thẻ hiện tại */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-5 rounded-2xl border border-slate-200 bg-white space-y-2">
                 <h2 className="text-sm font-bold text-slate-900 pb-2 border-b border-slate-100">
@@ -228,8 +225,8 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
                   Thông số thẻ hiện tại
                 </h2>
                 <p className="text-xs text-slate-600">
-                  UID hiện tại:{" "}
-                  <b className="font-mono text-slate-900">{cardInfo.MaUID || "—"}</b>
+                  Bảo mật thẻ:{" "}
+                  <b className="text-teal-700">Đã mã hóa HMAC-SHA256</b>
                 </p>
                 <p className="text-xs text-slate-600">
                   Trạng thái hiện tại: <b className="text-slate-900">{cardInfo.TrangThai}</b>
@@ -259,7 +256,6 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
               </div>
             </div>
 
-            {/* Khung chờ / kết quả */}
             {sessionState && (
               <div
                 className={`p-5 rounded-2xl border space-y-2 ${
@@ -276,7 +272,7 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
                       Đang chờ đặt phôi thẻ lên đầu đọc RC522 ({cardInfo.TenKhu})... (Còn {sessionState.remainingSec} giây)
                     </p>
                     <p className="text-xs">
-                      Đặt phôi thẻ trắng mới (hoặc nạp lại mã lên thẻ cũ) vào đầu đọc. Hệ thống sẽ cập nhật trực tiếp mã mới khi ghi hoàn tất.
+                      Đặt phôi thẻ trắng mới (hoặc nạp lại mã lên thẻ cũ) vào đầu đọc. Hệ thống sẽ mã hóa và cập nhật trực tiếp khi ghi hoàn tất.
                     </p>
                     {sessionState.lastError && (
                       <p className="text-xs font-bold text-red-700 mt-1">
@@ -292,11 +288,7 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
                       Cấp lại thẻ thành công!
                     </p>
                     <p className="text-xs">
-                      Thẻ của <b>{cardInfo.HoTen}</b> đã cập nhật UID mới{" "}
-                      <span className="font-mono font-bold">
-                        {sessionState.result?.uid}
-                      </span>{" "}
-                      và kích hoạt hoạt động trở lại.
+                      Thẻ của <b>{cardInfo.HoTen}</b> đã được cập nhật mã hóa mới và kích hoạt hoạt động trở lại.
                     </p>
                   </>
                 )}
@@ -315,7 +307,6 @@ function CapLaiTheContent({ user }: { user: UserProfile }) {
               </div>
             )}
 
-            {/* Nút thao tác */}
             <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
               {isWaiting ? (
                 <button
@@ -369,4 +360,4 @@ export default function CapLaiThePage() {
       {(user) => <CapLaiTheContent user={user} />}
     </ProtectedRoute>
   );
-}
+0}

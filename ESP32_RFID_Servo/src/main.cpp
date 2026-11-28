@@ -599,8 +599,7 @@ void pollPendingWriteCommand() {
           isRemoteWrite    = true;
           writeModeStartMs = millis();
           lastCardUid      = "";
-          // Xóa bộ đệm bàn phím nếu đang gõ dở để ưu tiên phiên ghi thẻ
-          pinBuffer = "";
+          pinBuffer        = "";
           syncPinStateToLcd(false, 0, pinLockUntilMs);
           syncWriteModeToLcd(true, writeModeStartMs);
           Serial.println("\n==========================================");
@@ -666,8 +665,6 @@ void handleKeypadInput() {
   char k = keypad.getKey();
   if (!k) return;
 
-  Serial.printf("[KEYPAD] Nhan phim: %c\n", k);
-
   // Đang ở chế độ ghi thẻ từ Web -> không nhận nhập PIN
   if (isWriteMode) {
     showToast("DANG GHI THE MOI", "Vui long cho...", 1200);
@@ -702,9 +699,9 @@ void handleKeypadInput() {
       showToast("DA HUY NHAP PIN", "Quay ve mac dinh", 1000);
     }
   } else if (k == '#') {
-    // Xác nhận mật khẩu
-    if (pinBuffer.length() == 0) {
-      showToast("CHUA NHAP MA!", "Nhap 6 so + #", 1500);
+    // Yêu cầu nhập đủ 6 chữ số mới gửi xác thực
+    if ((int)pinBuffer.length() < MAX_PIN_LEN) {
+      showToast("CHUA DU 6 SO!", "Nhap du 6 so + #", 1500);
       return;
     }
 
@@ -767,8 +764,7 @@ void handleSerialCommand() {
     pinBuffer        = "";
     syncPinStateToLcd(false, 0, pinLockUntilMs);
     syncWriteModeToLcd(true, writeModeStartMs);
-    Serial.print("[CHE DO GHI THU CONG] Dat the len RC522 de nap ma: ");
-    Serial.println(dataToWrite);
+    Serial.println("[CHE DO GHI THU CONG] Dat the len RC522 de nap ma.");
   } else if (cmd == "c") {
     isWriteMode      = false;
     isRemoteWrite    = false;
@@ -888,8 +884,7 @@ void loop() {
     syncPinStateToLcd(false, 0, pinLockUntilMs);
   }
 
-  Serial.print("\nPhat hien the - UID: ");
-  Serial.println(uid);
+  Serial.println("\n[RFID] Phat hien the tren dau doc.");
 
   if (isWriteMode) {
     setOpMessage("DANG GHI THE...", "Giu nguyen the!");

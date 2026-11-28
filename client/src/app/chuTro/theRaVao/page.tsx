@@ -25,16 +25,13 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [khuTroList, setKhuTroList] = useState<KhuTroSimple[]>([]);
   const [lichSu, setLichSu] = useState<LichSuTheItem[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
   const [newLogIds, setNewLogIds] = useState<number[]>([]);
 
-  // Giá trị trên các ô lọc
   const [selectedMaKhu, setSelectedMaKhu] = useState<string>("");
   const [keyword, setKeyword] = useState<string>("");
   const [tuNgay, setTuNgay] = useState<string>("");
   const [denNgay, setDenNgay] = useState<string>("");
 
-  // Bộ lọc đang áp dụng cho các lượt tải ngầm (tránh làm nhảy dữ liệu khi đang gõ)
   const appliedFiltersRef = useRef({
     maKhu: "",
     tuNgay: "",
@@ -95,13 +92,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
 
           setLichSu(nextLogs);
           if (res.khuTroList) setKhuTroList(res.khuTroList);
-          setLastUpdated(
-            new Date().toLocaleTimeString("vi-VN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-            })
-          );
         }
       } catch (err: unknown) {
         if (!silent) {
@@ -119,7 +109,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
     [isChuTro]
   );
 
-  // Tải khi đổi cơ sở
   useEffect(() => {
     appliedFiltersRef.current = {
       ...appliedFiltersRef.current,
@@ -129,7 +118,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
     fetchLichSu({ maKhu: selectedMaKhu }, false);
   }, [selectedMaKhu, fetchLichSu]);
 
-  // Tự động cập nhật ngầm mỗi 4 giây mà không load lại trang
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") {
@@ -181,7 +169,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
       <QuanLyHeader user={user} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-5">
-        {/* Header + Trạng thái cập nhật trực tiếp + Nút Thẻ ra vào */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
@@ -195,7 +182,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            
             <Link
               href="/chuTro/theRaVao/danhSach"
               className="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-[#00FFCC] hover:bg-[#00e6b8] text-slate-900 border border-teal-400 text-xs font-bold shadow-xs transition no-underline"
@@ -205,7 +191,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
           </div>
         </div>
 
-        {/* Thanh chọn Cơ sở */}
         {(isChuTro || khuTroList.length > 1) && khuTroList.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             {isChuTro && (
@@ -238,7 +223,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
           </div>
         )}
 
-        {/* Bộ lọc lịch sử */}
         <form
           onSubmit={handleFilterSubmit}
           className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col lg:flex-row lg:items-end gap-3 w-full"
@@ -251,7 +235,7 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Tên người mở cửa, tên phòng, UID thẻ..."
+              placeholder="Tên người mở cửa, tên phòng..."
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-[#00FFCC]"
             />
           </div>
@@ -299,7 +283,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
           </div>
         </form>
 
-        {/* Bảng ghi nhận lịch sử ra vào */}
         {loading ? (
           <div className="py-16 text-center text-slate-500 text-sm">
             Đang tải lịch sử ra vào...
@@ -330,9 +313,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
                       <p className="text-xs text-slate-500">
                         {ls.TenPhong || "—"} • {ls.TenKhu || "—"}
                       </p>
-                      <p className="text-[11px] font-mono text-slate-400 mt-1">
-                        UID: {ls.MaUID || "—"}
-                      </p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-mono font-bold text-teal-700 text-sm">
@@ -357,7 +337,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
                     <th className="py-3.5 px-4 font-bold">Người Mở Cửa</th>
                     <th className="py-3.5 px-4 font-bold">Phòng</th>
                     <th className="py-3.5 px-4 font-bold">Cơ Sở</th>
-                    <th className="py-3.5 px-4 font-bold">UID Thẻ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-xs">
@@ -382,9 +361,6 @@ function LichSuRaVaoContent({ user }: { user: UserProfile }) {
                         <td className="py-3.5 px-4">{ls.TenPhong || "—"}</td>
                         <td className="py-3.5 px-4 text-slate-600">
                           {ls.TenKhu || "—"}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-700">
-                          {ls.MaUID || "—"}
                         </td>
                       </tr>
                     );

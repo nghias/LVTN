@@ -13,7 +13,6 @@ const getApiBaseUrl = () => {
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 };
 
-// Tính khoảng tháng YYYY-MM mặc định để ô input type="month" không bao giờ hiện "---------- ----"
 const getDefaultMonthRange = (monthsCount = 6) => {
   const now = new Date();
   const endY = now.getFullYear();
@@ -42,6 +41,24 @@ const formatCompactVND = (val: number) => {
   return String(num);
 };
 
+const formatDateVN = (dateStr?: string | null) => {
+  if (!dateStr) return 'Chưa cập nhật';
+  const raw = String(dateStr).trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`;
+  }
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString('vi-VN');
+};
+
+const formatMonthVN = (ym?: string) => {
+  if (!ym) return '—';
+  const parts = String(ym).split('-');
+  return parts.length === 2 ? `${parts[1]}/${parts[0]}` : ym;
+};
+
 export default function ThongKeNguoiThuePage() {
   const { showError } = useAlertModal();
   const showErrorRef = useRef(showError);
@@ -50,7 +67,6 @@ export default function ThongKeNguoiThuePage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [stats, setStats] = useState<any>(null);
 
-  const [selectedMaPhong, setSelectedMaPhong] = useState<string>('ALL');
   const [presetMonths, setPresetMonths] = useState<string>('6');
   const [tuThang, setTuThang] = useState<string>(
     () => getDefaultMonthRange(6).tuThang
@@ -61,7 +77,6 @@ export default function ThongKeNguoiThuePage() {
 
   const fetchTenantStats = useCallback(
     async (paramsObj?: {
-      maPhong?: string;
       soThang?: string;
       tuThang?: string;
       denThang?: string;
@@ -100,10 +115,6 @@ export default function ThongKeNguoiThuePage() {
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
         const query = new URLSearchParams();
-        const phongVal =
-          paramsObj?.maPhong !== undefined
-            ? paramsObj.maPhong
-            : selectedMaPhong;
         const soThangVal =
           paramsObj?.soThang !== undefined ? paramsObj.soThang : presetMonths;
         const tuVal =
@@ -112,7 +123,6 @@ export default function ThongKeNguoiThuePage() {
           paramsObj?.denThang !== undefined ? paramsObj.denThang : denThang;
 
         if (storedMaND) query.set('maND', storedMaND);
-        if (phongVal && phongVal !== 'ALL') query.set('maPhong', phongVal);
         if (soThangVal) query.set('soThang', soThangVal);
         if (tuVal) query.set('tuThang', tuVal);
         if (denVal) query.set('denThang', denVal);
@@ -146,13 +156,12 @@ export default function ThongKeNguoiThuePage() {
         setLoading(false);
       }
     },
-    [selectedMaPhong, presetMonths, tuThang, denThang]
+    [presetMonths, tuThang, denThang]
   );
 
   useEffect(() => {
     const def = getDefaultMonthRange(6);
     fetchTenantStats({
-      maPhong: 'ALL',
       soThang: '6',
       tuThang: def.tuThang,
       denThang: def.denThang,
@@ -160,23 +169,12 @@ export default function ThongKeNguoiThuePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSelectPhong = (maPhongVal: string) => {
-    setSelectedMaPhong(maPhongVal);
-    fetchTenantStats({
-      maPhong: maPhongVal,
-      soThang: presetMonths,
-      tuThang,
-      denThang,
-    });
-  };
-
   const handleSelectPreset = (monthsCount: string) => {
     const range = getDefaultMonthRange(Number(monthsCount) || 6);
     setPresetMonths(monthsCount);
     setTuThang(range.tuThang);
     setDenThang(range.denThang);
     fetchTenantStats({
-      maPhong: selectedMaPhong,
       soThang: monthsCount,
       tuThang: range.tuThang,
       denThang: range.denThang,
@@ -191,7 +189,6 @@ export default function ThongKeNguoiThuePage() {
     }
     setPresetMonths('');
     fetchTenantStats({
-      maPhong: selectedMaPhong,
       soThang: '',
       tuThang,
       denThang,
@@ -204,6 +201,7 @@ export default function ThongKeNguoiThuePage() {
   const chartDienNuoc: any[] = stats?.bieuDoDienNuocTheoThang || [];
   const phongList: any[] = stats?.boLoc?.phongList || [];
   const hopDong = stats?.hopDongHienTai || null;
+  const phongHienTai = hopDong || phongList[0] || null;
 
   const maxChiPhi = Math.max(
     1,
@@ -219,24 +217,32 @@ export default function ThongKeNguoiThuePage() {
   );
 
   return (
-    <ProtectedRoute allowedRoles={['KhachThue', 'ChuTro', 'QuanLy']}>
+    <ProtectedRoute allowedRoles={['KhachThue']}>
       {(user) => (
         <div className="min-h-screen bg-white text-slate-900 flex flex-col">
           <NguoiThueHeader user={user} />
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-            {/* Tiêu đề & Nút chọn nhanh khoảng thời gian */}
+            {/* Tiêu đề, thông tin phòng đang ở & chọn nhanh khoảng thời gian */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200">
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                  Thống Kê Chi Phí & Tiêu Thụ Phòng Thuê
-                </h1>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    Tổng Quan Phòng Thuê
+                  </h1>
+                  {phongHienTai?.TenPhong && (
+                    <span className="px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold">
+                      {phongHienTai.TenPhong}
+                      {phongHienTai.TenKhu ? ` • ${phongHienTai.TenKhu}` : ''}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Theo dõi lịch sử chi phí hóa đơn, lượng điện nước tiêu thụ và thông tin hợp đồng của bạn.
+                  Theo dõi chi phí hóa đơn, lượng điện nước tiêu thụ và tình trạng hợp đồng phòng bạn đang ở.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {[
                   { label: '3 tháng', val: '3' },
                   { label: '6 tháng', val: '6' },
@@ -257,38 +263,6 @@ export default function ThongKeNguoiThuePage() {
                 ))}
               </div>
             </div>
-
-            {/* Các nút chọn phòng đang thuê */}
-            {phongList.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSelectPhong('ALL')}
-                  className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
-                    selectedMaPhong === 'ALL'
-                      ? 'bg-[#00FFCC] text-slate-900 border border-teal-300 shadow-2xs'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  Tất cả phòng của tôi ({phongList.length})
-                </button>
-
-                {phongList.map((p: any) => (
-                  <button
-                    key={p.MaPhong}
-                    type="button"
-                    onClick={() => handleSelectPhong(String(p.MaPhong))}
-                    className={`px-4 py-2 rounded-full text-xs font-bold transition cursor-pointer ${
-                      selectedMaPhong === String(p.MaPhong)
-                        ? 'bg-[#00FFCC] text-slate-900 border border-teal-300 shadow-2xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {p.TenPhong} ({p.TenKhu})
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Thanh lọc khoảng tháng tùy chỉnh */}
             <form
@@ -333,7 +307,7 @@ export default function ThongKeNguoiThuePage() {
                 <span className="text-xs text-slate-600 font-medium whitespace-nowrap">
                   Kỳ xem:{' '}
                   <strong className="font-bold text-slate-900">
-                    {tuThang} → {denThang}
+                    {formatMonthVN(tuThang)} → {formatMonthVN(denThang)}
                   </strong>
                 </span>
                 <button
@@ -345,11 +319,11 @@ export default function ThongKeNguoiThuePage() {
               </div>
             </form>
 
-            {/* 4 Thẻ chỉ số quan trọng cho Người thuê */}
+            {/* 4 Thẻ chỉ số quan trọng */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
                 <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
-                  Tổng chi phí trong kỳ
+                  Tổng hóa đơn trong kỳ
                 </span>
                 <div className="text-base sm:text-lg font-bold text-slate-900 mt-2 truncate">
                   {formatVND(tongQuan.tongChiPhiTrongKy || 0)}
@@ -361,7 +335,7 @@ export default function ThongKeNguoiThuePage() {
 
               <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
                 <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
-                  Công nợ hiện tại
+                  Tiền chưa thanh toán
                 </span>
                 <div
                   className={`text-base sm:text-lg font-bold mt-2 truncate ${
@@ -382,14 +356,14 @@ export default function ThongKeNguoiThuePage() {
 
               <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
                 <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">
-                  Điện Nước kỳ gần nhất
+                  Điện nước kỳ gần nhất
                 </span>
                 <div className="text-sm sm:text-base font-bold text-slate-900 mt-2">
                   {tongQuan.dienTieuThuKyGanNhat || 0} kWh •{' '}
                   {tongQuan.nuocTieuThuKyGanNhat || 0} m³
                 </div>
                 <div className="text-xs text-slate-500 mt-1">
-                  Ngày ghi: {tongQuan.kyDienNuocGanNhat || 'Chưa cập nhật'}
+                  Ngày ghi: {formatDateVN(tongQuan.kyDienNuocGanNhat)}
                 </div>
               </div>
 
@@ -421,17 +395,15 @@ export default function ThongKeNguoiThuePage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* 1. Biểu đồ chi phí hàng tháng */}
+                {/* 1. Biểu đồ hóa đơn theo tháng */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-base font-bold text-slate-900">
-                        Biểu Đồ Chi Phí Hóa Đơn Hàng Tháng
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Biến động tổng tiền hóa đơn của phòng qua từng tháng
-                      </p>
-                    </div>
+                  <div className="mb-4">
+                    <h3 className="text-base font-bold text-slate-900">
+                      Tổng Tiền Hóa Đơn Theo Tháng
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Số tiền hóa đơn phòng cần đóng qua từng tháng
+                    </p>
                   </div>
 
                   <div className="h-52 flex items-end gap-2 sm:gap-4 pt-6 pb-2 px-1 border-b border-slate-200 overflow-x-auto">
@@ -468,25 +440,25 @@ export default function ThongKeNguoiThuePage() {
                   </div>
                 </div>
 
-                {/* 2. Biểu đồ tiêu thụ Điện & Nước cá nhân */}
+                {/* 2. Biểu đồ tiêu thụ Điện & Nước */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between gap-2 mb-4">
                     <div>
                       <h3 className="text-base font-bold text-slate-900">
-                        Biểu Đồ Điện (kWh) & Nước (m³)
+                        Lượng Điện & Nước Tiêu Thụ
                       </h3>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Sản lượng điện nước tiêu thụ hàng tháng của phòng
+                        Số điện (kWh) và số nước (m³) phòng sử dụng theo tháng
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 text-xs font-semibold text-slate-700">
+                    <div className="flex items-center gap-3 text-xs font-semibold text-slate-700 shrink-0">
                       <span className="flex items-center gap-1">
                         <span className="w-2.5 h-2.5 bg-amber-500 inline-block rounded-xs" />
-                        Điện
+                        Điện (kWh)
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="w-2.5 h-2.5 bg-teal-500 inline-block rounded-xs" />
-                        Nước
+                        Nước (m³)
                       </span>
                     </div>
                   </div>
@@ -543,14 +515,14 @@ export default function ThongKeNguoiThuePage() {
                   </div>
                 </div>
 
-                {/* 3. Cơ cấu chi phí */}
+                {/* 3. Phân bổ các khoản chi phí */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3">
                   <div>
                     <h3 className="text-base font-bold text-slate-900">
-                      Cơ Cấu Chi Phí Sinh Hoạt Trong Kỳ
+                      Phân Bổ Các Khoản Chi Phí
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Tỷ trọng các khoản chi phí cấu thành hóa đơn
+                      Tỷ trọng tiền phòng, điện, nước và dịch vụ trong kỳ đang xem
                     </p>
                   </div>
 
@@ -607,14 +579,14 @@ export default function ThongKeNguoiThuePage() {
                   </div>
                 </div>
 
-                {/* 4. Thông tin hợp đồng phòng đang ở */}
+                {/* 4. Hợp đồng thuê phòng hiện tại */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs flex flex-col justify-between">
                   <div>
                     <h3 className="text-base font-bold text-slate-900">
-                      Thông Tin Hợp Đồng Phòng Đang Ở
+                      Hợp Đồng Thuê Phòng Hiện Tại
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5 mb-3">
-                      Tóm tắt thời hạn hợp đồng và tiền cọc phòng
+                      Thông tin phòng đang ở, thời hạn hợp đồng và tiền cọc
                     </p>
 
                     {!hopDong ? (
@@ -624,14 +596,14 @@ export default function ThongKeNguoiThuePage() {
                     ) : (
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
-                          <div className="text-slate-500">Phòng / Cơ sở</div>
+                          <div className="text-slate-500">Phòng đang ở</div>
                           <div className="font-bold text-slate-900 mt-1">
-                            {hopDong.TenPhong}{' '}
-                            {hopDong.TenKhu ? `(${hopDong.TenKhu})` : ''}
+                            {hopDong.TenPhong}
+                            {hopDong.TenKhu ? ` (${hopDong.TenKhu})` : ''}
                           </div>
                         </div>
                         <div className="p-3 bg-teal-50/60 rounded-xl border border-teal-200">
-                          <div className="text-teal-800">Tiền cọc hợp đồng</div>
+                          <div className="text-teal-800">Tiền cọc giữ phòng</div>
                           <div className="font-bold text-teal-900 mt-1">
                             {formatVND(hopDong.TienCoc || 0)}
                           </div>
@@ -639,13 +611,13 @@ export default function ThongKeNguoiThuePage() {
                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
                           <div className="text-slate-500">Ngày bắt đầu</div>
                           <div className="font-bold text-slate-900 mt-1">
-                            {hopDong.NgayBD || '—'}
+                            {formatDateVN(hopDong.NgayBD)}
                           </div>
                         </div>
                         <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/60">
                           <div className="text-slate-500">Ngày kết thúc</div>
                           <div className="font-bold text-slate-900 mt-1">
-                            {hopDong.NgayKT || '—'}
+                            {formatDateVN(hopDong.NgayKT)}
                           </div>
                         </div>
                       </div>
