@@ -1,4 +1,4 @@
-// src/services/phongTro.service.ts
+// client/src/services/phongTro.service.ts
 import { ApiResponse } from '../types/auth.type';
 import {
   KhuTroItem,
@@ -12,15 +12,17 @@ const API_BASE_URL = (
 ).replace(/\/+$/, '');
 const SERVER_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
 const PHONG_API = `${API_BASE_URL}/phong-tro`;
+const KHU_TRO_API = `${API_BASE_URL}/khu-tro`;
 
 export const DEFAULT_ROOM_FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&auto=format&fit=crop&q=80';
 
-async function requestJson<T>(
+async function requestByBase<T>(
+  baseUrl: string,
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${PHONG_API}${endpoint}`, {
+  const res = await fetch(`${baseUrl}${endpoint}`, {
     ...options,
     credentials: 'include',
     headers: {
@@ -35,6 +37,12 @@ async function requestJson<T>(
   return data;
 }
 
+const requestJson = <T>(endpoint: string, options: RequestInit = {}) =>
+  requestByBase<T>(PHONG_API, endpoint, options);
+
+const requestKhuTroJson = <T>(endpoint: string, options: RequestInit = {}) =>
+  requestByBase<T>(KHU_TRO_API, endpoint, options);
+
 async function requestFormData<T>(
   endpoint: string,
   method: string,
@@ -43,7 +51,7 @@ async function requestFormData<T>(
   const res = await fetch(`${PHONG_API}${endpoint}`, {
     method,
     credentials: 'include',
-    body: formData, // Không set Content-Type để trình duyệt tự gắn boundary cho multipart/form-data
+    body: formData,
   });
   const data = await res.json();
   if (!res.ok || !data.success) {
@@ -52,7 +60,6 @@ async function requestFormData<T>(
   return data;
 }
 
-// Chuẩn hóa URL ảnh phòng (Hỗ trợ cả link http/https, Cloudinary, đường dẫn uploads/... và object AnhPhong)
 export function resolveRoomImageUrl(
   rawInput?: string | { DuongDan?: string | null } | null
 ): string {
@@ -80,11 +87,12 @@ export function resolveRoomImageUrl(
 }
 
 export const PhongTroService = {
-  getKhuTroList: () => requestJson<ApiResponse<KhuTroItem[]>>('/khu-tro'),
+  // === NHÓM API CƠ SỞ (KHU TRỌ) -> /api/khu-tro ===
+  getKhuTroList: () => requestKhuTroJson<ApiResponse<KhuTroItem[]>>(''),
   getKhuTroDetail: (maKhu: number) =>
-    requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}`),
+    requestKhuTroJson<ApiResponse<KhuTroItem>>(`/${maKhu}`),
   getDanhSachQuanLy: () =>
-    requestJson<ApiResponse<QuanLyUserItem[]>>('/quan-ly-list'),
+    requestKhuTroJson<ApiResponse<QuanLyUserItem[]>>('/quan-ly-list'),
 
   createKhuTro: (payload: {
     MaND: number;
@@ -94,42 +102,36 @@ export const PhongTroService = {
     MatKhau?: string;
     MaMoCua?: string;
   }) =>
-    requestJson<ApiResponse<KhuTroItem>>('/khu-tro', {
+    requestKhuTroJson<ApiResponse<KhuTroItem>>('', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
 
   updateKhuTro: (
     maKhu: number,
-    payload: {
-      MaND?: number;
-      TenKhu: string;
-      DiaChi: string;
-      MoTa: string;
-      MatKhau?: string;
-      MaMoCua?: string;
-    }
+    payload: { MaND?: number; TenKhu: string; DiaChi: string; MoTa: string }
   ) =>
-    requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}`, {
+    requestKhuTroJson<ApiResponse<KhuTroItem>>(`/${maKhu}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
 
   updateMatKhauCua: (maKhu: number, matKhau: string) =>
-    requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}/mat-khau`, {
+    requestKhuTroJson<ApiResponse<KhuTroItem>>(`/${maKhu}/mat-khau`, {
       method: 'PUT',
       body: JSON.stringify({ MatKhau: matKhau }),
     }),
 
   updateMaMoCua: (maKhu: number, maMoCua: string) =>
-    requestJson<ApiResponse<KhuTroItem>>(`/khu-tro/${maKhu}/ma-mo-cua`, {
+    requestKhuTroJson<ApiResponse<KhuTroItem>>(`/${maKhu}/ma-mo-cua`, {
       method: 'PUT',
       body: JSON.stringify({ MaMoCua: maMoCua }),
     }),
 
   deleteKhuTro: (maKhu: number) =>
-    requestJson<ApiResponse<null>>(`/khu-tro/${maKhu}`, { method: 'DELETE' }),
+    requestKhuTroJson<ApiResponse<null>>(`/${maKhu}`, { method: 'DELETE' }),
 
+  // === NHÓM API TIỆN ÍCH & PHÒNG TRỌ -> /api/phong-tro ===
   getAllTienIch: () => requestJson<ApiResponse<TienIchItem[]>>('/tien-ich'),
 
   getPhongList: (params?: {

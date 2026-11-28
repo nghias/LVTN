@@ -14,6 +14,7 @@ const thanhToanRouter = require('./thanhToan.router');
 const aiChatRouter = require('./aiChat.router');
 const thongKeRouter = require('./thongKe.router');
 const theRaVaoRouter = require('./theRaVao.router');
+const khuTroRouter = require('./khuTro.router');
 
 
 
@@ -31,6 +32,7 @@ router.use('/dien-nuoc', dienNuocRouter);
 router.use('/hoa-don', hoaDonRouter);
 router.use('/thanh-toan', thanhToanRouter);
 router.use('/the-ra-vao', theRaVaoRouter);
+router.use('/khu-tro', khuTroRouter);
 
 
 router.get('/ping', (req, res) => {

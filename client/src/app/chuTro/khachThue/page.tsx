@@ -54,7 +54,7 @@ export default function QuanLyKhachThuePage() {
 
       const [khachRes, khuRes] = await Promise.all([
         KhachThueService.getList(),
-        fetch(`${getApiBaseUrl()}/phong-tro/khu-tro`, {
+        fetch(`${getApiBaseUrl()}/khu-tro`, {
           method: 'GET',
           headers,
           credentials: 'include',

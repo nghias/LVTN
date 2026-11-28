@@ -5936,7 +5936,7 @@ export default function QuanLyKhachThuePage() {
 
       const [khachRes, khuRes] = await Promise.all([
         KhachThueService.getList(),
-        fetch(`${getApiBaseUrl()}/phong-tro/khu-tro`, {
+        fetch(`${getApiBaseUrl()}/khu-tro`, {
           method: 'GET',
           headers,
           credentials: 'include',
@@ -92613,7 +92613,7 @@ class PhongTroController {
     }
   }
 
-  // 1. [GET] /api/phong-tro/khu-tro
+  // 1. [GET] /api/khu-tro
   async getKhuTroList(req, res, next) {
     try {
       const { quyen, maND } = req.user;
@@ -92653,7 +92653,7 @@ class PhongTroController {
     }
   }
 
-  // 2. [GET] /api/phong-tro/khu-tro/:maKhu
+  // 2. [GET] /api/khu-tro/:maKhu
   async getKhuTroDetail(req, res, next) {
     try {
       const maKhu = Number(req.params.maKhu);
@@ -92693,7 +92693,7 @@ class PhongTroController {
     }
   }
 
-  // 4. [POST] /api/phong-tro/khu-tro
+  // 4. [POST] /api/khu-tro
   async createKhuTro(req, res, next) {
     try {
       if (req.user.quyen !== "ChuTro") {
@@ -92723,7 +92723,7 @@ class PhongTroController {
     }
   }
 
-  // 5. [PUT] /api/phong-tro/khu-tro/:maKhu
+  // 5. [PUT] /api/khu-tro/:maKhu
   async updateKhuTro(req, res, next) {
     try {
       const maKhu = Number(req.params.maKhu);
@@ -92755,7 +92755,7 @@ class PhongTroController {
     }
   }
 
-  // 6. [DELETE] /api/phong-tro/khu-tro/:maKhu
+  // 6. [DELETE] /api/khu-tro/:maKhu
   async deleteKhuTro(req, res, next) {
     try {
       if (req.user.quyen !== "ChuTro") {
